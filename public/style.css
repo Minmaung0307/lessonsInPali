@@ -361,7 +361,7 @@ img {
   }
 }
 
-/* Admin form polish */
+/* Admin form polish (shared with Courses/Announcements/Messages) */
 .form {
   display: grid;
   gap: 0.8rem;

@@ -779,7 +779,6 @@ async function renderAdminAnns(container){
   `;
 
   const form = container.querySelector('#formAnn');
-
   form?.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
@@ -795,7 +794,6 @@ async function renderAdminAnns(container){
     location.hash = '#/home';
     setTimeout(()=> location.hash = '#/admin', 150);
   });
-
   container.querySelector('#btnResetAnn')?.addEventListener('click', ()=>{ form.reset(); form.id.value=''; });
 
   container.querySelectorAll('[data-act="edit"]').forEach(btn=>{
@@ -808,7 +806,6 @@ async function renderAdminAnns(container){
       form.scrollIntoView({behavior:'smooth', block:'center'});
     });
   });
-
   container.querySelectorAll('[data-act="del"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.closest('[data-id]')?.getAttribute('data-id');
@@ -840,24 +837,38 @@ async function renderAdminMsgs(container){
       <div class="card" id="msgList">
         <h3>Recent Messages</h3>
         <p class="muted">Last 20 messages you sent.</p>
+        <div id="msgItems"></div>
       </div>
     </div>
   `;
 
+  // Load last 20 messages (you are admin/TA; quick-start rules allow read)
   const mq = api.query(api.collection(db,'messages'), api.orderBy('ts','desc'));
   const mres = await api.getDocs(mq);
   const msgs = mres.docs.slice(0,20).map(d=>({id:d.id,...d.data()}));
-  const list = container.querySelector('#msgList');
-  list.insertAdjacentHTML('beforeend', msgs.map(m=>`
+
+  // map userId -> email for display
+  const uniqTo = [...new Set(msgs.map(m=> m.to).filter(Boolean))];
+  const emails = {};
+  for(const uid of uniqTo){
+    try{
+      const snap = await api.getDoc(api.doc(db,'users',uid));
+      emails[uid] = snap.data()?.email || uid;
+    }catch{ emails[uid] = uid; }
+  }
+
+  const items = container.querySelector('#msgItems');
+  items.innerHTML = msgs.map(m=>`
     <article class="card">
       <div class="row between">
-        <strong>To: ${escapeHtml(m.toEmail||m.to||'')}</strong>
+        <strong>To: ${escapeHtml(emails[m.to] || m.to || '')}</strong>
         <span class="muted">${new Date(m.ts?.toDate?.()||Date.now()).toLocaleString()}</span>
       </div>
       <p>${escapeHtml(m.text||'')}</p>
     </article>
-  `).join('') || '<p class="muted">No messages.</p>');
+  `).join('') || '<p class="muted">No messages.</p>';
 
+  // send
   container.querySelector('#formMsg')?.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
@@ -865,14 +876,17 @@ async function renderAdminMsgs(container){
     const text  = f.text.value.trim();
     if(!email || !text) return alert('Email and message are required.');
 
-    // find user by email
     const uq = api.query(api.collection(db,'users'), api.where('email','==',email));
     const ures = await api.getDocs(uq);
     if(ures.empty) return alert('No user with that email.');
     const uid = ures.docs[0].id;
 
+    // IMPORTANT: Quick-start rules allow only these keys
     await api.addDoc(api.collection(db,'messages'),{
-      from: currentUser.uid, to: uid, toEmail: email, text, ts: api.serverTimestamp()
+      from: currentUser.uid,
+      to: uid,
+      text,
+      ts: api.serverTimestamp()
     });
 
     alert('Message sent.');
@@ -920,18 +934,18 @@ function escapeHtml(s = "") {
 //   });
 // }
 
+// put near other helpers
 function orderItem(item){
   if(!currentUser) return authDlg.showModal();
-  // Simple placeholder: record order request
   api.addDoc(api.collection(db,'orders'),{
-    userId: currentUser.uid, itemId: item?.id || 'custom',
-    ts: api.serverTimestamp(), status: 'requested'
+    userId: currentUser.uid,
+    itemId: item?.id || 'custom',
+    ts: api.serverTimestamp(),
+    status: 'requested'
   }).then(()=> alert('Order request submitted.'));
 }
 
-// === expose global handlers ===
+// expose for inline handlers (keep at end of file)
 window.enroll = enroll;
 window.openLesson = openLesson;
-
-// orderItem ကို သုံးထားမယ်ဆိုရင် ဒီလိုပါထည့်ပါ
-window.orderItem = orderItem || (()=>{ alert("Order system coming soon"); });
+window.orderItem = orderItem;
