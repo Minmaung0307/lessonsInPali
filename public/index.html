@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lessons in Pali</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0b5" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button id="btnMenu" class="icon-btn" aria-label="Menu">☰</button>
+    <h1 class="brand">Lessons in Pali</h1>
+    <nav class="actions">
+      <button id="btnLogin" class="btn small">Login</button>
+      <button id="btnLogout" class="btn small ghost hidden">Logout</button>
+    </nav>
+  </header>
+
+  <aside id="sidebar" class="sidebar">
+    <a href="#/home" class="navlink">🏠 Home</a>
+    <a href="#/courses" class="navlink">📚 Courses</a>
+    <a href="#/dashboard" class="navlink auth-only hidden">📊 Dashboard</a>
+    <a href="#/shop" class="navlink">🛒 Shop</a>
+    <a href="#/admin" class="navlink admin-only hidden">🛠️ Admin</a>
+  </aside>
+
+  <main id="app" class="app"></main>
+
+  <!-- Auth Modal -->
+  <dialog id="authDlg" class="modal">
+    <form method="dialog" class="card">
+      <h3>Welcome</h3>
+      <p class="muted">Sign up or log in to track progress and earn certificates.</p>
+      <label>Email
+        <input id="authEmail" type="email" required placeholder="you@example.com" />
+      </label>
+      <label>Password
+        <input id="authPass" type="password" required placeholder="••••••••" />
+      </label>
+      <div class="row">
+        <button id="doSignUp" class="btn">Sign up</button>
+        <button id="doSignIn" class="btn ghost">Log in</button>
+      </div>
+      <button id="closeAuth" class="link" value="close">Close</button>
+    </form>
+  </dialog>
+
+  <!-- Certificate Canvas (hidden) -->
+  <canvas id="certCanvas" width="1600" height="1131" class="hidden"></canvas>
+
+  <footer class="footer">© <span id="year"></span> Lessons in Pali • Built with Firebase · EmailJS</footer>
+
+  <script type="module" src="/firebase.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
