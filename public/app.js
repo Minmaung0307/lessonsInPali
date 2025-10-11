@@ -593,46 +593,67 @@ async function renderAdmin(){
   app.innerHTML = `
     <section class="card">
       <h2>Admin Console</h2>
-      <div class="chips">
+      <div class="chips" style="margin:.6rem 0 1rem">
         <button class="btn small" id="tabCourses">Courses</button>
         <button class="btn small ghost" id="tabAnns">Announcements</button>
         <button class="btn small ghost" id="tabMsgs">Message Students</button>
       </div>
-      <div id="adminBody" style="margin-top:1rem"></div>
+      <div id="adminBody"></div>
     </section>
   `;
 
   const body = document.getElementById('adminBody');
   const setActive = (id) => {
     ['tabCourses','tabAnns','tabMsgs'].forEach(x=>{
-      document.getElementById(x).classList.toggle('ghost', x!==id);
+      const el = document.getElementById(x);
+      if(el) el.classList.toggle('ghost', x!==id);
     });
   };
 
-  document.getElementById('tabCourses').addEventListener('click', ()=>{ setActive('tabCourses'); renderAdminCourses(body); });
-  document.getElementById('tabAnns').addEventListener('click', ()=>{ setActive('tabAnns'); renderAdminAnns(body); });
-  document.getElementById('tabMsgs').addEventListener('click', ()=>{ setActive('tabMsgs'); renderAdminMsgs(body); });
+  document.getElementById('tabCourses')?.addEventListener('click', ()=>{ setActive('tabCourses'); renderAdminCourses(body); });
+  document.getElementById('tabAnns')?.addEventListener('click',   ()=>{ setActive('tabAnns');    renderAdminAnns(body);    });
+  document.getElementById('tabMsgs')?.addEventListener('click',   ()=>{ setActive('tabMsgs');    renderAdminMsgs(body);    });
 
-  // default tab
+  setActive('tabCourses');
   renderAdminCourses(body);
 }
 
 async function renderAdminCourses(container){
-  // list
   const q = api.query(api.collection(db,'courses'), api.orderBy('level','asc'));
   const res = await api.getDocs(q); const courses = res.docs.map(d=>({id:d.id,...d.data()}));
+
   container.innerHTML = `
     <div class="grid cols-1 cols-2">
-      <form class="card" id="formCourse">
+      <form class="card form" id="formCourse">
         <h3>Add / Update Course</h3>
+
         <input type="hidden" name="id" />
-        <label>Title<input name="title" required /></label>
-        <label>Level<select name="level">
-          <option value="0">Beginner</option><option value="1">Intermediate</option>
-          <option value="2">Advanced</option><option value="3">Pro</option>
-        </select></label>
-        <label>Credits<input type="number" name="credits" value="1" min="0" step="1"/></label>
-        <label>Summary<textarea name="summary"></textarea></label>
+
+        <label>Title
+          <input name="title" required placeholder="e.g., Intro to Pāli"/>
+        </label>
+
+        <div class="row-inline">
+          <label>Level
+            <select name="level">
+              <option value="0">Beginner</option>
+              <option value="1">Intermediate</option>
+              <option value="2">Advanced</option>
+              <option value="3">Pro</option>
+            </select>
+          </label>
+          <label>Credits
+            <input type="number" name="credits" value="1" min="0" step="1"/>
+          </label>
+          <label>Lessons (count)
+            <input type="number" name="lessons" value="0" min="0" step="1"/>
+          </label>
+        </div>
+
+        <label class="summary-lg">Summary
+          <textarea name="summary" placeholder="High-level course overview, learning outcomes…"></textarea>
+        </label>
+
         <div class="row">
           <button class="btn" id="btnSaveCourse">Save</button>
           <button class="btn ghost" type="button" id="btnResetCourse">Reset</button>
@@ -658,15 +679,16 @@ async function renderAdminCourses(container){
     </div>
   `;
 
-  // handlers
-  const form = document.getElementById('formCourse');
-  form.addEventListener('submit', async (e)=>{
+  const form = container.querySelector('#formCourse');
+
+  form?.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
     const payload = {
       title: f.title.value.trim(),
       level: Number(f.level.value||0),
       credits: Number(f.credits.value||1),
+      lessons: Number(f.lessons.value||0),
       summary: f.summary.value.trim(),
       ts: api.serverTimestamp()
     };
@@ -675,27 +697,28 @@ async function renderAdminCourses(container){
       await api.updateDoc(api.doc(db,'courses',id), payload);
       alert('Course updated');
     }else{
-      await api.addDoc(api.collection(db,'courses'), { ...payload, lessons: 0 });
+      await api.addDoc(api.collection(db,'courses'), payload);
       alert('Course added');
     }
-    // go see courses page immediately
+    // Show on Courses page then come back
     location.hash = '#/courses';
-    setTimeout(()=> location.hash = '#/admin', 100); // bounce back to Admin list
+    setTimeout(()=> location.hash = '#/admin', 150);
   });
 
-  document.getElementById('btnResetCourse').addEventListener('click', ()=>{
-    form.reset(); form.id.value = '';
-  });
+  container.querySelector('#btnResetCourse')?.addEventListener('click', ()=>{ form.reset(); form.id.value=''; });
 
+  // List item actions
   container.querySelectorAll('[data-act="edit"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.closest('[data-id]').getAttribute('data-id');
+      const id = btn.closest('[data-id]')?.getAttribute('data-id');
+      if(!id) return;
       const s = await api.getDoc(api.doc(db,'courses',id));
       const c = {id: s.id, ...s.data()};
       form.id.value = c.id;
       form.title.value = c.title||'';
       form.level.value = String(c.level||0);
       form.credits.value = String(c.credits||1);
+      form.lessons.value = String(c.lessons||0);
       form.summary.value = c.summary||'';
       form.scrollIntoView({behavior:'smooth', block:'center'});
     });
@@ -703,9 +726,8 @@ async function renderAdminCourses(container){
 
   container.querySelectorAll('[data-act="del"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.closest('[data-id]').getAttribute('data-id');
-      if(!confirm('Delete this course?')) return;
-      await api.updateDoc(api.doc(db,'courses',id), { title: '[deleted]' }).catch(()=>{});
+      const id = btn.closest('[data-id]')?.getAttribute('data-id');
+      if(!id || !confirm('Delete this course?')) return;
       await (await api.getDoc(api.doc(db,'courses',id))).ref.delete();
       alert('Course deleted');
       renderAdminCourses(container);
@@ -716,14 +738,21 @@ async function renderAdminCourses(container){
 async function renderAdminAnns(container){
   const q = api.query(api.collection(db,'announcements'), api.orderBy('ts','desc'));
   const res = await api.getDocs(q); const anns = res.docs.map(d=>({id:d.id,...d.data()}));
+
   container.innerHTML = `
     <div class="grid cols-1 cols-2">
-      <form class="card" id="formAnn">
+      <form class="card form" id="formAnn">
         <h3>Add / Update Announcement</h3>
         <input type="hidden" name="id" />
-        <label>Title<input name="title" required /></label>
-        <label>Level<select name="level"><option>All</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Pro</option></select></label>
-        <label>Body<textarea name="body" rows="4"></textarea></label>
+        <label>Title
+          <input name="title" required placeholder="Release note / Schedule / Update"/>
+        </label>
+        <label>Level
+          <select name="level"><option>All</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Pro</option></select>
+        </label>
+        <label class="summary-lg">Body
+          <textarea name="body" rows="6" placeholder="Announcement details…"></textarea>
+        </label>
         <div class="row">
           <button class="btn" id="btnSaveAnn">Save</button>
           <button class="btn ghost" type="button" id="btnResetAnn">Reset</button>
@@ -749,8 +778,9 @@ async function renderAdminAnns(container){
     </div>
   `;
 
-  const form = document.getElementById('formAnn');
-  form.addEventListener('submit', async (e)=>{
+  const form = container.querySelector('#formAnn');
+
+  form?.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
     const payload = { title:f.title.value.trim(), level:f.level.value, body:f.body.value.trim(), ts: api.serverTimestamp() };
@@ -762,25 +792,27 @@ async function renderAdminAnns(container){
       await api.addDoc(api.collection(db,'announcements'), payload);
       alert('Announcement posted');
     }
-    // go show on Home
     location.hash = '#/home';
-    setTimeout(()=> location.hash = '#/admin', 100);
+    setTimeout(()=> location.hash = '#/admin', 150);
   });
-  document.getElementById('btnResetAnn').addEventListener('click', ()=>{ form.reset(); form.id.value=''; });
+
+  container.querySelector('#btnResetAnn')?.addEventListener('click', ()=>{ form.reset(); form.id.value=''; });
 
   container.querySelectorAll('[data-act="edit"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.closest('[data-id]').getAttribute('data-id');
+      const id = btn.closest('[data-id]')?.getAttribute('data-id');
+      if(!id) return;
       const s = await api.getDoc(api.doc(db,'announcements',id));
       const a = {id:s.id, ...s.data()};
       form.id.value = a.id; form.title.value = a.title||''; form.level.value = a.level||'All'; form.body.value = a.body||'';
       form.scrollIntoView({behavior:'smooth', block:'center'});
     });
   });
+
   container.querySelectorAll('[data-act="del"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.closest('[data-id]').getAttribute('data-id');
-      if(!confirm('Delete this announcement?')) return;
+      const id = btn.closest('[data-id]')?.getAttribute('data-id');
+      if(!id || !confirm('Delete this announcement?')) return;
       await (await api.getDoc(api.doc(db,'announcements',id))).ref.delete();
       alert('Announcement deleted');
       renderAdminAnns(container);
@@ -789,29 +821,33 @@ async function renderAdminAnns(container){
 }
 
 async function renderAdminMsgs(container){
-  // simple send form by student email lookup
   container.innerHTML = `
     <div class="grid cols-1 cols-2">
-      <form class="card" id="formMsg">
-        <h3>Send Message to Student</h3>
-        <label>Student Email<input name="email" type="email" placeholder="student@example.com" required /></label>
-        <label>Message<textarea name="text" rows="5" placeholder="Your message..."></textarea></label>
+      <form class="card form" id="formMsg">
+        <h3>Message a Student</h3>
+        <label>Student Email
+          <input name="email" type="email" placeholder="student@example.com" required />
+        </label>
+        <label class="summary-lg">Message
+          <textarea name="text" rows="6" placeholder="Your message to the student…"></textarea>
+        </label>
         <div class="row">
           <button class="btn">Send</button>
           <button type="button" class="btn ghost" id="btnClearMsg">Clear</button>
         </div>
       </form>
+
       <div class="card" id="msgList">
         <h3>Recent Messages</h3>
-        <p class="muted">Sent messages (latest 20)…</p>
+        <p class="muted">Last 20 messages you sent.</p>
       </div>
     </div>
   `;
-  // recent messages
+
   const mq = api.query(api.collection(db,'messages'), api.orderBy('ts','desc'));
   const mres = await api.getDocs(mq);
   const msgs = mres.docs.slice(0,20).map(d=>({id:d.id,...d.data()}));
-  const list = document.getElementById('msgList');
+  const list = container.querySelector('#msgList');
   list.insertAdjacentHTML('beforeend', msgs.map(m=>`
     <article class="card">
       <div class="row between">
@@ -822,13 +858,13 @@ async function renderAdminMsgs(container){
     </article>
   `).join('') || '<p class="muted">No messages.</p>');
 
-  // send handler
-  document.getElementById('formMsg').addEventListener('submit', async (e)=>{
+  container.querySelector('#formMsg')?.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
     const email = f.email.value.trim().toLowerCase();
     const text  = f.text.value.trim();
     if(!email || !text) return alert('Email and message are required.');
+
     // find user by email
     const uq = api.query(api.collection(db,'users'), api.where('email','==',email));
     const ures = await api.getDocs(uq);
@@ -836,19 +872,16 @@ async function renderAdminMsgs(container){
     const uid = ures.docs[0].id;
 
     await api.addDoc(api.collection(db,'messages'),{
-      from: currentUser.uid,
-      to: uid,
-      toEmail: email,
-      text,
-      ts: api.serverTimestamp()
+      from: currentUser.uid, to: uid, toEmail: email, text, ts: api.serverTimestamp()
     });
+
     alert('Message sent.');
-    // show in Dashboard? (optional)
     location.hash = '#/dashboard';
-    setTimeout(()=> location.hash = '#/admin', 100);
+    setTimeout(()=> location.hash = '#/admin', 150);
   });
-  document.getElementById('btnClearMsg').addEventListener('click', ()=>{
-    document.getElementById('formMsg').reset();
+
+  container.querySelector('#btnClearMsg')?.addEventListener('click', ()=>{
+    container.querySelector('#formMsg')?.reset();
   });
 }
 
@@ -886,6 +919,15 @@ function escapeHtml(s = "") {
 //     }
 //   });
 // }
+
+function orderItem(item){
+  if(!currentUser) return authDlg.showModal();
+  // Simple placeholder: record order request
+  api.addDoc(api.collection(db,'orders'),{
+    userId: currentUser.uid, itemId: item?.id || 'custom',
+    ts: api.serverTimestamp(), status: 'requested'
+  }).then(()=> alert('Order request submitted.'));
+}
 
 // === expose global handlers ===
 window.enroll = enroll;

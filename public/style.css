@@ -118,10 +118,14 @@ img {
   font-weight: 700;
 }
 
-.btn.block{ width:100%; }
+.btn.block {
+  width: 100%;
+}
 
 .topbar {
-  min-height: var(--topbar-h); display:flex; align-items:center;
+  min-height: var(--topbar-h);
+  display: flex;
+  align-items: center;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -153,7 +157,9 @@ img {
   padding: 0.25rem;
 }
 
-.actions .btn.small.ghost{ color: var(--text); }
+.actions .btn.small.ghost {
+  color: var(--text);
+}
 
 .sidebar {
   top: var(--topbar-h);
@@ -172,8 +178,8 @@ img {
   z-index: 40;
   transition: transform 0.2s ease;
 }
-:root.light .topbar{
-  background: rgba(255,255,255,0.95);
+:root.light .topbar {
+  background: rgba(255, 255, 255, 0.95);
 }
 :root.light .sidebar {
   background: #fff;
@@ -353,4 +359,39 @@ img {
   .app {
     max-width: 1200px;
   }
+}
+
+/* Admin form polish */
+.form {
+  display: grid;
+  gap: 0.8rem;
+}
+.form label {
+  display: grid;
+  gap: 0.35rem;
+}
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--bord);
+  background: transparent;
+  color: var(--text);
+}
+.form .row-inline {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 1fr 160px 120px;
+}
+@media (max-width: 720px) {
+  .form .row-inline {
+    grid-template-columns: 1fr;
+  }
+}
+.form .summary-lg textarea {
+  min-height: 180px;
+  font-size: 0.98rem;
+  line-height: 1.4;
 }
