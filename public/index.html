@@ -42,48 +42,47 @@
   <main id="app" class="app"></main>
 
   <!-- Auth Modal -->
-  <dialog id="authDlg" class="modal">
-    <form method="dialog" class="card auth-card">
-      <div class="auth-header">
-        <!-- same lotus logo -->
-        <span class="logo" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 64 64" fill="none">
-            <path fill="#F49A17" d="M32 44c12 0 20-6 24-14-6 0-11 2-16 6 2-6 1-12-2-18-4 6-5 12-3 18-6-4-11-6-17-6 4 8 12 14 24 14z"/>
-            <path fill="#F49A17" d="M32 46c-8 0-14 2-18 6h36c-4-4-10-6-18-6z"/>
-            <path fill="#F49A17" d="M32 36c4-4 6-8 6-14-4 2-6 5-6 9-1-4-3-7-6-9 0 6 2 10 6 14z"/>
+<dialog id="authDlg" class="modal">
+  <form method="dialog" class="card auth-card">
+    <div class="auth-header" style="text-align:center; display:grid; justify-items:center; gap:.25rem;">
+      <!-- lotus logo centered -->
+      <span class="logo" aria-hidden="true" style="display:inline-grid;place-items:center;">
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+          <path fill="#F49A17" d="M32 44c12 0 20-6 24-14-6 0-11 2-16 6 2-6 1-12-2-18-4 6-5 12-3 18-6-4-11-6-17-6 4 8 12 14 24 14z"/>
+          <path fill="#F49A17" d="M32 46c-8 0-14 2-18 6h36c-4-4-10-6-18-6z"/>
+          <path fill="#F49A17" d="M32 36c4-4 6-8 6-14-4 2-6 5-6 9-1-4-3-7-6-9 0 6 2 10 6 14z"/>
+        </svg>
+      </span>
+      <h3 style="margin:.25rem 0 0">Welcome</h3>
+      <p class="muted" style="margin:0">Log in to track progress and earn certificates.</p>
+    </div>
+
+    <label>Email
+      <input id="authEmail" type="email" required placeholder="you@example.com" />
+    </label>
+
+    <label>Password
+      <div class="pw-wrap">
+        <input id="authPass" type="password" required placeholder="••••••••" />
+        <button type="button" id="pwToggle" class="eye-btn" aria-label="Show password" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/>
           </svg>
-        </span>
-        <h3>Welcome</h3>
-        <p class="muted">Log in to track progress and earn certificates.</p>
+        </button>
       </div>
+    </label>
 
-      <label>Email
-        <input id="authEmail" type="email" required placeholder="you@example.com" />
-      </label>
+    <!-- Full-width Log in button under password -->
+    <button id="doSignIn" class="btn" style="width:100%; margin:.4rem 0 .2rem">Log in</button>
 
-      <label>Password
-        <div class="pw-wrap">
-          <input id="authPass" type="password" required placeholder="••••••••" />
-          <button type="button" id="pwToggle" class="eye-btn" aria-label="Show password" aria-pressed="false">
-            <!-- eye icon -->
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/>
-            </svg>
-          </button>
-        </div>
-      </label>
+    <div class="row between" style="margin-top:.2rem">
+      <button type="button" id="doForgot" class="link">Forgot?</button>
+      <button id="doSignUp" class="btn ghost small" type="button">Create account</button>
+    </div>
 
-      <div class="row between">
-        <div class="row">
-          <button id="doSignUp" class="btn">Sign up</button>
-          <button id="doSignIn" class="btn ghost">Log in</button>
-        </div>
-        <button type="button" id="doForgot" class="link">Forgot?</button>
-      </div>
-
-      <button id="closeAuth" class="link" value="close">Close</button>
-    </form>
-  </dialog>
+    <button id="closeAuth" class="link" value="close">Close</button>
+  </form>
+</dialog>
 
   <!-- Certificate Canvas (hidden) -->
   <canvas id="certCanvas" width="1600" height="1131" class="hidden"></canvas>

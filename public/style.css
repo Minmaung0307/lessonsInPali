@@ -9,6 +9,7 @@
   --chip: #0a7b50;
   --warning: #ffb020;
   --fs: 16px;
+  --topbar-h: 56px;
 }
 /* light theme overrides */
 :root.light {
@@ -117,15 +118,19 @@ img {
   font-weight: 700;
 }
 
+.btn.block{ width:100%; }
+
 .topbar {
+  min-height: var(--topbar-h); display:flex; align-items:center;
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.6rem 0.8rem;
-  background: rgba(2, 4, 7, 0.85);
+  background: rgba(6, 10, 14, 0.95);
+  color: var(--text);
   backdrop-filter: saturate(140%) blur(8px);
   border-bottom: 1px solid var(--bord);
 }
@@ -135,6 +140,7 @@ img {
   gap: 0.6rem;
 }
 .brand {
+  color: var(--text);
   font-size: 1.1rem;
   margin: 0;
 }
@@ -147,7 +153,11 @@ img {
   padding: 0.25rem;
 }
 
+.actions .btn.small.ghost{ color: var(--text); }
+
 .sidebar {
+  top: var(--topbar-h);
+  height: calc(100dvh - var(--topbar-h));
   position: fixed;
   inset: 0 auto 0 0;
   width: 78vw;
@@ -159,8 +169,11 @@ img {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  z-index: 30;
+  z-index: 40;
   transition: transform 0.2s ease;
+}
+:root.light .topbar{
+  background: rgba(255,255,255,0.95);
 }
 :root.light .sidebar {
   background: #fff;
