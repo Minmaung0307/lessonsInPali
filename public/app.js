@@ -541,8 +541,8 @@ async function renderShop() {
   `;
 }
 
-async function renderProfile() {
-  if (!currentUser) return authDlg.showModal();
+async function renderProfile(){
+  if(!currentUser) return authDlg.showModal();
   const s = userSettings;
   app.innerHTML = `
     <section class="card">
@@ -551,54 +551,305 @@ async function renderProfile() {
         <div class="card">
           <h3>Theme</h3>
           <div class="row">
-            <label><input type="radio" name="theme" value="dark" ${
-              s.theme !== "light" ? "checked" : ""
-            }/> Dark</label>
-            <label><input type="radio" name="theme" value="light" ${
-              s.theme === "light" ? "checked" : ""
-            }/> Light</label>
+            <label><input type="radio" name="theme" value="dark" ${s.theme!=='light'?'checked':''}/> Dark</label>
+            <label><input type="radio" name="theme" value="light" ${s.theme==='light'?'checked':''}/> Light</label>
           </div>
         </div>
         <div class="card">
           <h3>Font Size</h3>
           <div class="row">
-            <label><input type="radio" name="fontSize" value="small" ${
-              s.fontSize === "small" ? "checked" : ""
-            }/> Small</label>
-            <label><input type="radio" name="fontSize" value="default" ${
-              s.fontSize === "default" ? "checked" : ""
-            }/> Default</label>
-            <label><input type="radio" name="fontSize" value="large" ${
-              s.fontSize === "large" ? "checked" : ""
-            }/> Large</label>
+            <label><input type="radio" name="fontSize" value="small" ${s.fontSize==='small'?'checked':''}/> Small</label>
+            <label><input type="radio" name="fontSize" value="default" ${s.fontSize==='default'?'checked':''}/> Default</label>
+            <label><input type="radio" name="fontSize" value="large" ${s.fontSize==='large'?'checked':''}/> Large</label>
           </div>
         </div>
       </div>
-      <div class="row">
-        <button id="savePrefs" class="btn">Save</button>
-        <button class="btn ghost" onclick="location.hash='#/dashboard'">Back</button>
-      </div>
+      <p class="muted">Changes are applied instantly and saved to your profile.</p>
+      <button class="btn ghost" onclick="location.hash='#/dashboard'">Back</button>
     </section>
   `;
-  $("#savePrefs").addEventListener("click", async () => {
-    const theme = document.querySelector('input[name="theme"]:checked').value;
-    const fontSize = document.querySelector(
-      'input[name="fontSize"]:checked'
-    ).value;
-    await saveSettings({ theme, fontSize });
-    alert("Preferences saved.");
+
+  // instant apply + auto-save (no Save button)
+  document.querySelectorAll('input[name="theme"]').forEach(r=>{
+    r.addEventListener('change', async ()=>{
+      const theme = document.querySelector('input[name="theme"]:checked').value;
+      const newS = { ...userSettings, theme };
+      await saveSettings(newS); // persists + applies
+    });
+  });
+  document.querySelectorAll('input[name="fontSize"]').forEach(r=>{
+    r.addEventListener('change', async ()=>{
+      const fontSize = document.querySelector('input[name="fontSize"]:checked').value;
+      const newS = { ...userSettings, fontSize };
+      await saveSettings(newS); // persists + applies
+    });
   });
 }
 
-async function renderAdmin() {
-  if (!(currentUser && (currentRole === "admin" || currentRole === "ta")))
-    return (app.innerHTML = `<div class="card"><p class="muted">Admins/TAs only.</p></div>`);
+async function renderAdmin(){
+  if(!(currentUser && (currentRole==='admin' || currentRole==='ta')))
+    return app.innerHTML = `<div class="card"><p class="muted">Admins/TAs only.</p></div>`;
+
   app.innerHTML = `
-    <section class="grid cols-1 cols-2">
-      <div class="card"><h3>Add Course</h3><p class="muted">Use your existing Admin form (Courses/Lessons/Quizzes/Announcements)…</p></div>
-      <div class="card"><h3>Message Students</h3><p class="muted">Coming soon.</p></div>
+    <section class="card">
+      <h2>Admin Console</h2>
+      <div class="chips">
+        <button class="btn small" id="tabCourses">Courses</button>
+        <button class="btn small ghost" id="tabAnns">Announcements</button>
+        <button class="btn small ghost" id="tabMsgs">Message Students</button>
+      </div>
+      <div id="adminBody" style="margin-top:1rem"></div>
     </section>
   `;
+
+  const body = document.getElementById('adminBody');
+  const setActive = (id) => {
+    ['tabCourses','tabAnns','tabMsgs'].forEach(x=>{
+      document.getElementById(x).classList.toggle('ghost', x!==id);
+    });
+  };
+
+  document.getElementById('tabCourses').addEventListener('click', ()=>{ setActive('tabCourses'); renderAdminCourses(body); });
+  document.getElementById('tabAnns').addEventListener('click', ()=>{ setActive('tabAnns'); renderAdminAnns(body); });
+  document.getElementById('tabMsgs').addEventListener('click', ()=>{ setActive('tabMsgs'); renderAdminMsgs(body); });
+
+  // default tab
+  renderAdminCourses(body);
+}
+
+async function renderAdminCourses(container){
+  // list
+  const q = api.query(api.collection(db,'courses'), api.orderBy('level','asc'));
+  const res = await api.getDocs(q); const courses = res.docs.map(d=>({id:d.id,...d.data()}));
+  container.innerHTML = `
+    <div class="grid cols-1 cols-2">
+      <form class="card" id="formCourse">
+        <h3>Add / Update Course</h3>
+        <input type="hidden" name="id" />
+        <label>Title<input name="title" required /></label>
+        <label>Level<select name="level">
+          <option value="0">Beginner</option><option value="1">Intermediate</option>
+          <option value="2">Advanced</option><option value="3">Pro</option>
+        </select></label>
+        <label>Credits<input type="number" name="credits" value="1" min="0" step="1"/></label>
+        <label>Summary<textarea name="summary"></textarea></label>
+        <div class="row">
+          <button class="btn" id="btnSaveCourse">Save</button>
+          <button class="btn ghost" type="button" id="btnResetCourse">Reset</button>
+        </div>
+      </form>
+
+      <div class="card">
+        <h3>Courses</h3>
+        ${courses.map(c=>`
+          <article class="card" data-id="${c.id}">
+            <div class="row between">
+              <strong>${escapeHtml(c.title)}</strong>
+              <span class="chip">${levelName(c.level)} · ${c.credits||1} cr</span>
+            </div>
+            <p class="muted">${escapeHtml(c.summary||'')}</p>
+            <div class="row">
+              <button class="btn small" data-act="edit">Edit</button>
+              <button class="btn small ghost" data-act="del">Delete</button>
+            </div>
+          </article>
+        `).join('') || '<p class="muted">No courses.</p>'}
+      </div>
+    </div>
+  `;
+
+  // handlers
+  const form = document.getElementById('formCourse');
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f = e.target;
+    const payload = {
+      title: f.title.value.trim(),
+      level: Number(f.level.value||0),
+      credits: Number(f.credits.value||1),
+      summary: f.summary.value.trim(),
+      ts: api.serverTimestamp()
+    };
+    const id = f.id.value;
+    if(id){
+      await api.updateDoc(api.doc(db,'courses',id), payload);
+      alert('Course updated');
+    }else{
+      await api.addDoc(api.collection(db,'courses'), { ...payload, lessons: 0 });
+      alert('Course added');
+    }
+    // go see courses page immediately
+    location.hash = '#/courses';
+    setTimeout(()=> location.hash = '#/admin', 100); // bounce back to Admin list
+  });
+
+  document.getElementById('btnResetCourse').addEventListener('click', ()=>{
+    form.reset(); form.id.value = '';
+  });
+
+  container.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.closest('[data-id]').getAttribute('data-id');
+      const s = await api.getDoc(api.doc(db,'courses',id));
+      const c = {id: s.id, ...s.data()};
+      form.id.value = c.id;
+      form.title.value = c.title||'';
+      form.level.value = String(c.level||0);
+      form.credits.value = String(c.credits||1);
+      form.summary.value = c.summary||'';
+      form.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
+
+  container.querySelectorAll('[data-act="del"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.closest('[data-id]').getAttribute('data-id');
+      if(!confirm('Delete this course?')) return;
+      await api.updateDoc(api.doc(db,'courses',id), { title: '[deleted]' }).catch(()=>{});
+      await (await api.getDoc(api.doc(db,'courses',id))).ref.delete();
+      alert('Course deleted');
+      renderAdminCourses(container);
+    });
+  });
+}
+
+async function renderAdminAnns(container){
+  const q = api.query(api.collection(db,'announcements'), api.orderBy('ts','desc'));
+  const res = await api.getDocs(q); const anns = res.docs.map(d=>({id:d.id,...d.data()}));
+  container.innerHTML = `
+    <div class="grid cols-1 cols-2">
+      <form class="card" id="formAnn">
+        <h3>Add / Update Announcement</h3>
+        <input type="hidden" name="id" />
+        <label>Title<input name="title" required /></label>
+        <label>Level<select name="level"><option>All</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Pro</option></select></label>
+        <label>Body<textarea name="body" rows="4"></textarea></label>
+        <div class="row">
+          <button class="btn" id="btnSaveAnn">Save</button>
+          <button class="btn ghost" type="button" id="btnResetAnn">Reset</button>
+        </div>
+      </form>
+
+      <div class="card">
+        <h3>Announcements</h3>
+        ${anns.map(a=>`
+          <article class="card" data-id="${a.id}">
+            <div class="row between">
+              <strong>${escapeHtml(a.title||'Update')}</strong>
+              <span class="chip">${a.level||'All'}</span>
+            </div>
+            <p class="muted">${escapeHtml(a.body||'')}</p>
+            <div class="row">
+              <button class="btn small" data-act="edit">Edit</button>
+              <button class="btn small ghost" data-act="del">Delete</button>
+            </div>
+          </article>
+        `).join('') || '<p class="muted">No announcements.</p>'}
+      </div>
+    </div>
+  `;
+
+  const form = document.getElementById('formAnn');
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f = e.target;
+    const payload = { title:f.title.value.trim(), level:f.level.value, body:f.body.value.trim(), ts: api.serverTimestamp() };
+    const id = f.id.value;
+    if(id){
+      await api.updateDoc(api.doc(db,'announcements',id), payload);
+      alert('Announcement updated');
+    }else{
+      await api.addDoc(api.collection(db,'announcements'), payload);
+      alert('Announcement posted');
+    }
+    // go show on Home
+    location.hash = '#/home';
+    setTimeout(()=> location.hash = '#/admin', 100);
+  });
+  document.getElementById('btnResetAnn').addEventListener('click', ()=>{ form.reset(); form.id.value=''; });
+
+  container.querySelectorAll('[data-act="edit"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.closest('[data-id]').getAttribute('data-id');
+      const s = await api.getDoc(api.doc(db,'announcements',id));
+      const a = {id:s.id, ...s.data()};
+      form.id.value = a.id; form.title.value = a.title||''; form.level.value = a.level||'All'; form.body.value = a.body||'';
+      form.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
+  container.querySelectorAll('[data-act="del"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.closest('[data-id]').getAttribute('data-id');
+      if(!confirm('Delete this announcement?')) return;
+      await (await api.getDoc(api.doc(db,'announcements',id))).ref.delete();
+      alert('Announcement deleted');
+      renderAdminAnns(container);
+    });
+  });
+}
+
+async function renderAdminMsgs(container){
+  // simple send form by student email lookup
+  container.innerHTML = `
+    <div class="grid cols-1 cols-2">
+      <form class="card" id="formMsg">
+        <h3>Send Message to Student</h3>
+        <label>Student Email<input name="email" type="email" placeholder="student@example.com" required /></label>
+        <label>Message<textarea name="text" rows="5" placeholder="Your message..."></textarea></label>
+        <div class="row">
+          <button class="btn">Send</button>
+          <button type="button" class="btn ghost" id="btnClearMsg">Clear</button>
+        </div>
+      </form>
+      <div class="card" id="msgList">
+        <h3>Recent Messages</h3>
+        <p class="muted">Sent messages (latest 20)…</p>
+      </div>
+    </div>
+  `;
+  // recent messages
+  const mq = api.query(api.collection(db,'messages'), api.orderBy('ts','desc'));
+  const mres = await api.getDocs(mq);
+  const msgs = mres.docs.slice(0,20).map(d=>({id:d.id,...d.data()}));
+  const list = document.getElementById('msgList');
+  list.insertAdjacentHTML('beforeend', msgs.map(m=>`
+    <article class="card">
+      <div class="row between">
+        <strong>To: ${escapeHtml(m.toEmail||m.to||'')}</strong>
+        <span class="muted">${new Date(m.ts?.toDate?.()||Date.now()).toLocaleString()}</span>
+      </div>
+      <p>${escapeHtml(m.text||'')}</p>
+    </article>
+  `).join('') || '<p class="muted">No messages.</p>');
+
+  // send handler
+  document.getElementById('formMsg').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const f = e.target;
+    const email = f.email.value.trim().toLowerCase();
+    const text  = f.text.value.trim();
+    if(!email || !text) return alert('Email and message are required.');
+    // find user by email
+    const uq = api.query(api.collection(db,'users'), api.where('email','==',email));
+    const ures = await api.getDocs(uq);
+    if(ures.empty) return alert('No user with that email.');
+    const uid = ures.docs[0].id;
+
+    await api.addDoc(api.collection(db,'messages'),{
+      from: currentUser.uid,
+      to: uid,
+      toEmail: email,
+      text,
+      ts: api.serverTimestamp()
+    });
+    alert('Message sent.');
+    // show in Dashboard? (optional)
+    location.hash = '#/dashboard';
+    setTimeout(()=> location.hash = '#/admin', 100);
+  });
+  document.getElementById('btnClearMsg').addEventListener('click', ()=>{
+    document.getElementById('formMsg').reset();
+  });
 }
 
 // ---------- Utils ----------
@@ -635,3 +886,10 @@ function escapeHtml(s = "") {
 //     }
 //   });
 // }
+
+// === expose global handlers ===
+window.enroll = enroll;
+window.openLesson = openLesson;
+
+// orderItem ကို သုံးထားမယ်ဆိုရင် ဒီလိုပါထည့်ပါ
+window.orderItem = orderItem || (()=>{ alert("Order system coming soon"); });

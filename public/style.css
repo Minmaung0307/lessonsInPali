@@ -160,7 +160,7 @@ img {
   height: calc(100dvh - var(--topbar-h));
   position: fixed;
   inset: 0 auto 0 0;
-  width: 78vw;
+  /* width: 78vw; */
   max-width: 320px;
   transform: translateX(-100%);
   background: rgba(2, 4, 7, 0.95);
