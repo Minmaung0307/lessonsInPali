@@ -1,7 +1,9 @@
 // /js/app.js
-import { auth, db, storage, providers, authApi } from "./firebase.js";
+import { auth, db, storage } from "./firebase.js";
+
 import {
   collection,
+  collectionGroup,
   doc,
   getDoc,
   getDocs,
@@ -15,6 +17,16 @@ import {
   onSnapshot,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  signOut, // ← ADD THIS
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
 import {
   ref as sref,
   uploadBytesResumable,
@@ -22,54 +34,63 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
 // ===== Mobile menu toggle (topbar → underbar nav) =====
-document.getElementById('btnMenu')?.addEventListener('click', ()=>{
-  document.getElementById('navLinks')?.classList.toggle('open');
+document.getElementById("btnMenu")?.addEventListener("click", () => {
+  document.getElementById("navLinks")?.classList.toggle("open");
 });
 
 // Mini guard
-function needAdmin(role){ 
-  if(!(role==='admin'||role==='ta')){ alert('Admins only'); throw new Error('no-admin'); }
+function needAdmin(role) {
+  if (!(role === "admin" || role === "ta")) {
+    alert("Admins only");
+    throw new Error("no-admin");
+  }
 }
 
 // Add Course
-document.getElementById('formCourse')?.addEventListener('submit', async (e)=>{
+document.getElementById("formCourse")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const data = {
     title: f.title.value.trim(),
-    level: Number(f.level.value||0),
-    credits: Number(f.credits.value||0),
+    level: Number(f.level.value || 0),
+    credits: Number(f.credits.value || 0),
     summary: f.summary.value.trim(),
-    ts: serverTimestamp()
+    ts: serverTimestamp(),
   };
   // doc id from slug
-  const id = data.title.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
-  await setDoc(doc(db, 'courses', id), data, { merge:true });
-  alert('Course saved: '+id);
+  const id = data.title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\-]/g, "");
+  await setDoc(doc(db, "courses", id), data, { merge: true });
+  alert("Course saved: " + id);
   f.reset();
 });
 
 // Add Lesson
-document.getElementById('formLesson')?.addEventListener('submit', async (e)=>{
+document.getElementById("formLesson")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const courseId = f.courseId.value.trim();
   const payload = {
-    order: Number(f.order.value||1),
+    order: Number(f.order.value || 1),
     title: f.title.value.trim(),
     readingUrl: f.readingUrl.value.trim(),
-    pages: Number(f.pages.value||22),
-    videos: (f.videos.value||'').split(',').map(s=>s.trim()).filter(Boolean),
-    ts: serverTimestamp()
+    pages: Number(f.pages.value || 22),
+    videos: (f.videos.value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    ts: serverTimestamp(),
   };
-  const lessonsCol = collection(db, 'courses', courseId, 'lessons');
+  const lessonsCol = collection(db, "courses", courseId, "lessons");
   await addDoc(lessonsCol, payload);
-  alert('Lesson saved to '+courseId);
+  alert("Lesson saved to " + courseId);
   f.reset();
 });
 
 // Add Quiz
-document.getElementById('formQuiz')?.addEventListener('submit', async (e)=>{
+document.getElementById("formQuiz")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const courseId = f.courseId.value.trim();
@@ -77,22 +98,40 @@ document.getElementById('formQuiz')?.addEventListener('submit', async (e)=>{
   const payload = {
     type: f.type.value,
     text: f.text.value.trim(),
-    options: (f.options.value||'').split(',').map(s=>s.trim()).filter(Boolean),
-    ts: serverTimestamp()
+    options: (f.options.value || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    ts: serverTimestamp(),
   };
-  await addDoc(collection(db, 'courses', courseId, 'lessons', lessonId, 'quizzes'), payload);
-  alert('Quiz saved.');
+  await addDoc(
+    collection(db, "courses", courseId, "lessons", lessonId, "quizzes"),
+    payload
+  );
+  alert("Quiz saved.");
   f.reset();
 });
 
-// ---------- Globals ----------
+// ---------- Globals DOM ----------
 const $ = (s) => document.querySelector(s);
 const appEl = $("#app");
 
+const btnMenu = document.getElementById("btnMenu");
+const navLinks = document.getElementById("navLinks");
+// const topbar   = document.getElementById('topbar');
+
 // ===== Auth modal behavior =====
-const authDlg   = document.getElementById('authDlg');
-const btnLogin  = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout');
+const authDlg = document.getElementById("authDlg");
+const btnLogin = document.getElementById("btnLogin");
+const btnLogout = document.getElementById("btnLogout");
+
+const doLogin = $("#doLogin");
+const doSignup = $("#doSignup");
+const doForgot = $("#doForgot");
+const closeAuth = $("#closeAuth");
+
+const buyDlg = $("#buyDlg");
+$("#closeBuy")?.addEventListener("click", () => buyDlg.close());
 
 const yearEl = $("#year");
 if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -103,19 +142,25 @@ document
   );
 
 let currentUser = null;
-let  currentRole = "guest";
+let currentRole = "guest";
 let profileCache = null;
 currentRole = await getUserRole();
 
 // ---------- Utils ----------
-const escapeHtml = (s = "") =>
-  s.replace(
+function escapeHtml(s = "") {
+  return s.replace(
     /[&<>"']/g,
     (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[
-        c
-      ])
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[c])
   );
+}
+
 const applyTheme = (v) =>
   (document.documentElement.dataset.theme = v || "pali");
 const applyFontSize = (v) => (document.documentElement.dataset.fs = v || "md");
@@ -149,83 +194,61 @@ async function ensureUserDoc() {
 // new ResizeObserver(updateTopbarHeight).observe(document.getElementById('topbar'));
 
 // ===== Mobile menu toggle =====
-const underNav = document.getElementById('underNav');
-document.getElementById('btnMenu')?.addEventListener('click', ()=>{
-  underNav?.classList.toggle('open');
+const underNav = document.getElementById("underNav");
+document.getElementById("btnMenu")?.addEventListener("click", () => {
+  underNav?.classList.toggle("open");
 });
 
 // Auto-close on link click (mobile)
-underNav?.addEventListener('click', (e)=>{
-  const a = e.target.closest('a.nav-link');
+underNav?.addEventListener("click", (e) => {
+  const a = e.target.closest("a.nav-link");
   if (!a) return;
-  if (window.innerWidth < 860) underNav.classList.remove('open');
+  if (window.innerWidth < 860) underNav.classList.remove("open");
 });
-
-// === DOM refs ===
-const btnMenu  = document.getElementById('btnMenu');
-const navLinks = document.getElementById('navLinks');
-// const topbar   = document.getElementById('topbar');
-
 
 /* ✅ Burger toggle */
-btnMenu?.addEventListener('click', ()=>{
-  const open = navLinks?.classList.toggle('open');
-  btnMenu.setAttribute('aria-expanded', open ? 'true' : 'false');
-  // updateTopbarHeight();
+btnMenu?.addEventListener("click", () => {
+  const open = navLinks?.classList.toggle("open");
+  btnMenu.setAttribute("aria-expanded", open ? "true" : "false");
 });
 
-navLinks?.querySelectorAll('a.nav-link').forEach(a=>{
-  a.addEventListener('click', ()=>{
-    navLinks.classList.remove('open');
-    btnMenu?.setAttribute('aria-expanded','false');
+navLinks?.querySelectorAll("a.nav-link").forEach((a) => {
+  a.addEventListener("click", () => {
+    navLinks.classList.remove("open");
+    btnMenu?.setAttribute("aria-expanded", "false");
   });
 });
 
 // Link တစ်ခုနှိပ်လျှင် panel ပိတ် + active state update
-function setActiveNav(){
+function setActiveNav() {
   // const cur = location.hash || '#/';
-  const cur = location.hash.split('?')[0] || '#/';
-  document.querySelectorAll('.nav-link').forEach(a=>{
-    const href = a.getAttribute('href');
-    a.classList.toggle('active', href === cur);
+  const cur = location.hash.split("?")[0] || "#/";
+  document.querySelectorAll(".nav-link").forEach((a) => {
+    const href = a.getAttribute("href");
+    a.classList.toggle("active", href === cur);
   });
 }
 
 /* Nav link တစ်ခုကနေ navigate လုပ်ချိန် panel ပိတ် */
-navLinks?.addEventListener('click', (e)=>{
-  const a = e.target.closest('a.nav-link');
+navLinks?.addEventListener("click", (e) => {
+  const a = e.target.closest("a.nav-link");
   if (!a) return;
-  navLinks.classList.remove('open');
-  btnMenu?.setAttribute('aria-expanded','false');
+  navLinks.classList.remove("open");
+  btnMenu?.setAttribute("aria-expanded", "false");
   // active သတ်မှတ်
   setTimeout(setActiveNav, 0);
 });
-window.addEventListener('hashchange', setActiveNav);
-window.addEventListener('load', setActiveNav);
+window.addEventListener("hashchange", setActiveNav);
+window.addEventListener("load", setActiveNav);
 
 // keyboard: Space/Enter နဲ့ burger toggle
-btnMenu?.addEventListener('keydown', (e)=>{
-  if (e.key === ' ' || e.key === 'Enter'){
-    e.preventDefault(); btnMenu.click();
+btnMenu?.addEventListener("keydown", (e) => {
+  if (e.key === " " || e.key === "Enter") {
+    e.preventDefault();
+    btnMenu.click();
   }
 });
 
-/* Router နဲ့ hash ပြောင်းတိုင်း panel ပိတ် */
-// window.addEventListener('hashchange', ()=>{
-//   navLinks?.classList.remove('open');
-//   btnMenu?.setAttribute('aria-expanded','false');
-//   // updateTopbarHeight();
-// });
-
-// Optional: auto-open once on first load for very small screens
-// window.addEventListener('load', ()=>{
-//   if (window.innerWidth < 860) {
-//     // comment out if you don't want default-open
-//     // navLinksEl?.classList.add('open');
-//   }
-// });
-
-// ===== Router (duplicate-safe) =====
 // ===== Router (single, duplicate-safe) =====
 if (!window.__APP_ROUTER__) {
   window.__APP_ROUTER__ = true;
@@ -279,26 +302,32 @@ function defaultsProfile(d = {}) {
 //     alert("Logout failed: " + (e?.message || ""));
 //   }
 // });
-document.getElementById('btnLogout')?.addEventListener('click', ()=> signOut(auth));
-document.getElementById('btnLogout_m')?.addEventListener('click', ()=> signOut(auth));
+document
+  .getElementById("btnLogout")
+  ?.addEventListener("click", () => signOut(auth));
+document
+  .getElementById("btnLogout_m")
+  ?.addEventListener("click", () => signOut(auth));
 
 /* ✅ Auth visibility helper (guest/student/admin menu gating) */
-function applyAuthVisibility(user, role){
+function applyAuthVisibility(user, role) {
   const authed = !!user;
-  const isStaff = authed && (String(role) === 'admin' || String(role) === 'ta');
+  const isStaff = authed && (String(role) === "admin" || String(role) === "ta");
 
   // auth-only / admin-only gating
-  document.querySelectorAll('.auth-only')
-    .forEach(el => el.classList.toggle('hidden', !authed));
+  document
+    .querySelectorAll(".auth-only")
+    .forEach((el) => el.classList.toggle("hidden", !authed));
 
-  document.querySelectorAll('.admin-only')
-    .forEach(el => el.classList.toggle('hidden', !isStaff));
+  document
+    .querySelectorAll(".admin-only")
+    .forEach((el) => el.classList.toggle("hidden", !isStaff));
 
   // buttons (desktop + mobile)
-  document.getElementById('btnLogin')   ?.classList.toggle('hidden',  authed);
-  document.getElementById('btnLogout')  ?.classList.toggle('hidden', !authed);
-  document.getElementById('btnLogin_m') ?.classList.toggle('hidden',  authed);
-  document.getElementById('btnLogout_m')?.classList.toggle('hidden', !authed);
+  document.getElementById("btnLogin")?.classList.toggle("hidden", authed);
+  document.getElementById("btnLogout")?.classList.toggle("hidden", !authed);
+  document.getElementById("btnLogin_m")?.classList.toggle("hidden", authed);
+  document.getElementById("btnLogout_m")?.classList.toggle("hidden", !authed);
 }
 
 // ✅ getUserRole() — current user’s role ကို Firestore မှာ query လုပ်ပြီး ပြန်ပေးမယ်
@@ -335,50 +364,68 @@ async function saveProfile(patch = {}) {
 }
 
 // ---------- Auth UI ----------
-btnLogin?.addEventListener('click', ()=> authDlg?.showModal());
-document.getElementById('btnAuthCancel')?.addEventListener('click', ()=> authDlg?.close());
-document.getElementById('closeAuth')?.addEventListener('click', ()=> authDlg?.close());
+btnLogin?.addEventListener("click", () => authDlg?.showModal());
+document
+  .getElementById("btnAuthCancel")
+  ?.addEventListener("click", () => authDlg?.close());
+document
+  .getElementById("closeAuth")
+  ?.addEventListener("click", () => authDlg?.close());
 
 // Tabs
-(() =>{
-  const tabs = document.querySelectorAll('.auth-card .tab');
-  const email = document.getElementById('authEmail');
-  const pw    = document.getElementById('authPassword');
-  let mode = 'login';
-  tabs.forEach(t => t.addEventListener('click', ()=>{
-    tabs.forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    mode = t.dataset.mode;
-    // forgot mode → hide password
-    document.querySelector('.pw').style.display = (mode==='forgot' ? 'none' : 'block');
-  }));
+(() => {
+  const tabs = document.querySelectorAll(".auth-card .tab");
+  const email = document.getElementById("authEmail");
+  const pw = document.getElementById("authPassword");
+  let mode = "login";
+  tabs.forEach((t) =>
+    t.addEventListener("click", () => {
+      tabs.forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
+      mode = t.dataset.mode;
+      // forgot mode → hide password
+      document.querySelector(".pw").style.display =
+        mode === "forgot" ? "none" : "block";
+    })
+  );
 
   // password eye toggle
-  document.getElementById('togglePw')?.addEventListener('click', ()=>{
-    pw.type = pw.type === 'password' ? 'text' : 'password';
+  document.getElementById("togglePw")?.addEventListener("click", () => {
+    pw.type = pw.type === "password" ? "text" : "password";
   });
 
   // submit
-  document.getElementById('authForm')?.addEventListener('submit', async (e)=>{
+  document.getElementById("authForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const errEl = document.getElementById('authError');
-    errEl.classList.add('hidden'); errEl.textContent = '';
-    try{
-      if(mode==='login'){
+    const errEl = document.getElementById("authError");
+    errEl.classList.add("hidden");
+    errEl.textContent = "";
+    try {
+      if (mode === "login") {
         await signInWithEmailAndPassword(auth, email.value, pw.value);
         authDlg.close();
-      }else if(mode==='signup'){
-        const { user } = await createUserWithEmailAndPassword(auth, email.value, pw.value);
+      } else if (mode === "signup") {
+        const { user } = await createUserWithEmailAndPassword(
+          auth,
+          email.value,
+          pw.value
+        );
         // create base user doc if not exist
-        await setDoc(doc(db,'users', user.uid), { email: user.email, role: 'student', createdAt: serverTimestamp() }, { merge:true });
+        await setDoc(
+          doc(db, "users", user.uid),
+          { email: user.email, role: "student", createdAt: serverTimestamp() },
+          { merge: true }
+        );
         authDlg.close();
-      }else{ // forgot
+      } else {
+        // forgot
         await sendPasswordResetEmail(auth, email.value);
-        errEl.textContent = 'Reset link sent to your email.'; errEl.classList.remove('hidden');
+        errEl.textContent = "Reset link sent to your email.";
+        errEl.classList.remove("hidden");
       }
-    }catch(e){
-      errEl.textContent = e.message || 'Something went wrong';
-      errEl.classList.remove('hidden');
+    } catch (e) {
+      errEl.textContent = e.message || "Something went wrong";
+      errEl.classList.remove("hidden");
     }
   });
 })();
@@ -428,15 +475,23 @@ btnLogout?.addEventListener("click", async () => {
   }
 });
 
-// app.js (TOP imports)
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  updateProfile,
-  signOut            // ← ADD THIS
-} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+doLogin?.addEventListener("click", async () => {
+  const email = $("#authEmail").value.trim();
+  const pass = $("#authPass").value;
+  await signInWithEmailAndPassword(auth, email, pass);
+  authDlg.close();
+});
+doSignup?.addEventListener("click", async () => {
+  const email = $("#authEmail").value.trim();
+  const pass = $("#authPass").value;
+  await createUserWithEmailAndPassword(auth, email, pass);
+  authDlg.close();
+});
+doForgot?.addEventListener("click", async () => {
+  const email = $("#authEmail").value.trim();
+  await sendPasswordResetEmail(auth, email);
+  alert("Password reset email sent.");
+});
 
 // mobile toggle
 document.getElementById("btnMenu")?.addEventListener("click", () => {
@@ -464,34 +519,38 @@ function gateNavByAuth(user, role = "guest") {
 onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
 
-  let role = 'guest';
+  let role = "guest";
   if (u) {
     try {
-      role = await getUserRole();       // users/{uid}.role ကနေ ယူတာ
-      if (!role) role = 'student';      // fallback
-      console.log('✅ Logged in as:', u.email, 'Role:', role);
-    } catch (e){
+      role = await getUserRole(); // users/{uid}.role ကနေ ယူတာ
+      if (!role) role = "student"; // fallback
+      console.log("✅ Logged in as:", u.email, "Role:", role);
+    } catch (e) {
       console.warn('getUserRole failed, fallback to "student"', e);
-      role = 'student';
+      role = "student";
     }
   } else {
-    console.log('🚪 Logged out');
+    console.log("🚪 Logged out");
   }
   currentRole = role;
 
   // UI gating + active nav update
   applyAuthVisibility(currentUser, currentRole);
-  if (typeof setActiveNav === 'function') setActiveNav();
+  if (typeof setActiveNav === "function") setActiveNav();
 
   // nav gating (function ရှိမရှိစစ်ပြီး ခေါ်)
-  if (typeof gateNavByAuth === 'function') {
+  if (typeof gateNavByAuth === "function") {
     gateNavByAuth(currentUser, currentRole);
   }
 
   // route render (hashchange/load ကနေ route ခေါ်ထားရင် ဒီလို guard လုပ်ချင်ရင်)
   if (!window.__ROUTE_LOCK__) {
     window.__ROUTE_LOCK__ = true;
-    try { route && route(); } finally { window.__ROUTE_LOCK__ = false; }
+    try {
+      route && route();
+    } finally {
+      window.__ROUTE_LOCK__ = false;
+    }
   }
 });
 
@@ -500,16 +559,6 @@ document
   .getElementById("btnLogout")
   ?.addEventListener("click", () => signOut(auth));
 
-// ---------- Routing ----------
-// window.addEventListener("hashchange", route);
-// function route(){
-//   const h = location.hash || "#/";
-//   if(h.startsWith("#/courses")) renderCourses();
-//   else if(h.startsWith("#/dashboard")) renderDashboard();
-//   else if(h.startsWith("#/admin")) renderAdmin();
-//   else renderHome();
-// }
-
 // ---------- Home ----------
 function renderHome() {
   appEl.innerHTML = `
@@ -517,7 +566,7 @@ function renderHome() {
       <img src="/icons/icon-192.png" alt="Lotus">
       <div>
         <h1>Pāli Lessons</h1>
-        <p class="muted">Ancient language, modern learning — mobile‑first LMS with quizzes, certificates & shop.</p>
+        <p class="muted">Ancient language, modern learning — Explore structured Pāli courses from Beginner to Pro.</p>
         <div class="list">
           <span class="badge">Beginner → Pro</span>
           <span class="badge">Gated quizzes</span>
@@ -531,7 +580,34 @@ function renderHome() {
   `;
   renderCourseCards("#homeCourses");
 }
+// async function renderCourseCards(){
+//   const q = query(collection(db, "courses"), orderBy("level","asc"), orderBy("title","asc"));
+//   const snap = await getDocs(q);
+//   let html = `<section class="grid">`;
+//   snap.forEach(d=>{
+//     const c = d.data();
+//     html += `
+//       <article class="card">
+//         <div class="row" style="justify-content:space-between;align-items:baseline">
+//           <h3 style="margin:0">${c.title}</h3>
+//           <span class="badge">${["Beginner","Intermediate","Advanced","Pro"][c.level||0]}</span>
+//         </div>
+//         <p class="muted">${c.summary||""}</p>
+//         <div class="row">
+//           <button class="btn" data-buy="${d.id}" data-price="${(c.price||0).toFixed(2)}">Buy $${(c.price||0).toFixed(2)}</button>
+//           <a class="btn ghost" href="#/courses/${d.id}">Details</a>
+//         </div>
+//       </article>
+//     `;
+//   });
+//   html += `</section>`;
+//   app.innerHTML += html;
 
+//   // attach PayPal buy buttons on click
+//   app.querySelectorAll("button[data-buy]").forEach(btn=>{
+//     btn.addEventListener("click", ()=> openBuyDialog(btn.dataset.buy, btn.dataset.price));
+//   });
+// }
 // ---------- Courses (cards) ----------
 async function renderCourseCards(sel) {
   const host = document.querySelector(sel);
@@ -605,91 +681,111 @@ async function renderCourseCards(sel) {
 
 function makeCertPDF({ name, courseTitle, score }) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('l', 'pt', 'a4');
+  const doc = new jsPDF("l", "pt", "a4");
 
   // background + border
-  doc.setFillColor(255,255,255);       // white bg (no fade)
-  doc.rect(0,0,842,595,'F');
-  doc.setDrawColor(30,30,30);
+  doc.setFillColor(255, 255, 255); // white bg (no fade)
+  doc.rect(0, 0, 842, 595, "F");
+  doc.setDrawColor(30, 30, 30);
   doc.setLineWidth(4);
-  doc.rect(24,24,842-48,595-48);
+  doc.rect(24, 24, 842 - 48, 595 - 48);
 
   // title + text
-  doc.setTextColor(20,20,20);
-  doc.setFont('helvetica','bold');
+  doc.setTextColor(20, 20, 20);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(32);
-  doc.text('Certificate of Completion', 842/2, 120, { align: 'center' });
+  doc.text("Certificate of Completion", 842 / 2, 120, { align: "center" });
 
   doc.setFontSize(22);
-  doc.text(name || 'Student Name', 842/2, 175, { align: 'center' });
-  doc.setFont('helvetica','normal');
+  doc.text(name || "Student Name", 842 / 2, 175, { align: "center" });
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(16);
-  doc.text('has successfully completed', 842/2, 205, { align: 'center' });
+  doc.text("has successfully completed", 842 / 2, 205, { align: "center" });
 
-  doc.setFont('helvetica','bold');
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text(courseTitle || 'Course Title', 842/2, 235, { align: 'center' });
+  doc.text(courseTitle || "Course Title", 842 / 2, 235, { align: "center" });
 
-  doc.setFont('helvetica','normal');
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(14);
-  doc.text(`Score: ${score ?? 0}%`, 842/2, 265, { align: 'center' });
+  doc.text(`Score: ${score ?? 0}%`, 842 / 2, 265, { align: "center" });
 
   const issued = new Date().toLocaleDateString();
   doc.setFontSize(12);
-  doc.text(`Issued: ${issued}`, 842/2, 520, { align: 'center' });
+  doc.text(`Issued: ${issued}`, 842 / 2, 520, { align: "center" });
 
-  doc.save(`certificate-${(courseTitle||'course').replace(/\s+/g,'-')}.pdf`);
+  doc.save(`certificate-${(courseTitle || "course").replace(/\s+/g, "-")}.pdf`);
 }
 
-async function renderStudentDashboard(){
-  if(!auth.currentUser){ return; }
+async function renderStudentDashboard() {
+  if (!auth.currentUser) {
+    return;
+  }
   const uid = auth.currentUser.uid;
 
   // Enrollments (progress per course)
-  const q1 = query(collection(db,'enrollments'), where('userId','==',uid));
+  const q1 = query(collection(db, 'users', uid, 'enrollments'), orderBy('ts','desc'));
   const snap1 = await getDocs(q1);
   const courses = [];
-  for (const d of snap1.docs){
+  for (const d of snap1.docs) {
     const e = d.data();
     courses.push(e);
   }
 
-  const wrap = document.getElementById('myCourses');
-  wrap.innerHTML = courses.map(e=>{
-    const pcent = Math.round(((e.progress||0) / (e.totalLessons||12))*100);
-    return `
+  const wrap = document.getElementById("myCourses");
+  wrap.innerHTML =
+    courses
+      .map((e) => {
+        const pcent = Math.round(
+          ((e.progress || 0) / (e.totalLessons || 12)) * 100
+        );
+        return `
       <div class="item">
         <div class="row">
-          <strong>${e.courseTitle||e.courseId}</strong>
-          <span>${e.progress||0} / ${e.totalLessons||12} lessons</span>
+          <strong>${e.courseTitle || e.courseId}</strong>
+          <span>${e.progress || 0} / ${e.totalLessons || 12} lessons</span>
         </div>
         <div class="progress"><i style="width:${pcent}%"></i></div>
       </div>
     `;
-  }).join('') || '<p class="muted">No enrollments yet.</p>';
+      })
+      .join("") || '<p class="muted">No enrollments yet.</p>';
 
   // Certificates
-  const q2 = query(collection(db,'certificates'), where('userId','==',uid)); // client sort if needed
+  const q2 = query(collection(db, "certificates"), where("userId", "==", uid)); // client sort if needed
   const snap2 = await getDocs(q2);
   const certs = [];
-  for(const d of snap2.docs){ certs.push({ id:d.id, ...d.data() }); }
+  for (const d of snap2.docs) {
+    certs.push({ id: d.id, ...d.data() });
+  }
 
-  const certWrap = document.getElementById('myCerts');
-  certWrap.innerHTML = certs.map(c=>`
+  const certWrap = document.getElementById("myCerts");
+  certWrap.innerHTML =
+    certs
+      .map(
+        (c) => `
     <div class="item">
       <div class="row">
         <strong>${c.courseId}</strong>
-        <span>Score: <b>${c.score||'-'}</b></span>
+        <span>Score: <b>${c.score || "-"}</b></span>
       </div>
       <div class="row">
-        <small>${new Date(c.ts?.seconds*1000||Date.now()).toLocaleString()}</small>
-        ${c.pdfUrl ? `<a class="btn" href="${c.pdfUrl}" target="_blank" rel="noopener">Download PDF</a>` : ''}
+        <small>${new Date(
+          c.ts?.seconds * 1000 || Date.now()
+        ).toLocaleString()}</small>
+        ${
+          c.pdfUrl
+            ? `<a class="btn" href="${c.pdfUrl}" target="_blank" rel="noopener">Download PDF</a>`
+            : ""
+        }
       </div>
     </div>
-  `).join('') || '<p class="muted">No certificates yet.</p>';
+  `
+      )
+      .join("") || '<p class="muted">No certificates yet.</p>';
 
-  const name = userProfile?.name || auth.currentUser?.displayName || 'Student';
-  const courseTitle = 'Pāli Beginner — Module 1';
+  const name = userProfile?.name || auth.currentUser?.displayName || "Student";
+  const courseTitle = "Pāli Beginner — Module 1";
   const score = 82;
 
   appEl.innerHTML = `
@@ -703,7 +799,7 @@ async function renderStudentDashboard(){
   `;
 
   // ✅ button → PDF
-  document.getElementById('btnCert')?.addEventListener('click', () => {
+  document.getElementById("btnCert")?.addEventListener("click", () => {
     makeCertPDF({ name, courseTitle, score });
   });
 }
@@ -718,25 +814,153 @@ function renderCourses() {
   renderCourseCards("#courseList");
 }
 
-async function enrollCourse(courseId) {
-  if (!auth.currentUser) {
-    authDlg.showModal();
+function $$(s) {
+  return document.querySelector(s);
+}
+function openBuyDialog(courseId, price) {
+  const buyDlg = $("#buyDlg");
+  $("#buyTitle").textContent = `Purchase course – $${price}`;
+  buyDlg?.showModal();
+
+  const mount = $("#paypal-buttons");
+  if (!mount) {
+    alert("Mount not found");
     return;
   }
-  await setDoc(
-    doc(db, "enrollments", `${auth.currentUser.uid}_${courseId}`),
-    {
-      userId: auth.currentUser.uid,
-      courseId,
-      status: "active",
-      progress: 0,
-      ts: serverTimestamp(),
-    },
-    { merge: true }
-  );
-  alert("Enrolled!");
-  location.hash = "#/dashboard";
+  mount.innerHTML = "";
+
+  if (!window.paypal) {
+    mount.innerHTML = "<p class='muted'>PayPal SDK not loaded.</p>";
+    return;
+  }
+
+  window.paypal
+    .Buttons({
+      style: {
+        layout: "vertical",
+        color: "gold",
+        shape: "rect",
+        label: "paypal",
+      },
+      createOrder(_, actions) {
+        return actions.order.create({
+          purchase_units: [
+            { amount: { value: String(price) }, custom_id: courseId },
+          ],
+        });
+      },
+      async onApprove(data, actions) {
+        const details = await actions.order.capture();
+        const u = auth.currentUser;
+        await fetch("/verifyPayPal", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-id": u?.uid || "",
+          },
+          body: JSON.stringify({ orderId: data.orderID, courseId }),
+        })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false }));
+
+        alert("Payment verified. You're enrolled!");
+        buyDlg?.close();
+        location.hash = "#/dashboard";
+      },
+      onError(err) {
+        console.error(err);
+        alert("PayPal error.");
+      },
+    })
+    .render(mount);
 }
+window.openBuyDialog = openBuyDialog;
+
+// ✅ Enroll (writes to users/{uid}/enrollments/{courseId})
+async function enrollCourse(courseOrId) {
+  try {
+    if (!db) {
+      alert("App not initialized (db). Refresh.");
+      return;
+    }
+    const user = auth?.currentUser;
+    if (!user) {
+      window.authDlg?.showModal?.();
+      return;
+    }
+    const uid = user.uid;
+
+    // Normalize id/object
+    let courseId = "";
+    let course = null;
+    if (typeof courseOrId === "string") {
+      courseId = courseOrId.trim();
+    } else if (courseOrId && typeof courseOrId === "object") {
+      course = courseOrId;
+      courseId = course.id || course.courseId || "";
+    }
+    if (!courseId) {
+      alert("Cannot enroll: missing course id.");
+      return;
+    }
+
+    // Get course data if not provided
+    if (!course) {
+      const cRef = doc(db, "courses", courseId);
+      const cSnap = await getDoc(cRef);
+      if (!cSnap.exists()) {
+        alert("Course not found.");
+        return;
+      }
+      course = { id: cSnap.id, ...cSnap.data() };
+    }
+
+    // Subcollection path: users/{uid}/enrollments/{courseId}
+    const enrRef = doc(db, "users", uid, "enrollments", courseId);
+    await setDoc(
+      enrRef,
+      {
+        userId: uid,
+        courseId,
+        courseTitle: course.title || "",
+        level: typeof course.level === "number" ? course.level : 0,
+        status: "enrolled",
+        progress: 0,
+        ts: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Success
+    if (window.toast) toast(`Enrolled in ${course.title || "course"} 🎉`);
+    else alert(`Enrolled in ${course.title || "course"} 🎉`);
+    location.hash = "#/dashboard";
+  } catch (err) {
+    console.error("[enrollCourse] Failed:", err);
+    if (
+      String(err?.message || "").includes("Missing or insufficient permissions")
+    ) {
+      alert(
+        "Permission denied: check Firestore rules for users/{uid}/enrollments/* create/read."
+      );
+    } else {
+      alert("Enroll failed: " + (err?.message || err));
+    }
+  }
+}
+window.enrollCourse = enrollCourse;
+
+async function loadMyEnrollments() {
+  const u = auth?.currentUser;
+  if (!u) return [];
+  const q = query(
+    collection(db, "users", u.uid, "enrollments"),
+    orderBy("ts", "desc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+window.loadMyEnrollments = loadMyEnrollments;
 
 async function openCourse(courseId) {
   const ref = doc(db, "courses", courseId);
@@ -863,7 +1087,7 @@ async function openLesson(lessonId) {
     }
     const pct = total ? Math.round((score / total) * 100) : 0;
     const passed = pct >= 65;
-    await addDoc(collection(db, "attempts"), {
+    await addDoc(collection(db, "users", uid, "attempts"), {
       userId: auth.currentUser.uid,
       lessonId: L.id,
       score: pct,
@@ -876,19 +1100,23 @@ async function openLesson(lessonId) {
 
 // ---------- Dashboard ----------
 async function renderDashboard() {
-  if (!currentUser) {
-    location.hash = "/";
+  const user = auth?.currentUser;
+  if (!user) {
+    authDlg?.showModal?.();
     return;
   }
-  const app = document.getElementById("app");
-  app.innerHTML = `
+
+  const appEl = document.getElementById("app");
+  appEl.innerHTML = `
     <section class="card max">
       <h2>Dashboard</h2>
+
       <div class="grid-2">
         <div>
           <h3>Announcements</h3>
           <div id="annList">Loading…</div>
         </div>
+
         <div>
           <h3>Messages</h3>
           <div id="msgList">Loading…</div>
@@ -897,61 +1125,87 @@ async function renderDashboard() {
     </section>
   `;
 
-  // announcements for all (or by level if သင်လို)
+  /* -------------------- Announcements (public) -------------------- */
   try {
+    // single-field orderBy သာမန်အတွက် composite index မလို
     const aq = query(collection(db, "announcements"), orderBy("ts", "desc"));
     const as = await getDocs(aq);
-    const box = document.getElementById("annList");
-    box.innerHTML = "";
-    as.forEach((d) => {
-      const a = d.data();
-      box.insertAdjacentHTML(
-        "beforeend",
-        `
-        <div class="card"><strong>${a.title}</strong><p>${a.body}</p></div>
-      `
-      );
-    });
-  } catch (e) {
-    console.error(e);
-    document.getElementById(
-      "annList"
-    ).innerHTML = `<div class="card">Unavailable</div>`;
-  }
 
-  // messages to me + broadcast (“*”) — split queries
-  try {
-    const mineQ = query(
-      collection(db, "messages"),
-      where("to", "==", currentUser.uid),
-      orderBy("ts", "desc")
-    );
-    const allQ = query(
-      collection(db, "messages"),
-      where("to", "==", "*"),
-      orderBy("ts", "desc")
-    );
-    const [ms, bs] = await Promise.all([getDocs(mineQ), getDocs(allQ)]);
-    const items = [];
-    ms.forEach((d) => items.push({ id: d.id, ...d.data() }));
-    bs.forEach((d) => items.push({ id: d.id, ...d.data() }));
-    items.sort((a, b) => (b.ts?.seconds || 0) - (a.ts?.seconds || 0));
-
-    const box = document.getElementById("msgList");
-    box.innerHTML = items.length
-      ? ""
-      : '<div class="card muted">No messages.</div>';
-    for (const m of items) {
-      box.insertAdjacentHTML(
-        "beforeend",
-        `<div class="card"><p>${m.text}</p></div>`
-      );
+    const annBox = document.getElementById("annList");
+    if (as.empty) {
+      annBox.innerHTML = `<div class="card muted">No announcements.</div>`;
+    } else {
+      annBox.innerHTML = "";
+      as.forEach((d) => {
+        const a = d.data();
+        annBox.insertAdjacentHTML(
+          "beforeend",
+          `
+            <article class="card">
+              <strong>${escapeHtml(a.title || "")}</strong>
+              <p class="muted" style="margin:.25rem 0">
+                ${a.ts?.toDate ? a.ts.toDate().toLocaleString() : ""}
+              </p>
+              <p>${escapeHtml(a.body || "")}</p>
+            </article>
+          `
+        );
+      });
     }
   } catch (e) {
-    console.error(e);
+    console.error("[dashboard] announcements:", e);
+    document.getElementById(
+      "annList"
+    ).innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+  }
+
+  /* -------------------- Messages (to me + broadcast '*') -------------------- */
+  try {
+    // composite index မတောင်းအောင်: where + client-side sort
+    const mineQ = query(
+      collection(db, "messages"),
+      where("to", "==", user.uid)
+    );
+    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
+
+    const [mineSnap, broadSnap] = await Promise.all([
+      getDocs(mineQ),
+      getDocs(allQ),
+    ]);
+
+    const items = [];
+    mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    broadSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+
+    // robust sort by timestamp
+    items.sort((a, b) => {
+      const ta = a.ts?.toMillis ? a.ts.toMillis() : (a.ts?.seconds || 0) * 1000;
+      const tb = b.ts?.toMillis ? b.ts.toMillis() : (b.ts?.seconds || 0) * 1000;
+      return tb - ta;
+    });
+
+    const msgBox = document.getElementById("msgList");
+    if (!items.length) {
+      msgBox.innerHTML = `<div class="card muted">No messages.</div>`;
+    } else {
+      msgBox.innerHTML = items
+        .map(
+          (m) => `
+        <article class="card">
+          <p class="muted" style="margin:0 0 .25rem">
+            ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
+          </p>
+          <p>${escapeHtml(m.text || "")}</p>
+        </article>
+      `
+        )
+        .join("");
+    }
+  } catch (e) {
+    console.error("[dashboard] messages:", e);
     document.getElementById(
       "msgList"
-    ).innerHTML = `<div class="card">Unavailable</div>`;
+    ).innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
@@ -1081,8 +1335,12 @@ async function renderAdmin() {
             <span class="badge">${c.credits || 0} credits</span>
           </div>
           <div class="row">
-            <button class="btn small" data-edit="${d.id}">Edit</button>
-            <button class="btn small danger" data-del="${d.id}">Delete</button>
+            <button class="btn small" data-action="edit-course" data-edit="${
+              d.id
+            }">Edit</button>
+            <button class="btn small danger" data-action="delete-course" data-del="${
+              d.id
+            }">Delete</button>
           </div>
         </article>
       `
@@ -1098,6 +1356,27 @@ async function renderAdmin() {
     // (edit flow ကိုနောက်တစ်ဖက် ဆက်ဖြည့်နိုင်)
   }
   loadAdminCourses();
+
+  // event delegation (once)
+  const adminList = document.getElementById("adminCourseList"); // container id you render into
+  if (adminList && !adminList.__wired) {
+    adminList.__wired = true;
+    adminList.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const act = btn.getAttribute("data-action");
+
+      if (act === "edit-course") {
+        openCourseEditor(id); // -> ပဲလုပ်သင့်တဲ့ function (form ဖြင့်နေရာတစ်ခုကို ပြ)
+      } else if (act === "delete-course") {
+        if (confirm("Delete this course?")) {
+          await deleteCourse(id);
+          renderAdmin(); // refresh list
+        }
+      }
+    });
+  }
 
   // Announcements
   document.getElementById("formAnn").addEventListener("submit", async (e) => {
@@ -1180,28 +1459,80 @@ async function renderAdmin() {
   loadAdminMsgs();
 }
 
+async function openCourseEditor(id){
+  const ref = doc(db, "courses", id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()){ alert("Course not found"); return; }
+  const c = snap.data();
+
+  // တည်ရှိနေတဲ့ admin card အတွင်းက editor panel ကိုပြ
+  const host = document.getElementById('adminEditor');
+  host.innerHTML = `
+    <div class="card">
+      <h3>Edit: ${escapeHtml(c.title || "")}</h3>
+      <label>Title <input id="editTitle" value="${escapeHtml(c.title||"")}"></label>
+      <label>Level <input id="editLevel" type="number" min="0" max="3" value="${c.level ?? 0}"></label>
+      <label>Credits <input id="editCredits" type="number" min="0" max="100" value="${c.credits ?? 0}"></label>
+      <label>Summary <textarea id="editSummary">${escapeHtml(c.summary||"")}</textarea></label>
+      <div class="row" style="gap:.5rem">
+        <button class="btn" id="btnSaveCourse">Save</button>
+        <button class="btn ghost" id="btnCancelEdit">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btnCancelEdit')?.addEventListener('click', ()=> {
+    host.innerHTML = "";
+  });
+
+  document.getElementById('btnSaveCourse')?.addEventListener('click', async ()=>{
+    await updateDoc(ref, {
+      title: document.getElementById('editTitle').value.trim(),
+      level: Number(document.getElementById('editLevel').value || 0),
+      credits: Number(document.getElementById('editCredits').value || 0),
+      summary: document.getElementById('editSummary').value.trim()
+    });
+    alert("Saved");
+    host.innerHTML = "";
+    renderAdmin(); // refresh list
+  });
+}
+
 // ---------- small helpers ----------
 function profileViewHTML(p = {}) {
   const line = (label, val) => `
     <div class="kv">
       <div class="kv-k">${label}</div>
-      <div class="kv-v">${val ? escapeHtml(val) : '<span class="muted">—</span>'}</div>
+      <div class="kv-v">${
+        val ? escapeHtml(val) : '<span class="muted">—</span>'
+      }</div>
     </div>`;
   return `
     <div class="profile-view">
       <div class="profile-head">
-        <img class="avatar" src="${p.photoURL||'/icons/icon-192.png'}" alt="avatar">
+        <img class="avatar" src="${
+          p.photoURL || "/icons/icon-192.png"
+        }" alt="avatar">
         <div>
-          <h3 class="h3 tight">${escapeHtml(p.name||'Unnamed')}</h3>
-          <div class="muted">${escapeHtml(p.email||'')}</div>
+          <h3 class="h3 tight">${escapeHtml(p.name || "Unnamed")}</h3>
+          <div class="muted">${escapeHtml(p.email || "")}</div>
         </div>
       </div>
       <div class="grid-2 sm1">
-        <div class="card sub">${line('Contact', p.contact)}${line('DoB', p.dob)}</div>
-        <div class="card sub">${line('Education', p.education)}${line('Skills', p.skills)}</div>
-        <div class="card sub">${line('Address', p.address)}</div>
-        <div class="card sub">${line('Portfolio', p.portfolio)}${line('GitHub', p.github)}</div>
-        <div class="card sub">${line('Socials', p.socials)}</div>
+        <div class="card sub">${line("Contact", p.contact)}${line(
+    "DoB",
+    p.dob
+  )}</div>
+        <div class="card sub">${line("Education", p.education)}${line(
+    "Skills",
+    p.skills
+  )}</div>
+        <div class="card sub">${line("Address", p.address)}</div>
+        <div class="card sub">${line("Portfolio", p.portfolio)}${line(
+    "GitHub",
+    p.github
+  )}</div>
+        <div class="card sub">${line("Socials", p.socials)}</div>
       </div>
     </div>
   `;
@@ -1210,21 +1541,41 @@ function profileViewHTML(p = {}) {
 function profileFormHTML(p = {}) {
   return `
     <form id="profileForm" class="form grid-2 sm1">
-      <label>Full name<input name="name" value="${escapeHtml(p.name||'')}" /></label>
-      <label>Date of Birth<input type="date" name="dob" value="${escapeHtml(p.dob||'')}" /></label>
+      <label>Full name<input name="name" value="${escapeHtml(
+        p.name || ""
+      )}" /></label>
+      <label>Date of Birth<input type="date" name="dob" value="${escapeHtml(
+        p.dob || ""
+      )}" /></label>
 
-      <label>Email<input type="email" name="email" value="${escapeHtml(p.email||'')}" /></label>
-      <label>Contact<input name="contact" value="${escapeHtml(p.contact||'')}" /></label>
+      <label>Email<input type="email" name="email" value="${escapeHtml(
+        p.email || ""
+      )}" /></label>
+      <label>Contact<input name="contact" value="${escapeHtml(
+        p.contact || ""
+      )}" /></label>
 
-      <label class="col-2">Address<textarea name="address" rows="2">${escapeHtml(p.address||'')}</textarea></label>
+      <label class="col-2">Address<textarea name="address" rows="2">${escapeHtml(
+        p.address || ""
+      )}</textarea></label>
 
-      <label>Education<input name="education" value="${escapeHtml(p.education||'')}" /></label>
-      <label>Skills (comma-separated)<input name="skills" value="${escapeHtml(p.skills||'')}" /></label>
+      <label>Education<input name="education" value="${escapeHtml(
+        p.education || ""
+      )}" /></label>
+      <label>Skills (comma-separated)<input name="skills" value="${escapeHtml(
+        p.skills || ""
+      )}" /></label>
 
-      <label>Portfolio<input name="portfolio" value="${escapeHtml(p.portfolio||'')}" /></label>
-      <label>GitHub<input name="github" value="${escapeHtml(p.github||'')}" /></label>
+      <label>Portfolio<input name="portfolio" value="${escapeHtml(
+        p.portfolio || ""
+      )}" /></label>
+      <label>GitHub<input name="github" value="${escapeHtml(
+        p.github || ""
+      )}" /></label>
 
-      <label class="col-2">Social links<input name="socials" value="${escapeHtml(p.socials||'')}" /></label>
+      <label class="col-2">Social links<input name="socials" value="${escapeHtml(
+        p.socials || ""
+      )}" /></label>
 
       <div class="col-2 row gap">
         <label class="file">
@@ -1242,14 +1593,17 @@ function profileFormHTML(p = {}) {
 
 // ---------- main renderer ----------
 async function renderProfile() {
-  if (!auth.currentUser) { authDlg?.showModal(); return; }
+  if (!auth.currentUser) {
+    authDlg?.showModal();
+    return;
+  }
 
   const uid = auth.currentUser.uid;
   const meRef = doc(db, "users", uid);
-  const snap  = await getDoc(meRef);
-  const p     = snap.exists() ? snap.data() : {};
+  const snap = await getDoc(meRef);
+  const p = snap.exists() ? snap.data() : {};
 
-  const app = document.getElementById('app');
+  const app = document.getElementById("app");
   app.innerHTML = `
     <section class="card max">
       <h2 class="h2">Profile</h2>
@@ -1285,86 +1639,97 @@ async function renderProfile() {
   `;
 
   // init prefs
-  const selTheme = document.getElementById('prefTheme');
-  const selFS    = document.getElementById('prefFontSize');
-  selTheme.value = p.theme || 'pali';
-  selFS.value    = p.fontSize || 'md';
+  const selTheme = document.getElementById("prefTheme");
+  const selFS = document.getElementById("prefFontSize");
+  selTheme.value = p.theme || "pali";
+  selFS.value = p.fontSize || "md";
   applyTheme(selTheme.value);
   applyFontSize(selFS.value);
 
   // live-apply + save
-  selTheme.addEventListener('change', async e => {
+  selTheme.addEventListener("change", async (e) => {
     const v = e.target.value;
     applyTheme(v);
     await setDoc(meRef, { theme: v }, { merge: true });
   });
-  selFS.addEventListener('change', async e => {
+  selFS.addEventListener("change", async (e) => {
     const v = e.target.value;
     applyFontSize(v);
     await setDoc(meRef, { fontSize: v }, { merge: true });
   });
 
   // edit toggle
-  const bodyEl = document.getElementById('profileBody');
-  document.getElementById('btnEditProfile').addEventListener('click', ()=>{
+  const bodyEl = document.getElementById("profileBody");
+  document.getElementById("btnEditProfile").addEventListener("click", () => {
     bodyEl.innerHTML = profileFormHTML(p);
     bindProfileForm();
   });
 
-  function bindProfileForm(){
-    const form = document.getElementById('profileForm');
+  function bindProfileForm() {
+    const form = document.getElementById("profileForm");
 
     // Save submit
-    form.addEventListener('submit', async (e)=>{
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const patch = Object.fromEntries(new FormData(form).entries());
       await setDoc(meRef, patch, { merge: true });
       // reload latest
       const s2 = await getDoc(meRef);
-      const p2 = s2.exists()? s2.data() : {};
+      const p2 = s2.exists() ? s2.data() : {};
       bodyEl.innerHTML = profileViewHTML(p2);
     });
 
     // Cancel
-    document.getElementById('btnCancelEdit')?.addEventListener('click', ()=>{
+    document.getElementById("btnCancelEdit")?.addEventListener("click", () => {
       bodyEl.innerHTML = profileViewHTML(p);
     });
 
     // Image upload (resumable)
-    document.getElementById('photoFile')?.addEventListener('change', async (e)=>{
-      const file = e.target.files?.[0];
-      if(!file) return;
-      if(file.size > 5*1024*1024){ alert("Image too large (max 5MB)"); return; }
+    document
+      .getElementById("photoFile")
+      ?.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+          alert("Image too large (max 5MB)");
+          return;
+        }
 
-      // ext detect
-      const t = (file.type||'').toLowerCase();
-      let ext = 'jpg';
-      if (t.includes('png')) ext = 'png';
-      else if (t.includes('webp')) ext = 'webp';
-      else if (t.includes('gif')) ext = 'gif';
-      else if (t.includes('jpeg')) ext = 'jpg';
+        // ext detect
+        const t = (file.type || "").toLowerCase();
+        let ext = "jpg";
+        if (t.includes("png")) ext = "png";
+        else if (t.includes("webp")) ext = "webp";
+        else if (t.includes("gif")) ext = "gif";
+        else if (t.includes("jpeg")) ext = "jpg";
 
-      const r = sref(storage, `profiles/${uid}/avatar.${ext}`);
-      const task = uploadBytesResumable(r, file, { contentType: file.type || `image/${ext}` });
-      await new Promise((res,rej)=> task.on('state_changed', ()=>{}, rej, res));
-      const url = await getDownloadURL(task.snapshot.ref);
-      await setDoc(meRef, { photoURL: url }, { merge: true });
+        const r = sref(storage, `profiles/${uid}/avatar.${ext}`);
+        const task = uploadBytesResumable(r, file, {
+          contentType: file.type || `image/${ext}`,
+        });
+        await new Promise((res, rej) =>
+          task.on("state_changed", () => {}, rej, res)
+        );
+        const url = await getDownloadURL(task.snapshot.ref);
+        await setDoc(meRef, { photoURL: url }, { merge: true });
 
-      // reflect in UI
-      const s2 = await getDoc(meRef);
-      const p2 = s2.exists()? s2.data() : {};
-      bodyEl.innerHTML = profileFormHTML(p2); // keep editing state after upload
-      bindProfileForm();
-    });
+        // reflect in UI
+        const s2 = await getDoc(meRef);
+        const p2 = s2.exists() ? s2.data() : {};
+        bodyEl.innerHTML = profileFormHTML(p2); // keep editing state after upload
+        bindProfileForm();
+      });
 
     // Remove photo
-    document.getElementById('btnRemovePhoto')?.addEventListener('click', async ()=>{
-      await setDoc(meRef, { photoURL: "" }, { merge:true });
-      const s2 = await getDoc(meRef);
-      const p2 = s2.exists()? s2.data() : {};
-      bodyEl.innerHTML = profileFormHTML(p2);
-      bindProfileForm();
-    });
+    document
+      .getElementById("btnRemovePhoto")
+      ?.addEventListener("click", async () => {
+        await setDoc(meRef, { photoURL: "" }, { merge: true });
+        const s2 = await getDoc(meRef);
+        const p2 = s2.exists() ? s2.data() : {};
+        bodyEl.innerHTML = profileFormHTML(p2);
+        bindProfileForm();
+      });
   }
 }
 
@@ -1413,64 +1778,98 @@ function renderSettings() {
 }
 
 async function renderCertificates(){
-  if(!auth.currentUser){ location.hash='/'; return; }
-  const app = document.getElementById('app');
-  app.innerHTML = `<section class="card max"><h2>Certificates</h2><div id="certList">Loading…</div></section>`;
-  const box = document.getElementById('certList');
+  if (!auth?.currentUser){ location.hash = "#/"; return; }
+  const uid = auth.currentUser.uid;
+
+  const box = document.getElementById("app");
+  box.innerHTML = `
+    <section class="card max">
+      <h2>Certificates</h2>
+      <div id="certList">Loading…</div>
+    </section>`;
 
   try{
-    // ✅ Fallback: index မလိုအောင် orderBy မသုံးဘဲ fetch + client-side sort
-    const qy = query(collection(db,'completions'), where('userId','==', auth.currentUser.uid));
-    const snap = await getDocs(qy);
-    const items = [];
-    snap.forEach(d=> items.push({ id:d.id, ...d.data() }));
-    items.sort((a,b)=> (b.ts?.seconds||0) - (a.ts?.seconds||0));
-
-    box.innerHTML = items.length? "" : `<div class="card muted">No certificates yet.</div>`;
-    for(const c of items){
-      box.insertAdjacentHTML('beforeend', `
-        <div class="card">
-          <div><strong>Course:</strong> ${c.courseId}</div>
-          <div><strong>Credits:</strong> ${c.credits||0}</div>
-          <div><strong>Score:</strong> ${c.score ?? '-'}</div>
-          <button class="btn small" data-print="${c.id}">Download certificate</button>
+    const q = query(
+      collection(db, "users", uid, "completions"),        // ✅ top-level
+      where("userId","==", uid),
+      orderBy("ts","desc")
+    );
+    const snap = await getDocs(q);
+    const list = document.getElementById("certList");
+    if (snap.empty){
+      list.innerHTML = `<div class="card muted">No certificates yet.</div>`;
+      return;
+    }
+    list.innerHTML = "";
+    snap.forEach(d=>{
+      const c = d.data();
+      list.insertAdjacentHTML("beforeend", `
+        <div class="card row-between">
+          <div>
+            <strong>${c.courseTitle || c.courseId}</strong>
+            <div class="muted">Credits: ${c.credits ?? 0}</div>
+          </div>
+          <div class="row" style="gap:.5rem">
+            <button class="btn small" onclick="makeCertPDF('${d.id}')">Download PDF</button>
+          </div>
         </div>
       `);
-    }
-  }catch(e){
-    console.error("[certs]", e);
-    box.innerHTML = `<div class="card">Unable to load certificates: ${e.message}</div>`;
+    });
+  }catch(err){
+    console.error("[certs]", err);
+    document.getElementById("certList").innerHTML =
+      `<div class="card error">Can't load certificates (permissions?).</div>`;
   }
 }
+window.renderCertificates = renderCertificates;
 
 async function renderTranscripts(){
-  if(!auth.currentUser){ location.hash='/'; return; }
-  const app = document.getElementById('app');
-  app.innerHTML = `<section class="card max"><h2>Transcripts</h2><div id="txList">Loading…</div></section>`;
-  const box = document.getElementById('txList');
+  if (!auth?.currentUser){ location.hash = "#/"; return; }
+  const uid = auth.currentUser.uid;
+
+  const box = document.getElementById("app");
+  box.innerHTML = `
+    <section class="card max">
+      <h2>Transcripts</h2>
+      <div id="txList">Loading…</div>
+    </section>`;
 
   try{
-    // ✅ Fallback: index မလိုအောင် orderBy မသုံးဘဲ fetch + client-side sort
-    const qy = query(collection(db,'attempts'), where('userId','==', auth.currentUser.uid));
-    const snap = await getDocs(qy);
-    const items = [];
-    snap.forEach(d=> items.push({ id:d.id, ...d.data() }));
-    items.sort((a,b)=> (b.ts?.seconds||0) - (a.ts?.seconds||0));
-
-    box.innerHTML = items.length? "" : `<div class="card muted">No attempts yet.</div>`;
-    for(const a of items){
-      box.insertAdjacentHTML('beforeend', `
-        <div class="card row-3">
-          <div><strong>Lesson:</strong> ${a.lessonId}</div>
-          <div><strong>Score:</strong> ${a.score}</div>
-          <div><strong>Passed:</strong> ${a.pass ? 'Yes' : 'No'}</div>
+    const q = query(
+      collection(db, "users", uid, "attempts"),          // ✅ top-level
+      where("userId","==", uid),
+      orderBy("ts","desc")
+    );
+    const snap = await getDocs(q);
+    const list = document.getElementById("txList");
+    if (snap.empty){
+      list.innerHTML = `<div class="card muted">No attempts yet.</div>`;
+      return;
+    }
+    list.innerHTML = "";
+    snap.forEach(d=>{
+      const a = d.data();
+      list.insertAdjacentHTML("beforeend", `
+        <div class="card">
+          <div class="row-between">
+            <strong>${a.courseTitle || a.courseId}</strong>
+            <span>${a.score ?? 0}% ${a.pass ? "✅" : "❌"}</span>
+          </div>
+          <div class="muted">Lesson: ${a.lessonTitle || a.lessonId}</div>
         </div>
       `);
-    }
-  }catch(e){
-    console.error("[transcripts]", e);
-    box.innerHTML = `<div class="card">Unable to load transcripts: ${e.message}</div>`;
+    });
+  }catch(err){
+    console.error("[transcripts]", err);
+    document.getElementById("txList").innerHTML =
+      `<div class="card error">Can't load transcripts (permissions?).</div>`;
   }
+}
+window.renderTranscripts = renderTranscripts;
+
+// ====== Not Found ======
+function renderNotFound() {
+  app.innerHTML = `<section class="card"><h2>Not found</h2></section>`;
 }
 
 // ---------- PayPal (demo button) ----------
@@ -1513,5 +1912,5 @@ window.addEventListener("load", () => {
 
 // ✅ boot point
 window.addEventListener("load", () => {
-  route();  // handles all navigation automatically
+  route(); // handles all navigation automatically
 });

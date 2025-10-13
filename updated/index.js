@@ -1,10 +1,8 @@
-// functions/index.js
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+// /functions/index.js
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 
 admin.initializeApp();
-
 const db = admin.firestore();
 
 // ----- Helper: course-wide grade letter
