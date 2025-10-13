@@ -1,95 +1,265 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lessons in Pali</title>
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#0b5" />
-  <link rel="icon" href="/icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-  <link rel="stylesheet" href="/style.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="left">
-      <!-- Inline Lotus SVG as Logo (no extra file needed) -->
-      <span class="logo" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
-          <path fill="#F49A17" d="M32 44c12 0 20-6 24-14-6 0-11 2-16 6 2-6 1-12-2-18-4 6-5 12-3 18-6-4-11-6-17-6 4 8 12 14 24 14z"/>
-          <path fill="#F49A17" d="M32 46c-8 0-14 2-18 6h36c-4-4-10-6-18-6z"/>
-          <path fill="#F49A17" d="M32 36c4-4 6-8 6-14-4 2-6 5-6 9-1-4-3-7-6-9 0 6 2 10 6 14z"/>
-        </svg>
-      </span>
-      <button id="btnMenu" class="icon-btn" aria-label="Menu">☰</button>
-      <h1 class="brand">Lessons in Pali</h1>
-    </div>
-    <nav class="actions">
-      <button id="btnLogin" class="btn small">Login</button>
-      <button id="btnLogout" class="btn small ghost hidden">Logout</button>
-    </nav>
-  </header>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#6a3b2d" />
+    <title>Pāli Lessons (LMS)</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <!-- PayPal SDK (replace YOUR_CLIENT_ID) -->
+    <script
+      src="https://www.paypal.com/sdk/js?client-id=AVpfmQ8DyyatFaAGQ3Jg58XtUt_2cJDr1leqcc_JI8LvKIR2N5WB_yljqCOTTCtvK1hFJ7Q9X0ojXsEC&currency=USD"
+      defer
+    ></script>
+    <!-- EmailJS SDK -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"
+      defer
+    ></script>
+  </head>
+  <body>
+    <!-- ✅ Topbar -->
+    <header id="topbar" class="topbar">
+      <div class="topbar-inner">
+        <!-- Left: brand/logo -->
+        <a class="brand" href="#/">
+          <img src="/icons/icon-192.png" alt="Logo" class="logo" />
+          <span class="brand-text">Pāli LMS</span>
+        </a>
 
-  <aside id="sidebar" class="sidebar">
-    <a href="#/home" class="navlink">🏠 Home</a>
-    <a href="#/courses" class="navlink">📚 Courses</a>
-    <a href="#/dashboard" class="navlink auth-only hidden">📊 Dashboard</a>
-    <a href="#/shop" class="navlink">🛒 Shop</a>
-    <a href="#/profile" class="navlink auth-only hidden">👤 Profile</a>
-    <a href="#/admin" class="navlink admin-only hidden">🛠️ Admin</a>
-  </aside>
-
-  <main id="app" class="app"></main>
-
-  <!-- Auth Modal -->
-<dialog id="authDlg" class="modal">
-  <form method="dialog" class="card auth-card">
-    <div class="auth-header" style="text-align:center; display:grid; justify-items:center; gap:.25rem;">
-      <!-- lotus logo centered -->
-      <span class="logo" aria-hidden="true" style="display:inline-grid;place-items:center;">
-        <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
-          <path fill="#F49A17" d="M32 44c12 0 20-6 24-14-6 0-11 2-16 6 2-6 1-12-2-18-4 6-5 12-3 18-6-4-11-6-17-6 4 8 12 14 24 14z"/>
-          <path fill="#F49A17" d="M32 46c-8 0-14 2-18 6h36c-4-4-10-6-18-6z"/>
-          <path fill="#F49A17" d="M32 36c4-4 6-8 6-14-4 2-6 5-6 9-1-4-3-7-6-9 0 6 2 10 6 14z"/>
-        </svg>
-      </span>
-      <h3 style="margin:.25rem 0 0">Welcome</h3>
-      <p class="muted" style="margin:0">Log in to track progress and earn certificates.</p>
-    </div>
-
-    <label>Email
-      <input id="authEmail" type="email" required placeholder="you@example.com" />
-    </label>
-
-    <label>Password
-      <div class="pw-wrap">
-        <input id="authPass" type="password" required placeholder="••••••••" />
-        <button type="button" id="pwToggle" class="eye-btn" aria-label="Show password" aria-pressed="false">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path fill="currentColor" d="M12 5c-7 0-11 7-11 7s4 7 11 7 11-7 11-7-4-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/>
-          </svg>
+        <!-- Center: burger (mobile only) -->
+        <button
+          id="btnMenu"
+          class="btn-icon burger"
+          aria-label="Open menu"
+          aria-expanded="false"
+          aria-controls="navLinks"
+        >
+          ☰
         </button>
+
+        <!-- Right: desktop nav / auth -->
+        <nav class="nav-desktop" aria-label="Primary">
+          <a class="nav-link" href="#/">Home</a>
+          <a class="nav-link" href="#/courses">Courses</a>
+
+          <!-- auth-only: login လုပ်ရင်ပဲ မြင်မယ် -->
+          <a class="nav-link auth-only" href="#/dashboard">Dashboard</a>
+          <a class="nav-link auth-only" href="#/certs">Certificates</a>
+          <a class="nav-link auth-only" href="#/transcripts">Transcripts</a>
+          <a class="nav-link auth-only" href="#/settings">Settings</a>
+          <a class="nav-link" href="#/profile">Profile</a>
+
+          <!-- admin-only -->
+          <a class="nav-link admin-only" href="#/admin">Admin</a>
+        </nav>
+
+        <div class="auth-actions">
+          <button id="btnLogin" class="btn small">Login</button>
+          <button id="btnLogout" class="btn small ghost hidden">Logout</button>
+        </div>
       </div>
-    </label>
+    </header>
 
-    <!-- Full-width Log in button under password -->
-    <button id="doSignIn" class="btn" style="width:100%; margin:.4rem 0 .2rem">Log in</button>
+    <!-- Mobile overlay panel (header အပြင်) -->
+    <nav id="navLinks" class="mobile-panel" aria-label="Mobile Navigation">
+      <a class="nav-link" href="#/">Home</a>
+      <a class="nav-link" href="#/courses">Courses</a>
 
-    <div class="row between" style="margin-top:.2rem">
-      <button type="button" id="doForgot" class="link">Forgot?</button>
-      <button id="doSignUp" class="btn ghost small" type="button">Create account</button>
-    </div>
+      <a class="nav-link auth-only" href="#/dashboard">Dashboard</a>
+      <a class="nav-link auth-only" href="#/certs">Certificates</a>
+      <a class="nav-link auth-only" href="#/transcripts">Transcripts</a>
+      <a class="nav-link auth-only" href="#/settings">Settings</a>
+      <a class="nav-link" href="#/profile">Profile</a>
 
-    <button id="closeAuth" class="link" value="close">Close</button>
-  </form>
-</dialog>
+      <a class="nav-link admin-only" href="#/admin">Admin</a>
+      <hr />
+      <button id="btnLogin_m" class="btn">Login</button>
+      <button id="btnLogout_m" class="btn ghost hidden">Logout</button>
+    </nav>
 
-  <!-- Certificate Canvas (hidden) -->
-  <canvas id="certCanvas" width="1600" height="1131" class="hidden"></canvas>
+    <!-- ===== App content ===== -->
+    <main id="app">
+      <!-- Admin Console -->
+      <section
+        class="card maxw"
+        id="adminConsole"
+        style="max-width: 980px; margin-inline: auto"
+      >
+        <h2>Admin Console</h2>
 
-  <footer class="footer">© <span id="year"></span> Lessons in Pali • Built with Firebase · EmailJS</footer>
+        <details open class="blk">
+          <summary class="h3">Add Course</summary>
+          <form id="formCourse" class="grid-2">
+            <label>Title <input name="title" required /></label>
+            <label
+              >Level
+              <select name="level">
+                <option value="0">Beginner</option>
+                <option value="1">Intermediate</option>
+                <option value="2">Advanced</option>
+                <option value="3">Pro</option>
+              </select>
+            </label>
+            <label
+              >Credits <input type="number" name="credits" value="3"
+            /></label>
+            <label>Summary <textarea name="summary" rows="3"></textarea></label>
+            <button class="btn" type="submit">Save Course</button>
+          </form>
+        </details>
 
-  <script type="module" src="/firebase.js"></script>
-  <script type="module" src="/app.js"></script>
-</body>
+        <details class="blk">
+          <summary class="h3">Add Lesson</summary>
+          <form id="formLesson" class="grid-2">
+            <label
+              >Course ID
+              <input name="courseId" required placeholder="e.g. pali-beg-1"
+            /></label>
+            <label
+              >Order <input type="number" name="order" min="1" required
+            /></label>
+            <label>Title <input name="title" required /></label>
+            <label
+              >Reading PDF URL
+              <input name="readingUrl" placeholder="https://...pdf"
+            /></label>
+            <label>Pages <input type="number" name="pages" value="22" /></label>
+            <label
+              >Videos (comma)
+              <input name="videos" placeholder="https://v1, https://v2"
+            /></label>
+            <button class="btn" type="submit">Save Lesson</button>
+          </form>
+        </details>
+
+        <details class="blk">
+          <summary class="h3">Add Quiz</summary>
+          <form id="formQuiz" class="grid-2">
+            <label>Course ID <input name="courseId" required /></label>
+            <label>Lesson ID <input name="lessonId" required /></label>
+            <label
+              >Type
+              <select name="type">
+                <option value="mcq">Single choice</option>
+                <option value="msq">Multiple choice</option>
+                <option value="short">Short answer</option>
+              </select>
+            </label>
+            <label
+              >Question <textarea name="text" rows="3" required></textarea>
+            </label>
+            <label
+              >Options (comma) <input name="options" placeholder="A, B, C, D"
+            /></label>
+            <button class="btn" type="submit">Save Quiz</button>
+          </form>
+        </details>
+
+        <p class="muted">
+          Tips: Save လုပ်ပြီးတာနဲ့ Home/Courses/Dashboard ထဲမှာ
+          ချက်ချင်းပေါ်သွားပါမယ်။
+        </p>
+      </section>
+
+      <section
+        class="card maxw"
+        id="studentDash"
+        style="max-width: 980px; margin-inline: auto"
+      >
+        <h2>Student Dashboard</h2>
+
+        <div id="myCourses" class="list"></div>
+
+        <h3>Certificates</h3>
+        <div id="myCerts" class="list"></div>
+      </section>
+    </main>
+
+    <!-- <main class="container">
+      <div id="app"></div>
+    </main> -->
+
+    <footer class="footer">&copy; <span id="year"></span> Pāli Lessons</footer>
+
+    <!-- Auth dialog -->
+    <dialog id="authDlg" class="auth-modal">
+      <form method="dialog" class="auth-card" id="authForm" novalidate>
+        <button
+          id="closeAuth"
+          class="icon-btn close"
+          type="button"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+        <div class="auth-header">
+          <img src="/icons/icon-192.png" alt="logo" />
+          <h3>Welcome back</h3>
+          <p class="muted">Log in to continue your learning</p>
+        </div>
+
+        <div class="tabs">
+          <button type="button" class="tab active" data-mode="login">
+            Log in
+          </button>
+          <button type="button" class="tab" data-mode="signup">Sign up</button>
+          <button type="button" class="tab" data-mode="forgot">Forgot</button>
+        </div>
+
+        <div class="fields">
+          <label
+            >Email
+            <input id="authEmail" type="email" autocomplete="email" required />
+          </label>
+
+          <label class="pw">
+            Password
+            <input
+              id="authPassword"
+              type="password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              id="togglePw"
+              class="icon-btn eye"
+              aria-label="Show password"
+            >
+              👁
+            </button>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="btnAuthSubmit" class="btn primary" type="submit">
+            Continue
+          </button>
+          <button class="btn ghost" type="button" id="btnAuthCancel">
+            Cancel
+          </button>
+        </div>
+
+        <p id="authError" class="error hidden"></p>
+      </form>
+    </dialog>
+
+    <!-- jsPDF (UMD) -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script>
+      // window.jspdf.jsPDF ကို အသုံးပြုရမယ်
+      function demoMakePDF() {
+        // const { jsPDF } = window.jspdf;
+        const doc = new jsPDF("l", "pt", "a4");
+        doc.text("Hello from jsPDF (UMD)!", 60, 80);
+        doc.save("demo.pdf");
+      }
+      // demoMakePDF();
+    </script>
+    <script type="module" src="/js/firebase.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </body>
 </html>

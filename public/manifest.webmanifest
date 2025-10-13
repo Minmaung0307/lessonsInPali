@@ -1,12 +1,22 @@
 {
-  "name": "Lessons in Pali",
-  "short_name": "Pali Lessons",
-  "start_url": "/index.html#/home",
+  "name": "P\u0101li Lessons (LMS)",
+  "short_name": "P\u0101li LMS",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0e11",
-  "theme_color": "#00b36b",
+  "background_color": "#f6efe1",
+  "theme_color": "#6a3b2d",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
