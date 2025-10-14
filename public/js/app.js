@@ -16,6 +16,9 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
+  limit,
+  startAt,
+  endAt,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 import {
@@ -40,10 +43,13 @@ document.getElementById("btnMenu")?.addEventListener("click", () => {
 
 // Mini guard
 function needAdmin(role) {
-  if (!(role === "admin" || role === "ta")) {
-    alert("Admins only");
-    throw new Error("no-admin");
+  const r = role || window.currentRole || "guest";
+  const ok = r === "admin" || r === "ta";
+  if (!ok) {
+    alert("Admin only.");
+    location.hash = "#/";
   }
+  return ok;
 }
 
 // Add Course
@@ -148,7 +154,8 @@ currentRole = await getUserRole();
 
 // one-line SVG placeholder (gray box with text)
 const PLACEHOLDER_IMG =
-  'data:image/svg+xml;utf8,' + encodeURIComponent(`
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">
       <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
         <stop offset="0%" stop-color="#e9eef3"/><stop offset="100%" stop-color="#dfe6ee"/>
@@ -166,7 +173,7 @@ const PLACEHOLDER_IMG =
 //   .replaceAll('&','&amp;').replaceAll('<','&lt;')
 //   .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
 
-const short = (s='', n=140) => s.length>n ? s.slice(0,n-1)+'…' : s;
+const short = (s = "", n = 140) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ---------- Utils ----------
 function escapeHtml(s = "") {
@@ -187,22 +194,16 @@ const applyTheme = (v) =>
   (document.documentElement.dataset.theme = v || "pali");
 const applyFontSize = (v) => (document.documentElement.dataset.fs = v || "md");
 
-async function ensureUserDoc() {
-  if (!auth.currentUser) return;
-  const ref = doc(db, "users", auth.currentUser.uid);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    await setDoc(
-      ref,
-      {
-        email: auth.currentUser.email || "",
-        displayName: auth.currentUser.displayName || "",
-        role: "student",
-        credits: 0,
-        createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+async function ensureUserDoc(u){
+  const r = doc(db, "users", u.uid);
+  const s = await getDoc(r);
+  if (!s.exists()) {
+    await setDoc(r, {
+      email: u.email || "",
+      displayName: u.displayName || "",
+      role: "student",
+      ts: serverTimestamp(),
+    }, { merge: true });
   }
 }
 
@@ -277,6 +278,7 @@ if (!window.__APP_ROUTER__) {
 
   window.route = async function route() {
     const hash = location.hash.replace(/^#/, "") || "/";
+
     if (hash === "/") return renderHome?.();
     if (hash.startsWith("/courses")) return renderCourses?.();
     if (hash.startsWith("/dashboard")) return renderDashboard?.();
@@ -285,6 +287,7 @@ if (!window.__APP_ROUTER__) {
     if (hash.startsWith("/settings")) return renderSettings?.();
     if (hash.startsWith("/certs")) return renderCertificates?.();
     if (hash.startsWith("/transcripts")) return renderTranscripts?.();
+    if (hash.startsWith("/search")) return renderSearch?.();   // ✅ move this UP
     return renderNotFound?.();
   };
 
@@ -353,21 +356,11 @@ function applyAuthVisibility(user, role) {
 }
 
 // ✅ getUserRole() — current user’s role ကို Firestore မှာ query လုပ်ပြီး ပြန်ပေးမယ်
-async function getUserRole() {
-  if (!auth.currentUser) return "guest";
-  try {
-    const ref = doc(db, "users", auth.currentUser.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      return data.role || "student"; // default = student
-    } else {
-      return "student";
-    }
-  } catch (err) {
-    console.error("getUserRole error:", err);
-    return "guest";
-  }
+async function getUserRole(){
+  const u = auth.currentUser;
+  if (!u) return "guest";
+  const s = await getDoc(doc(db, "users", u.uid));
+  return s.exists() ? (s.data().role || "student") : "student";
 }
 
 async function loadProfile() {
@@ -541,14 +534,28 @@ function gateNavByAuth(user, role = "guest") {
 onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
 
+  // 1) user doc ကို login ဖြစ်သလို စောစော ensure (role/theme/fs စသည့် default တွေ စီ)
+  if (u) {
+    // 1) users/{uid} မရှိရင် ဖန်တီး
+    await ensureUserDoc(u);
+    // 2) role ဖတ်
+    currentRole = await getUserRole();
+    if (!currentRole) currentRole = "student";
+    console.log("✅ Logged in as:", u.email, "Role:", currentRole);
+  } else {
+    console.log("🚪 Logged out");
+    currentRole = "guest";
+  }
+
+  // 2) role ထုတ်ယူ
   let role = "guest";
   if (u) {
     try {
-      role = await getUserRole(); // users/{uid}.role ကနေ ယူတာ
-      if (!role) role = "student"; // fallback
+      role = await getUserRole();   // users/{uid}.role
+      if (!role) role = "student";
       console.log("✅ Logged in as:", u.email, "Role:", role);
     } catch (e) {
-      console.warn('getUserRole failed, fallback to "student"', e);
+      console.warn('getUserRole failed, fallback "student"', e);
       role = "student";
     }
   } else {
@@ -556,20 +563,18 @@ onAuthStateChanged(auth, async (u) => {
   }
   currentRole = role;
 
-  // UI gating + active nav update
+  // 3) UI gating
   applyAuthVisibility(currentUser, currentRole);
   if (typeof setActiveNav === "function") setActiveNav();
-
-  // nav gating (function ရှိမရှိစစ်ပြီး ခေါ်)
   if (typeof gateNavByAuth === "function") {
     gateNavByAuth(currentUser, currentRole);
   }
 
-  // route render (hashchange/load ကနေ route ခေါ်ထားရင် ဒီလို guard လုပ်ချင်ရင်)
+  // 4) route re-render (re-entrant guard)
   if (!window.__ROUTE_LOCK__) {
     window.__ROUTE_LOCK__ = true;
     try {
-      route && route();
+      if (typeof route === "function") await route();
     } finally {
       window.__ROUTE_LOCK__ = false;
     }
@@ -582,26 +587,269 @@ document
   ?.addEventListener("click", () => signOut(auth));
 
 // ---------- Home ----------
-function renderHome(){
+// helpers
+const PLACEHOLDER_MEDIA = "/img/placeholder.png"; // already configured
+
+function postCardHTML(p) {
+  const t = p.type || "text";
+  const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
+  const title = p.title || "";
+  const body = p.body || "";
+  const media = p.mediaUrl || "";
+
+  let mediaBlock = "";
+  if (t === "image" && media) {
+    mediaBlock = `<img class="cover" src="${media}" alt="">`;
+  } else if (t === "video" && media) {
+    mediaBlock = `
+      <video class="cover" controls playsinline preload="metadata">
+        <source src="${media}" type="${p.mediaType || "video/mp4"}" />
+        Your browser does not support the video tag.
+      </video>`;
+  } else if (t === "audio" && media) {
+    mediaBlock = `
+      <audio controls preload="metadata" style="width:100%">
+        <source src="${media}" type="${p.mediaType || "audio/mpeg"}" />
+        Your browser does not support the audio element.
+      </audio>`;
+  }
+
+  return `
+  <article class="card post" data-id="${p.id}">
+    ${title ? `<h3>${escapeHtml(title)}</h3>` : ""}
+    ${mediaBlock}
+    ${body ? `<p class="desc">${escapeHtml(body)}</p>` : ""}
+    <div class="muted" style="margin-top:.25rem">${ts}</div>
+  </article>`;
+}
+
+async function renderHome() {
   appEl.innerHTML = `
     <section class="card hero">
-      <img src="/icons/icon-192.png" alt="Lotus">
-      <div>
-        <h1>Pāli Lessons</h1>
-        <p class="muted">Ancient language, modern learning — Explore structured Pāli courses from Beginner to Pro.</p>
-        <div class="list">
-          <span class="badge">Beginner → Pro</span>
-          <span class="badge">Gated quizzes</span>
-          <span class="badge">Certificates (≥65%)</span>
-          <span class="badge">Shop & PayPal</span>
-        </div>
+      <div class="banner" id="heroBanner"></div>
+      <div class="overlay">
+        <h1 id="bannerH">Pāli Lessons</h1>
+        <p id="bannerP" class="muted">Latest posts from teachers & staff — announcements, lessons, media updates.</p>
       </div>
     </section>
 
-    <section class="grid cards" id="homeCourses"></section>
+    <section id="homeFeed" class="stack"></section>
   `;
-  renderCourseCards("#homeCourses"); // same HTML + logic with Courses page
+
+  // 🔹 Mount banner slider right away
+  mountHeroSlider('#heroBanner');
+
+  const feed = document.getElementById("homeFeed");
+  feed.innerHTML = `<div class="muted">Loading posts…</div>`;
+
+  if (!window.db) {
+    console.error('[home] Firestore not initialized');
+    feed.innerHTML = `<div class="card error">App not initialized.</div>`;
+    return;
+  }
+
+  try {
+    const q1 = query(collection(db, "posts"), orderBy("ts", "desc"), limit(50));
+    const snap = await getDocs(q1);
+    const items = [];
+    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+
+    feed.innerHTML = items.length
+      ? items.map(postCardHTML).join("")
+      : `<div class="card muted">No posts yet.</div>`;
+  } catch (e) {
+    console.error("[home posts]", e);
+    feed.innerHTML = `<div class="card error">Failed to load posts.</div>`;
+  }
 }
+
+// ===== Hero Banner Slider =====
+
+// Local images (public/img/… ထဲ ထားပြီး firebase deploy လုပ်ထားရန်)
+const LOCAL_BANNERS = [
+  '/img/banner1.svg',
+  '/img/banner2.svg',
+  '/img/banner3.svg',
+  '/img/banner4.png',
+];
+
+// Unsplash random (no API key) — reload တစ်ခါချင်း마다 အသစ်တွေ လာနိုင်
+// အလိုရှိသလို keyword တွေပြောင်းနိုင်ပါတယ်
+const UNSPLASH_RANDOM = [
+  'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=1600&q=80',
+  'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1600&q=80',
+  'https://images.unsplash.com/photo-1528819622765-d6bcf132f793?auto=format&fit=crop&w=1600&q=80',
+  'https://images.unsplash.com/photo-1504203700686-0c3b9dba4991?auto=format&fit=crop&w=1600&q=80'
+];
+
+// Mix local + online (သင်မလိုတယ်ဆိုရင် တစ်မျိုးတည်းသုံး)
+const BANNER_SOURCES = [...LOCAL_BANNERS, ...UNSPLASH_RANDOM];
+
+// Preload helper
+function preload(src) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => res(src);
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+}
+
+// Main mount
+async function mountHeroSlider(targetSel, images = BANNER_SOURCES, intervalMs = 6000) {
+  const host = document.querySelector(targetSel);
+  if (!host) return;
+
+  // preload (faulty URLs ကို filter ပြန်တယ်)
+  const loaded = (await Promise.all(images.map(preload))).filter(Boolean);
+  if (!loaded.length) {
+    // totally failed → fallback to placeholder
+    host.innerHTML = `<div class="slide is-active"><img src="${PLACEHOLDER_IMG}" alt=""></div>`;
+    return;
+  }
+
+  // randomize order
+  for (let i = loaded.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [loaded[i], loaded[j]] = [loaded[j], loaded[i]];
+  }
+
+  // build DOM
+  const slides = loaded.map((src, idx) =>
+    `<div class="slide${idx===0?' is-active':''}"><img src="${src}" alt=""></div>`
+  ).join('');
+  const dots = loaded.map((_, idx) =>
+    `<div class="dot${idx===0?' is-active':''}" data-i="${idx}"></div>`
+  ).join('');
+
+  host.innerHTML = slides + `<div class="dots">${dots}</div>`;
+
+  const slideEls = Array.from(host.querySelectorAll('.slide'));
+  const dotEls   = Array.from(host.querySelectorAll('.dot'));
+  let i = 0, timer = null;
+
+  const go = (next) => {
+    slideEls[i]?.classList.remove('is-active');
+    dotEls[i]?.classList.remove('is-active');
+    i = next;
+    slideEls[i]?.classList.add('is-active');
+    dotEls[i]?.classList.add('is-active');
+  };
+
+  const tick = () => {
+    const next = (i + 1) % slideEls.length;
+    go(next);
+  };
+
+  timer = setInterval(tick, intervalMs);
+
+  // dot click → jump
+  dotEls.forEach(d => {
+    d.addEventListener('click', () => {
+      clearInterval(timer);
+      go(Number(d.dataset.i));
+      timer = setInterval(tick, intervalMs); // resume
+    });
+  });
+}
+// Admin Posts form submit
+// formPosts.addEventListener('submit', async (e)=>{
+//   e.preventDefault();
+//   const f = e.target;
+//   const type = f.type.value;          // text | image | video | audio | link
+//   const text = (f.text?.value || '').trim();
+//   const file = f.media?.files?.[0] || null;
+
+//   let mediaUrl = '';
+//   let mediaType = '';
+
+//   if (file) {
+//     const ext = (file.name.split('.').pop() || '').toLowerCase();
+//     const path = `posts/${auth.currentUser.uid}/${Date.now()}-${file.name}`;
+//     const r = sref(storage, path);
+//     const task = uploadBytesResumable(r, file, { contentType: file.type || `application/octet-stream` });
+//     await new Promise((res, rej)=> task.on('state_changed', null, rej, res));
+//     mediaUrl = await getDownloadURL(task.snapshot.ref);
+//     mediaType = file.type; // e.g. "image/png", "video/mp4"
+//   }
+
+//   // Save Firestore doc
+//   await addDoc(collection(db, 'posts'), {
+//     type, text, mediaUrl, mediaType,
+//     createdBy: auth.currentUser.uid,
+//     ts: serverTimestamp(),
+//     // optional extra fields
+//     title: f.title?.value || '',
+//     tags: (f.tags?.value || '').split(',').map(s=>s.trim()).filter(Boolean)
+//   });
+
+//   f.reset();
+//   alert('Post published ✅');
+//   loadPosts(); // refresh list
+// });
+
+function postItemHTML(p){
+  const safeText = escapeHtml(p.text || '');
+  if (p.type === 'image') {
+    return `
+      <article class="card post">
+        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
+        <img class="post-img" src="${p.mediaUrl}"
+             alt="${(p.title||'').replace(/"/g,'&quot;')}"
+             onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+      </article>`;
+  }
+  if (p.type === 'video') {
+    return `
+      <article class="card post">
+        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
+        <video class="post-video" src="${p.mediaUrl}" controls preload="metadata"></video>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+      </article>`;
+  }
+  if (p.type === 'audio') {
+    return `
+      <article class="card post">
+        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
+        <audio class="post-audio" src="${p.mediaUrl}" controls preload="metadata"></audio>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+      </article>`;
+  }
+  if (p.type === 'link') {
+    // simplest: just anchor
+    return `
+      <article class="card post">
+        <a href="${p.mediaUrl}" target="_blank" rel="noopener noreferrer">${p.mediaUrl}</a>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+      </article>`;
+  }
+  // default: text
+  return `
+    <article class="card post">
+      <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
+      <p class="post-text">${safeText || '(empty)'}</p>
+    </article>`;
+}
+
+async function loadPosts() {
+  const box = document.getElementById('homePosts');
+  box.innerHTML = 'Loading…';
+  const qSnap = await getDocs(query(collection(db,'posts'), orderBy('ts','desc')));
+  box.innerHTML = '';
+  qSnap.forEach(d => {
+    const p = { id: d.id, ...d.data() };
+    box.insertAdjacentHTML('beforeend', postItemHTML(p));
+  });
+}
+
+// const typeSel = document.querySelector('#postType');
+// const mediaRow = document.querySelector('#rowMedia');
+// typeSel.addEventListener('change', ()=>{
+//   const t = typeSel.value;
+//   // text-only → hide file input
+//   mediaRow.classList.toggle('hidden', (t==='text'));
+// });
 
 // ---------- Courses (cards) ----------
 async function renderCourseCards(sel) {
@@ -611,40 +859,63 @@ async function renderCourseCards(sel) {
 
   let items = [];
   try {
-    const qIndexed = query(collection(db,"courses"), orderBy("level","asc"), orderBy("title","asc"));
+    const qIndexed = query(
+      collection(db, "courses"),
+      orderBy("level", "asc"),
+      orderBy("title", "asc")
+    );
     const snap = await getDocs(qIndexed);
-    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
   } catch (e) {
     console.warn("[courses] indexed query failed, fallback:", e.message);
-    const qSimple = query(collection(db,"courses"), orderBy("level","asc"));
+    const qSimple = query(collection(db, "courses"), orderBy("level", "asc"));
     const snap = await getDocs(qSimple);
-    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-    items.sort((a,b)=>(a.level??0)-(b.level??0) || String(a.title||"").localeCompare(String(b.title||"")));
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    items.sort(
+      (a, b) =>
+        (a.level ?? 0) - (b.level ?? 0) ||
+        String(a.title || "").localeCompare(String(b.title || ""))
+    );
   }
 
   for (const c of items) {
     host.insertAdjacentHTML("beforeend", courseCardHTML(c));
   }
 
-  host.querySelectorAll("[data-action='details']").forEach(b =>
-    b.addEventListener("click", e => openCourse(e.currentTarget.dataset.id))
-  );
-  host.querySelectorAll("[data-action='enroll']").forEach(b =>
-    b.addEventListener("click", e => enrollCourse(e.currentTarget.dataset.id))
+  host
+    .querySelectorAll("[data-action='details']")
+    .forEach((b) =>
+      b.addEventListener("click", (e) => openCourse(e.currentTarget.dataset.id))
+    );
+
+  host.querySelectorAll("[data-action='enroll']").forEach((b) =>
+    b.addEventListener("click", (e) => {
+      const id = e.currentTarget.dataset.id;
+      const price = Number(e.currentTarget.dataset.price);
+      if (price > 0) {
+        openBuyDialog(id, price); // 💳 PayPal
+      } else {
+        enrollCourse(id); // 🆓 Free
+      }
+    })
   );
 }
 
 function replaceBrokenPlaceholders(root = document) {
-  root.querySelectorAll('img').forEach(img => {
-    const s = (img.getAttribute('src') || '').trim();
-    if (!s || s.endsWith('/img/placeholder.png')) {
-      img.setAttribute('src', PLACEHOLDER_IMG); // ✅ no 404 calls
+  root.querySelectorAll("img").forEach((img) => {
+    const s = (img.getAttribute("src") || "").trim();
+    if (!s || s.endsWith("/img/placeholder.png")) {
+      img.setAttribute("src", PLACEHOLDER_IMG); // ✅ no 404 calls
     }
     // If any image still errors → fallback
-    img.addEventListener('error', () => {
-      img.onerror = null;
-      img.src = PLACEHOLDER_IMG;
-    }, { once:true });
+    img.addEventListener(
+      "error",
+      () => {
+        img.onerror = null;
+        img.src = PLACEHOLDER_IMG;
+      },
+      { once: true }
+    );
   });
 }
 
@@ -1035,23 +1306,23 @@ function createAdminCourseDialog() {
 }
 
 // Hook “Edit” buttons in Admin list
-function bindAdminCourseList(){
+function bindAdminCourseList() {
   const list = document.getElementById("adminCourseList");
-  if(!list) return;
+  if (!list) return;
 
-  list.addEventListener("click", async (e)=>{
+  list.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action]");
-    if(!btn) return;
+    if (!btn) return;
     const act = btn.dataset.action;
-    const id  = btn.dataset.id;
+    const id = btn.dataset.id;
 
-    if (act === "edit"){
-      const s = await getDoc(doc(db,"courses", id));
+    if (act === "edit") {
+      const s = await getDoc(doc(db, "courses", id));
       if (s.exists()) fillCourseForm({ id: s.id, ...s.data() });
     }
-    if (act === "delete"){
+    if (act === "delete") {
       if (confirm("Delete this course?")) {
-        await deleteDoc(doc(db,"courses", id));
+        await deleteDoc(doc(db, "courses", id));
         await loadAdminCourses();
       }
     }
@@ -1059,31 +1330,37 @@ function bindAdminCourseList(){
 
   // form submit/save
   const form = document.getElementById("courseForm");
-  form?.addEventListener("submit", async (ev)=>{
+  form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const data = formToCourse(form);
-    const id   = data.id || crypto.randomUUID();
+    const id = data.id || crypto.randomUUID();
 
-    await setDoc(doc(db,"courses", id), {
-      title: data.title || "",
-      summary: data.summary || "",
-      description: data.description || "",
-      level: Number(data.level ?? 0),
-      credits: Number(data.credits ?? 0),
-      price: Number(data.price ?? 0),
-      img: data.img || "",
-      benefits: normBenefits(data.benefits) // store as array
-    }, { merge:true });
+    await setDoc(
+      doc(db, "courses", id),
+      {
+        title: data.title || "",
+        summary: data.summary || "",
+        description: data.description || "",
+        level: Number(data.level ?? 0),
+        credits: Number(data.credits ?? 0),
+        price: Number(data.price ?? 0),
+        img: data.img || "",
+        benefits: normBenefits(data.benefits), // store as array
+      },
+      { merge: true }
+    );
 
     alert("Saved.");
-    fillCourseForm({});    // reset
+    fillCourseForm({}); // reset
     await loadAdminCourses();
   });
 
-  document.getElementById("btnResetCourse")?.addEventListener("click", ()=> fillCourseForm({}));
+  document
+    .getElementById("btnResetCourse")
+    ?.addEventListener("click", () => fillCourseForm({}));
 }
 
-function formToCourse(form){
+function formToCourse(form) {
   const o = Object.fromEntries(new FormData(form).entries());
   // benefits: keep raw but normalize when saving
   return o;
@@ -1093,15 +1370,21 @@ function $$(s) {
   return document.querySelector(s);
 }
 function openBuyDialog(courseId, price) {
+  // $0 (Free) → PayPal မသွားဘဲ တန်း Enroll
+  const p = Number(price || 0);
+  if (p <= 0) return enrollCourse(courseId);
+
   const buyDlg = $("#buyDlg");
-  $("#buyTitle").textContent = `Purchase course – $${price}`;
+  $("#buyTitle").textContent = `Purchase course – $${p.toFixed(2)}`;
   buyDlg?.showModal();
 
   const mount = $("#paypal-buttons");
   if (!mount) {
-    alert("Mount not found");
+    alert("PayPal mount not found");
     return;
   }
+  // Prevent duplicate renders
+  if (mount.__rendered) return;
   mount.innerHTML = "";
 
   if (!window.paypal) {
@@ -1120,27 +1403,31 @@ function openBuyDialog(courseId, price) {
       createOrder(_, actions) {
         return actions.order.create({
           purchase_units: [
-            { amount: { value: String(price) }, custom_id: courseId },
+            { amount: { value: p.toFixed(2) }, custom_id: courseId },
           ],
         });
       },
       async onApprove(data, actions) {
-        const details = await actions.order.capture();
-        const u = auth.currentUser;
-        await fetch("/verifyPayPal", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": u?.uid || "",
-          },
-          body: JSON.stringify({ orderId: data.orderID, courseId }),
-        })
-          .then((r) => r.json())
-          .catch(() => ({ ok: false }));
-
-        alert("Payment verified. You're enrolled!");
-        buyDlg?.close();
-        location.hash = "#/dashboard";
+        try {
+          await actions.order.capture();
+          const u = auth.currentUser;
+          await fetch("/verifyPayPal", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": u?.uid || "",
+            },
+            body: JSON.stringify({ orderId: data.orderID, courseId }),
+          })
+            .then((r) => r.json())
+            .catch(() => ({ ok: false }));
+          alert("Payment verified. You're enrolled!");
+          buyDlg?.close();
+          location.hash = "#/dashboard";
+        } catch (err) {
+          console.error(err);
+          alert("PayPal error.");
+        }
       },
       onError(err) {
         console.error(err);
@@ -1148,6 +1435,8 @@ function openBuyDialog(courseId, price) {
       },
     })
     .render(mount);
+
+  mount.__rendered = true;
 }
 window.openBuyDialog = openBuyDialog;
 
@@ -1376,7 +1665,10 @@ async function openLesson(lessonId) {
 // ---------- Dashboard ----------
 async function renderDashboard() {
   const u = auth.currentUser;
-  if (!u) { location.hash = "#/"; return; }
+  if (!u) {
+    location.hash = "#/";
+    return;
+  }
 
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -1399,7 +1691,10 @@ async function renderDashboard() {
 
   /* ---------- My Enrollments ---------- */
   try {
-    const eq = query(collection(db, "users", u.uid, "enrollments"), orderBy("ts", "desc"));
+    const eq = query(
+      collection(db, "users", u.uid, "enrollments"),
+      orderBy("ts", "desc")
+    );
     const es = await getDocs(eq);
 
     const my = document.getElementById("myCourses");
@@ -1407,11 +1702,13 @@ async function renderDashboard() {
       my.innerHTML = `<div class="card muted">No enrollments yet.</div>`;
     } else {
       // parallel load course docs
-      const enrolls = es.docs.map(d => ({ id: d.id, ...d.data() }));
-      const coursePromises = enrolls.map(async e => {
+      const enrolls = es.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const coursePromises = enrolls.map(async (e) => {
         const cRef = doc(db, "courses", e.courseId);
         const cs = await getDoc(cRef);
-        return cs.exists() ? { id: cs.id, ...cs.data() } : { id: e.courseId, title: e.courseTitle || "Course" };
+        return cs.exists()
+          ? { id: cs.id, ...cs.data() }
+          : { id: e.courseId, title: e.courseTitle || "Course" };
       });
       const courses = await Promise.all(coursePromises);
 
@@ -1435,7 +1732,9 @@ async function renderDashboard() {
     }
   } catch (e) {
     console.error("[dashboard] enrollments:", e);
-    document.getElementById("myCourses").innerHTML = `<div class="card error">Can't load courses.</div>`;
+    document.getElementById(
+      "myCourses"
+    ).innerHTML = `<div class="card error">Can't load courses.</div>`;
   }
 
   /* ---------- Announcements (public) ---------- */
@@ -1450,25 +1749,33 @@ async function renderDashboard() {
       as.forEach((d) => {
         const a = d.data();
         const when = a.ts?.toDate ? a.ts.toDate().toLocaleString() : "";
-        annBox.insertAdjacentHTML("beforeend", `
+        annBox.insertAdjacentHTML(
+          "beforeend",
+          `
           <article class="card">
             <strong>${escapeHtml(a.title || "")}</strong>
             <p class="muted" style="margin:.25rem 0">${when}</p>
             <p>${escapeHtml(a.body || "")}</p>
           </article>
-        `);
+        `
+        );
       });
     }
   } catch (e) {
     console.error("[dashboard] announcements:", e);
-    document.getElementById("annList").innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    document.getElementById(
+      "annList"
+    ).innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
   /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
     const mineQ = query(collection(db, "messages"), where("to", "==", u.uid));
-    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
-    const [mineSnap, broadSnap] = await Promise.all([getDocs(mineQ), getDocs(allQ)]);
+    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([
+      getDocs(mineQ),
+      getDocs(allQ),
+    ]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -1482,26 +1789,38 @@ async function renderDashboard() {
 
     const msgBox = document.getElementById("msgList");
     msgBox.innerHTML = items.length
-      ? items.map(m => `
+      ? items
+          .map(
+            (m) => `
           <article class="card">
-            <p class="muted" style="margin:0 0 .25rem">${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}</p>
+            <p class="muted" style="margin:0 0 .25rem">${
+              m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""
+            }</p>
             <p>${escapeHtml(m.text || "")}</p>
           </article>
-        `).join("")
+        `
+          )
+          .join("")
       : `<div class="card muted">No messages.</div>`;
   } catch (e) {
     console.error("[dashboard] messages:", e);
-    document.getElementById("msgList").innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    document.getElementById(
+      "msgList"
+    ).innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
 // ---------- Admin (CRUD) ----------
-function requireStaff() {
-  const ok = currentUser && (currentRole === "admin" || currentRole === "ta");
-  if (!ok) {
-    document.getElementById(
-      "app"
-    ).innerHTML = `<div class="card">Admin only.</div>`;
+function requireStaff(){
+  const app = document.getElementById("app");
+  if (!auth.currentUser){
+    // login dialog ရှိရင် ပြ
+    try { authDlg?.showModal?.(); } catch {}
+    app.innerHTML = `<section class="card max"><h2>Admin</h2><p class="error">Please login.</p></section>`;
+    return false;
+  }
+  if (!["admin","ta"].includes(currentRole)){
+    app.innerHTML = `<section class="card max"><h2>Admin</h2><p class="error">Admin only.</p></section>`;
     return false;
   }
   return true;
@@ -1517,6 +1836,7 @@ async function renderAdmin() {
 
       <div class="tabs">
         <button class="tab is-active" data-tab="courses">Courses</button>
+        <button class="tab" data-tab="posts">Posts</button>
         <button class="tab" data-tab="ann">Announcements</button>
         <button class="tab" data-tab="msg">Message Students</button>
       </div>
@@ -1552,6 +1872,42 @@ async function renderAdmin() {
         <div id="adminCourseList" class="grid"></div>
       </div>
 
+      <!-- POSTS -->
+      <div id="tab-posts" class="hidden">
+        <form id="formPosts" class="form grid-2">
+          <label>Type
+            <select name="type" id="postType">
+              <option value="text">Text</option>
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+              <option value="audio">Audio</option>
+            </select>
+          </label>
+          <label>Title
+            <input name="title" placeholder="Post title">
+          </label>
+
+          <label class="col-2">Body
+            <textarea name="body" rows="4" placeholder="Write something…"></textarea>
+          </label>
+
+          <div id="rowMedia" class="col-2">
+            <label>Media file
+              <input type="file" name="media" id="postMedia" accept="image/*,audio/*,video/*">
+            </label>
+            <label>OR Media URL
+              <input name="mediaUrl" placeholder="https://… (optional)">
+            </label>
+          </div>
+
+          <div class="col-2">
+            <button class="btn" type="submit">Publish</button>
+          </div>
+        </form>
+
+        <div id="adminPosts" class="stack" style="margin-top:1rem"></div>
+      </div>
+
       <!-- ANNOUNCEMENTS -->
       <div id="tab-ann" class="hidden">
         <form id="formAnn" class="form">
@@ -1584,74 +1940,91 @@ async function renderAdmin() {
   `;
 
   /* ---------------- Tabs ---------------- */
-  app.querySelectorAll(".tab").forEach(btn => {
+  app.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       app.querySelectorAll(".tab").forEach(b => b.classList.remove("is-active"));
       btn.classList.add("is-active");
       const k = btn.dataset.tab;
-      app.querySelector("#tab-courses").classList.toggle("hidden", k !== "courses");
-      app.querySelector("#tab-ann").classList.toggle("hidden", k !== "ann");
-      app.querySelector("#tab-msg").classList.toggle("hidden", k !== "msg");
+      app.querySelector("#tab-courses").classList.toggle("hidden", k!=="courses");
+      app.querySelector("#tab-posts").classList.toggle("hidden",   k!=="posts");
+      app.querySelector("#tab-ann").classList.toggle("hidden",     k!=="ann");
+      app.querySelector("#tab-msg").classList.toggle("hidden",     k!=="msg");
     });
   });
 
   /* --------------- COURSES: load/list/bind --------------- */
   const listEl = document.getElementById("adminCourseList");
-  const formCourse = document.getElementById("formCourse");
+  // bindAdminCourseList(listEl);
 
-  function normBenefits(b){
+  const formCourse = document.getElementById("formCourse");
+  if (!formCourse) { console.warn('[admin] #formCourse not found'); return; }
+
+  function normBenefits(b) {
     if (Array.isArray(b)) return b;
-    return String(b||"").split(",").map(s=>s.trim()).filter(Boolean);
+    return String(b || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
-  function courseCardAdminHTML(c){
+  function courseCardAdminHTML(c) {
     const price = Number(c.price ?? 0);
     const priceLabel = price > 0 ? `$${price.toFixed(2)}` : "Free";
     return `
       <article class="course-card" data-id="${c.id}">
-        <img src="${c.img || '/img/placeholder.png'}" class="cover" alt="">
+        <img src="${c.img || "/img/placeholder.png"}" class="cover" alt="">
         <div class="body">
-          <h3>${c.title || ''}</h3>
-          <p class="desc">${c.short || c.summary || ''}</p>
+          <h3>${c.title || ""}</h3>
+          <p class="desc">${c.short || c.summary || ""}</p>
           <ul class="meta">
             <li>Level: ${c.level ?? 0}</li>
             <li>Credits: ${c.credits ?? 0}</li>
-            <li>Benefits: ${(c.benefits || []).slice(0,3).join(" • ")}</li>
+            <li>Benefits: ${(c.benefits || []).slice(0, 3).join(" • ")}</li>
           </ul>
           <div class="footer">
             <span class="price">${priceLabel}</span>
             <div class="actions">
-              <button class="btn ghost" data-action="edit" data-id="${c.id}">Edit</button>
-              <button class="btn danger" data-action="delete" data-id="${c.id}">Delete</button>
+              <button class="btn ghost" data-action="edit" data-id="${
+                c.id
+              }">Edit</button>
+              <button class="btn danger" data-action="delete" data-id="${
+                c.id
+              }">Delete</button>
             </div>
           </div>
         </div>
       </article>`;
   }
 
-  async function loadAdminCourses(){
+  async function loadAdminCourses() {
     if (!listEl) return;
     listEl.innerHTML = "Loading…";
-    const snap = await getDocs(query(collection(db,"courses"), orderBy("title","asc")));
+    const snap = await getDocs(
+      query(collection(db, "courses"), orderBy("title", "asc"))
+    );
     const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
     listEl.innerHTML = rows.map(courseCardAdminHTML).join("");
   }
 
-  function fillCourseForm(c = {}){
-    formCourse.id.value        = c.id || "";
-    formCourse.title.value     = c.title || "";
-    formCourse.level.value     = (typeof c.level === "number") ? c.level : 0;
-    formCourse.credits.value   = (typeof c.credits === "number") ? c.credits : 10;
-    formCourse.summary.value   = c.summary || c.short || "";
-    formCourse.price.value     = (typeof c.price === "number") ? c.price : 0;
-    formCourse.img.value       = c.img || "";
-    formCourse.benefits.value  = Array.isArray(c.benefits) ? c.benefits.join(", ") : (c.benefits || "");
+  function fillCourseForm(c = {}) {
+    formCourse.id.value = c.id || "";
+    formCourse.title.value = c.title || "";
+    formCourse.level.value = typeof c.level === "number" ? c.level : 0;
+    formCourse.credits.value = typeof c.credits === "number" ? c.credits : 10;
+    formCourse.summary.value = c.summary || c.short || "";
+    formCourse.price.value = typeof c.price === "number" ? c.price : 0;
+    formCourse.img.value = c.img || "";
+    formCourse.benefits.value = Array.isArray(c.benefits)
+      ? c.benefits.join(", ")
+      : c.benefits || "";
   }
 
-  document.getElementById("btnResetCourse")?.addEventListener("click", ()=> fillCourseForm({}));
+  document
+    .getElementById("btnResetCourse")
+    ?.addEventListener("click", () => fillCourseForm({}));
 
-  formCourse.addEventListener("submit", async (e)=>{
+  formCourse.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target;
     const id = f.id.value || crypto.randomUUID();
@@ -1665,26 +2038,26 @@ async function renderAdmin() {
       benefits: normBenefits(f.benefits.value),
       ts: serverTimestamp(),
     };
-    await setDoc(doc(db,"courses", id), data, { merge:true });
+    await setDoc(doc(db, "courses", id), data, { merge: true });
     alert("Saved.");
     fillCourseForm({});
     await loadAdminCourses();
   });
 
   // ✅ one-time delegation on the list container
-  if (listEl && !listEl.__wired){
+  if (listEl && !listEl.__wired) {
     listEl.__wired = true;
-    listEl.addEventListener("click", async (e)=>{
+    listEl.addEventListener("click", async (e) => {
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
       const id = btn.dataset.id;
       const act = btn.dataset.action;
-      if (act === "edit"){
-        const s = await getDoc(doc(db,"courses", id));
-        if (s.exists()) fillCourseForm({ id:s.id, ...s.data() });
-      } else if (act === "delete"){
+      if (act === "edit") {
+        const s = await getDoc(doc(db, "courses", id));
+        if (s.exists()) fillCourseForm({ id: s.id, ...s.data() });
+      } else if (act === "delete") {
         if (confirm("Delete this course?")) {
-          await deleteDoc(doc(db,"courses", id));
+          await deleteDoc(doc(db, "courses", id));
           await loadAdminCourses();
         }
       }
@@ -1693,39 +2066,239 @@ async function renderAdmin() {
 
   await loadAdminCourses();
 
+  /* --------------- POSTS --------------- */
+  const formPosts = app.querySelector('#formPosts');
+  const postType  = app.querySelector('#postType');
+  const rowMedia  = app.querySelector('#rowMedia');
+
+  // type ပြောင်းသလောက် media row ပြ/ဖျောက်
+  if (postType && rowMedia) {
+    const syncMediaRow = () => {
+      rowMedia.classList.toggle('hidden', postType.value === 'text');
+    };
+    postType.addEventListener('change', syncMediaRow);
+    syncMediaRow(); // initial
+  }
+
+  // Publish handler (guard with if)
+  if (formPosts) {
+    formPosts.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+
+      const type  = f.type.value;
+      const title = (f.title.value || '').trim();
+      const body  = (f.body.value  || '').trim();
+
+      // either URL or file
+      let mediaUrl  = (f.mediaUrl?.value || '').trim();
+      let mediaType = '';
+
+      const file = f.media?.files?.[0];
+      if (file) {
+        const path = `posts/${auth.currentUser.uid}/${Date.now()}-${file.name}`;
+        const r = sref(storage, path);
+        const task = uploadBytesResumable(r, file, { contentType: file.type || 'application/octet-stream' });
+        await new Promise((res, rej) => task.on('state_changed', null, rej, res));
+        mediaUrl  = await getDownloadURL(task.snapshot.ref);
+        mediaType = file.type || '';
+      }
+
+      await addDoc(collection(db, 'posts'), {
+        type, title, body, mediaUrl, mediaType, ts: serverTimestamp()
+      });
+
+      alert('Post published ✅');
+      f.reset();
+      // type ပြန်ချိန်ထား (text ဖြစ်ရင် media row ဖျောက်)
+      postType?.dispatchEvent(new Event('change'));
+
+      // refresh list
+      if (typeof loadAdminPosts === 'function') loadAdminPosts();
+    });
+  } else {
+    console.warn('[admin] #formPosts not found — make sure renderAdmin() ran and the HTML ids match.');
+  }
+
+  // Upload helper
+  async function uploadAdminPostFile(){
+    const file = document.getElementById('postFile')?.files?.[0];
+    if(!file){ alert('Choose a file'); return; }
+    if(!auth.currentUser){ authDlg?.showModal?.(); return; }
+    const ext = (file.name.split('.').pop()||'bin').toLowerCase();
+    const uid = auth.currentUser.uid;
+    const r   = sref(storage, `posts/${uid}/${Date.now()}-${file.name}`);
+    const task= uploadBytesResumable(r, file, { contentType: file.type || `application/octet-stream`});
+    await new Promise((res, rej)=> task.on('state_changed', ()=>{}, rej, res));
+    const url = await getDownloadURL(task.snapshot.ref);
+    const f = document.getElementById('formPost');
+    f.mediaUrl.value = url;
+    f.mediaType.value = file.type || '';
+    alert('Uploaded. URL filled in the form.');
+  }
+  document.getElementById('btnUploadPostFile')?.addEventListener('click', uploadAdminPostFile);
+
+  // Create post
+  // document.getElementById('formPost')?.addEventListener('submit', async (e)=>{
+  //   e.preventDefault();
+  //   const f = e.target;
+  //   const data = {
+  //     type:   (f.type.value || 'text'),
+  //     title:  f.title.value.trim(),
+  //     body:   f.body.value.trim(),
+  //     mediaUrl:  f.mediaUrl.value.trim(),
+  //     mediaType: f.mediaType.value.trim(),
+  //     authorId: auth.currentUser?.uid || '',
+  //     ts: serverTimestamp(),
+  //   };
+  //   await addDoc(collection(db,'posts'), data);
+  //   f.reset();
+  //   loadAdminPosts();
+  // });
+
+  // List posts
+  // helper: post card UI (type အလိုက် preview ပြ)
+  function renderPostCard(p) {
+    const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : '';
+    let media = '';
+    if (p.mediaUrl) {
+      if ((p.mediaType || '').startsWith('image/')) {
+        media = `<img src="${p.mediaUrl}" alt="" style="max-width:100%;border-radius:12px;margin:.5rem 0">`;
+      } else if ((p.mediaType || '').startsWith('video/')) {
+        media = `<video src="${p.mediaUrl}" controls style="width:100%;border-radius:12px;margin:.5rem 0"></video>`;
+      } else if ((p.mediaType || '').startsWith('audio/')) {
+        media = `<audio src="${p.mediaUrl}" controls style="width:100%;margin:.5rem 0"></audio>`;
+      } else {
+        media = `<div class="muted" style="word-break:break-all">${p.mediaUrl}</div>`;
+      }
+    }
+    return `
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <strong>${escapeHtml(p.title || '(no title)')}
+            <span class="badge">${escapeHtml(p.type || 'text')}</span>
+          </strong>
+          <div class="row" style="gap:.5rem">
+            <button class="btn small ghost"  data-act="edit" data-id="${p.id}">Edit</button>
+            <button class="btn small danger" data-act="del"  data-id="${p.id}">Delete</button>
+          </div>
+        </div>
+        <div class="muted" style="margin:.25rem 0">${ts}</div>
+        ${media}
+        ${p.body ? `<p>${escapeHtml(p.body)}</p>` : ''}
+      </div>
+    `;
+  }
+
+  async function loadAdminPosts(){
+    const box = app.querySelector('#adminPosts');
+    if (!box) return;
+    box.innerHTML = `<div class="muted">Loading…</div>`;
+    const snap = await getDocs(query(collection(db,'posts'), orderBy('ts','desc'), limit(50)));
+    const items = [];
+    snap.forEach(d=>items.push({ id:d.id, ...d.data() }));
+    box.innerHTML = items.length ? items.map(p => `
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <strong>${escapeHtml(p.title||'(no title)')} <span class="badge">${p.type||'text'}</span></strong>
+          <div class="row" style="gap:.5rem">
+            <button class="btn small ghost" data-act="edit" data-id="${p.id}">Edit</button>
+            <button class="btn small danger" data-act="del"  data-id="${p.id}">Delete</button>
+          </div>
+        </div>
+        <div class="muted" style="margin:.25rem 0">${p.ts?.toDate ? p.ts.toDate().toLocaleString():''}</div>
+        ${p.mediaUrl ? `<div class="muted" style="word-break:break-all">${p.mediaUrl}</div>` : ''}
+        ${p.body ? `<p>${escapeHtml(p.body)}</p>` : ''}
+      </div>
+    `).join('') : `<div class="card muted">No posts yet.</div>`;
+
+    // delegate: delete
+    box.querySelectorAll('[data-act="del"]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const id = b.getAttribute('data-id');
+        if(confirm('Delete this post?')){
+          await deleteDoc(doc(db,'posts', id));
+          loadAdminPosts();
+        }
+      });
+    });
+
+    // delegate: edit → prefill form
+    box.querySelectorAll('[data-act="edit"]').forEach(b=>{
+      b.addEventListener('click', async ()=>{
+        const id = b.getAttribute('data-id');
+        const s = await getDoc(doc(db,'posts', id));
+        if(!s.exists()) return;
+        const p = s.data();
+        const f = app.querySelector('#formPosts');
+        if (!f) return;
+        f.type.value      = p.type||'text';
+        f.title.value     = p.title||'';
+        f.body.value      = p.body||'';
+        f.mediaUrl.value  = p.mediaUrl||'';
+        postType?.dispatchEvent(new Event('change'));
+
+        // overwrite submit for update
+        f.onsubmit = async (e2)=>{
+          e2.preventDefault();
+          const upd = {
+            type:f.type.value,
+            title:(f.title.value||'').trim(),
+            body:(f.body.value||'').trim(),
+            mediaUrl:(f.mediaUrl.value||'').trim(),
+            mediaType:(p.mediaType||''),
+            ts: serverTimestamp(),
+          };
+          await updateDoc(doc(db,'posts', id), upd);
+          alert('Updated ✅');
+          f.reset();
+          f.onsubmit = null; // restore default (addEventListener) next render
+          loadAdminPosts();
+        };
+      });
+    });
+  }
+  loadAdminPosts();
+
   /* --------------- ANNOUNCEMENTS --------------- */
   const formAnn = document.getElementById("formAnn");
-  formAnn.addEventListener("submit", async (e)=>{
+  if (formAnn) formAnn.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target;
-    await addDoc(collection(db,"announcements"), {
+    await addDoc(collection(db, "announcements"), {
       title: f.title.value.trim(),
-      level: f.level.value,     // '*' or '0..3'
-      body:  f.body.value.trim(),
+      level: f.level.value, // '*' or '0..3'
+      body: f.body.value.trim(),
       ts: serverTimestamp(),
     });
     f.reset();
     await loadAdminAnns();
   });
 
-  async function loadAdminAnns(){
+  async function loadAdminAnns() {
     const box = document.getElementById("adminAnns");
     box.innerHTML = "Loading…";
-    const snap = await getDocs(query(collection(db,"announcements"), orderBy("ts","desc")));
+    const snap = await getDocs(
+      query(collection(db, "announcements"), orderBy("ts", "desc"))
+    );
     const rows = [];
-    snap.forEach(d => rows.push({ id:d.id, ...d.data() }));
-    box.innerHTML = rows.map(a => `
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    box.innerHTML = rows
+      .map(
+        (a) => `
       <div class="card" data-id="${a.id}">
         <strong>${a.title}</strong>
         <div class="muted">Level: ${a.level}</div>
         <p>${a.body}</p>
         <button class="btn small danger" data-del="${a.id}">Delete</button>
       </div>
-    `).join("");
+    `
+      )
+      .join("");
 
-    box.querySelectorAll("[data-del]").forEach(b=>{
-      b.addEventListener("click", async ()=>{
-        await deleteDoc(doc(db,"announcements", b.dataset.del));
+    box.querySelectorAll("[data-del]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        await deleteDoc(doc(db, "announcements", b.dataset.del));
         await loadAdminAnns();
       });
     });
@@ -1734,12 +2307,12 @@ async function renderAdmin() {
 
   /* --------------- MESSAGES --------------- */
   const formMsg = document.getElementById("formMsg");
-  formMsg.addEventListener("submit", async (e)=>{
+  if (formMsg) formMsg.addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = e.target;
-    await addDoc(collection(db,"messages"), {
+    await addDoc(collection(db, "messages"), {
       from: auth.currentUser.uid,
-      to:   f.to.value.trim(),   // uid or "*"
+      to: f.to.value.trim(), // uid or "*"
       text: f.text.value.trim(),
       ts: serverTimestamp(),
     });
@@ -1747,18 +2320,24 @@ async function renderAdmin() {
     await loadAdminMsgs();
   });
 
-  async function loadAdminMsgs(){
+  async function loadAdminMsgs() {
     const box = document.getElementById("adminMsgs");
     box.innerHTML = "Loading…";
-    const snap = await getDocs(query(collection(db,"messages"), orderBy("ts","desc")));
+    const snap = await getDocs(
+      query(collection(db, "messages"), orderBy("ts", "desc"))
+    );
     const rows = [];
-    snap.forEach(d => rows.push(d.data()));
-    box.innerHTML = rows.map(m => `
+    snap.forEach((d) => rows.push(d.data()));
+    box.innerHTML = rows
+      .map(
+        (m) => `
       <div class="card">
         <div><strong>To:</strong> ${m.to}</div>
         <p>${m.text}</p>
       </div>
-    `).join("");
+    `
+      )
+      .join("");
   }
   await loadAdminMsgs();
 }
@@ -1906,6 +2485,93 @@ function profileFormHTML(p = {}) {
       </div>
     </form>
   `;
+}
+
+// Topbar search -> router
+document.getElementById('searchForm')?.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const q = document.getElementById('searchInput')?.value?.trim() || '';
+  location.hash = '#/search?q=' + encodeURIComponent(q);
+});
+
+function highlight(hay, needle){
+  if(!needle) return escapeHtml(hay||'');
+  try{
+    const re = new RegExp('('+needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')+')','ig');
+    return escapeHtml(hay||'').replace(re, '<mark>$1</mark>');
+  }catch{
+    return escapeHtml(hay||'');
+  }
+}
+
+async function renderSearch(){
+  const params = new URLSearchParams((location.hash.split('?')[1]||''));
+  const kw = (params.get('q')||'').trim();
+  appEl.innerHTML = `
+    <section class="card max">
+      <h2>Search</h2>
+      <p class="muted">Query: <strong>${escapeHtml(kw)}</strong></p>
+      <div class="grid-2">
+        <div>
+          <h3>Posts</h3>
+          <div id="searchPosts" class="stack"><div class="muted">Loading…</div></div>
+        </div>
+        <div>
+          <h3>Courses</h3>
+          <div id="searchCourses" class="course-grid"><div class="muted">Loading…</div></div>
+        </div>
+      </div>
+    </section>
+  `;
+
+  // Fetch recent datasets then filter client-side
+  try{
+    const [ps, cs] = await Promise.all([
+      getDocs(query(collection(db,'posts'), orderBy('ts','desc'), limit(100))),
+      getDocs(query(collection(db,'courses'), orderBy('level','asc'), limit(100))),
+    ]);
+
+    const ql = kw.toLowerCase();
+    const posts = [];
+    ps.forEach(d=>posts.push({id:d.id, ...d.data()}));
+    const courses = [];
+    cs.forEach(d=>courses.push({id:d.id, ...d.data()}));
+
+    const pFiltered = kw ? posts.filter(p =>
+      (p.title||'').toLowerCase().includes(ql) ||
+      (p.body||'').toLowerCase().includes(ql)
+    ) : posts;
+    const cFiltered = kw ? courses.filter(c =>
+      (c.title||'').toLowerCase().includes(ql) ||
+      (c.summary||'').toLowerCase().includes(ql) ||
+      (Array.isArray(c.benefits)? c.benefits.join(' ').toLowerCase() : '').includes(ql)
+    ) : courses;
+
+    const boxP = document.getElementById('searchPosts');
+    boxP.innerHTML = pFiltered.length ? pFiltered.map(p=>{
+      const mp = {...p};
+      mp.title = highlight(p.title||'', kw);
+      mp.body  = highlight(p.body||'', kw);
+      return postCardHTML(mp);
+    }).join('') : `<div class="card muted">No matching posts.</div>`;
+
+    const boxC = document.getElementById('searchCourses');
+    boxC.innerHTML = cFiltered.length ? cFiltered.map(courseCardHTML).join('')
+                                     : `<div class="card muted">No matching courses.</div>`;
+
+    // wire buttons in course cards
+    boxC.querySelectorAll("[data-action='details']").forEach(b =>
+      b.addEventListener("click", e => openCourse(e.currentTarget.dataset.id))
+    );
+    boxC.querySelectorAll("[data-action='enroll']").forEach(b =>
+      b.addEventListener("click", e => enrollCourse(e.currentTarget.dataset.id))
+    );
+
+  }catch(e){
+    console.error('[search]', e);
+    document.getElementById('searchPosts').innerHTML = `<div class="card error">Failed to search posts.</div>`;
+    document.getElementById('searchCourses').innerHTML = `<div class="card error">Failed to search courses.</div>`;
+  }
 }
 
 // ---------- main renderer ----------
@@ -2207,7 +2873,12 @@ function renderNotFound() {
 
 function normBenefits(b) {
   // array / comma-separated / string → array
-  let arr = Array.isArray(b) ? b : String(b || "").split(",").map(s=>s.trim()).filter(Boolean);
+  let arr = Array.isArray(b)
+    ? b
+    : String(b || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
   // show at least 3 lines (pad with em-dash)
   while (arr.length < 3) arr.push("—");
   return arr.slice(0, 3);
@@ -2220,17 +2891,21 @@ function priceLabel(c) {
 
 function levelLabel(c) {
   // Home မှာ 0 လို့ပေါ်တာကို တား — number မဖြစ်ရင် မပြ
-  return (typeof c.level === "number" && !Number.isNaN(c.level)) ? `Level: ${c.level}` : "";
+  return typeof c.level === "number" && !Number.isNaN(c.level)
+    ? `Level: ${c.level}`
+    : "";
 }
 
 function courseCardHTML(c) {
-  const src = (c.img && String(c.img).trim()) ? c.img : PLACEHOLDER_IMG;
-  const benefits = normBenefits(c.benefits);
+  const src = c.img && String(c.img).trim() ? c.img : PLACEHOLDER_IMG;
+  const benefits = normBenefits(c.benefits || []);
+  const priceNum = Number(c.price ?? 0);
+  const priceText = priceNum > 0 ? `$${priceNum.toFixed(2)}` : "Free";
 
   return `
   <article class="course-card" data-cid="${c.id}">
     <img class="cover"
-         alt="${(c.title || 'Course').replace(/"/g,'&quot;')}"
+         alt="${(c.title || "Course").replace(/"/g, "&quot;")}"
          src="${src}"
          onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
     <div class="body">
@@ -2243,14 +2918,23 @@ function courseCardHTML(c) {
       </ul>
 
       <div class="benefits">
-        ${benefits.map(b => `<div class="benefit">• ${b}</div>`).join("")}
+        ${benefits
+          .slice(0, 3)
+          .map((b) => `<div class="benefit">• ${b}</div>`)
+          .join("")}
       </div>
 
       <div class="footer">
-        <span class="price">${priceLabel(c)}</span>
+        <span class="price">${priceText}</span>
         <div class="actions">
-          <button class="btn ghost" data-action="details" data-id="${c.id}">Details</button>
-          <button class="btn" data-action="enroll"  data-id="${c.id}">Enroll</button>
+          <button class="btn ghost" data-action="details" data-id="${c.id}">
+            Details
+          </button>
+          <button class="btn" data-action="enroll" data-id="${
+            c.id
+          }" data-price="${priceNum}">
+            ${priceNum > 0 ? "Buy" : "Enroll"}
+          </button>
         </div>
       </div>
     </div>

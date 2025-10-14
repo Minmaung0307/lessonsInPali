@@ -60,6 +60,17 @@
       </div>
     </header>
 
+    <!-- Topbar inside header/topbar -->
+    <form id="searchForm" class="nav-search" role="search">
+      <input
+        id="searchInput"
+        type="search"
+        placeholder="Search posts & courses…"
+        aria-label="Search"
+      />
+      <button class="icon-btn" type="submit" aria-label="Search">🔎</button>
+    </form>
+
     <!-- Mobile overlay panel (header အပြင်) -->
     <nav id="navLinks" class="mobile-panel" aria-label="Mobile Navigation">
       <a class="nav-link" href="#/">Home</a>
@@ -199,8 +210,9 @@
           type="button"
           aria-label="Close"
         >
-          ✕
+          ×
         </button>
+
         <div class="auth-header">
           <img src="/icons/icon-192.png" alt="logo" />
           <h3>Welcome back</h3>
@@ -221,8 +233,8 @@
             <input id="authEmail" type="email" autocomplete="email" required />
           </label>
 
-          <label class="pw">
-            Password
+          <label class="pw"
+            >Password
             <input
               id="authPassword"
               type="password"
@@ -264,6 +276,23 @@
           Close
         </button>
       </div>
+    </dialog>
+    <!-- Buy dialog -->
+    <dialog id="buyDlg" class="modal">
+      <form method="dialog" class="card" style="min-width: min(520px, 92vw)">
+        <h3 id="buyTitle">Purchase course</h3>
+        <div id="paypal-buttons" style="margin-top: 0.75rem"></div>
+        <menu
+          style="
+            margin-top: 1rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+          "
+        >
+          <button class="btn ghost">Close</button>
+        </menu>
+      </form>
     </dialog>
 
     <!-- jsPDF (UMD) -->
