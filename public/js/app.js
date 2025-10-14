@@ -146,6 +146,28 @@ let currentRole = "guest";
 let profileCache = null;
 currentRole = await getUserRole();
 
+// one-line SVG placeholder (gray box with text)
+const PLACEHOLDER_IMG =
+  'data:image/svg+xml;utf8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="500">
+      <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0%" stop-color="#e9eef3"/><stop offset="100%" stop-color="#dfe6ee"/>
+      </linearGradient></defs>
+      <rect width="100%" height="100%" fill="url(#g)"/>
+      <g fill="#9aa7b2" font-family="system-ui, -apple-system, Segoe UI, Roboto" text-anchor="middle">
+        <circle cx="400" cy="200" r="60" fill="#c7d1db"/>
+        <rect x="240" y="290" width="320" height="18" rx="9" fill="#c7d1db"/>
+        <text x="400" y="360" font-size="22">Image unavailable</text>
+      </g>
+    </svg>
+  `);
+
+// const escapeHtml = (s='') => String(s)
+//   .replaceAll('&','&amp;').replaceAll('<','&lt;')
+//   .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+
+const short = (s='', n=140) => s.length>n ? s.slice(0,n-1)+'…' : s;
+
 // ---------- Utils ----------
 function escapeHtml(s = "") {
   return s.replace(
@@ -560,7 +582,7 @@ document
   ?.addEventListener("click", () => signOut(auth));
 
 // ---------- Home ----------
-function renderHome() {
+function renderHome(){
   appEl.innerHTML = `
     <section class="card hero">
       <img src="/icons/icon-192.png" alt="Lotus">
@@ -578,104 +600,56 @@ function renderHome() {
 
     <section class="grid cards" id="homeCourses"></section>
   `;
-  renderCourseCards("#homeCourses");
+  renderCourseCards("#homeCourses"); // same HTML + logic with Courses page
 }
-// async function renderCourseCards(){
-//   const q = query(collection(db, "courses"), orderBy("level","asc"), orderBy("title","asc"));
-//   const snap = await getDocs(q);
-//   let html = `<section class="grid">`;
-//   snap.forEach(d=>{
-//     const c = d.data();
-//     html += `
-//       <article class="card">
-//         <div class="row" style="justify-content:space-between;align-items:baseline">
-//           <h3 style="margin:0">${c.title}</h3>
-//           <span class="badge">${["Beginner","Intermediate","Advanced","Pro"][c.level||0]}</span>
-//         </div>
-//         <p class="muted">${c.summary||""}</p>
-//         <div class="row">
-//           <button class="btn" data-buy="${d.id}" data-price="${(c.price||0).toFixed(2)}">Buy $${(c.price||0).toFixed(2)}</button>
-//           <a class="btn ghost" href="#/courses/${d.id}">Details</a>
-//         </div>
-//       </article>
-//     `;
-//   });
-//   html += `</section>`;
-//   app.innerHTML += html;
 
-//   // attach PayPal buy buttons on click
-//   app.querySelectorAll("button[data-buy]").forEach(btn=>{
-//     btn.addEventListener("click", ()=> openBuyDialog(btn.dataset.buy, btn.dataset.price));
-//   });
-// }
 // ---------- Courses (cards) ----------
 async function renderCourseCards(sel) {
   const host = document.querySelector(sel);
+  if (!host) return;
   host.innerHTML = "";
+
   let items = [];
-
-  // မူရင်း multi-orderBy (index လိုအပ်)
-  const qIndexed = query(
-    collection(db, "courses"),
-    orderBy("level", "asc"),
-    orderBy("title", "asc")
-  );
-
   try {
+    const qIndexed = query(collection(db,"courses"), orderBy("level","asc"), orderBy("title","asc"));
     const snap = await getDocs(qIndexed);
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
   } catch (e) {
-    // ✅ index build အဆင်ပြေနေတာ မဟုတ်တယ် => fallback
     console.warn("[courses] indexed query failed, fallback:", e.message);
-
-    // index မလိုအောင် orderBy တစ်ခုပဲ အသုံးပြု
-    const qSimple = query(collection(db, "courses"), orderBy("level", "asc"));
+    const qSimple = query(collection(db,"courses"), orderBy("level","asc"));
     const snap = await getDocs(qSimple);
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-
-    // ဒုတိယ sort ကို client-side မှာလုပ် (level → title)
-    items.sort(
-      (a, b) =>
-        a.level - b.level ||
-        String(a.title || "").localeCompare(String(b.title || ""))
-    );
+    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    items.sort((a,b)=>(a.level??0)-(b.level??0) || String(a.title||"").localeCompare(String(b.title||"")));
   }
 
   for (const c of items) {
-    host.insertAdjacentHTML(
-      "beforeend",
-      `
-      <article class="card">
-        <h3>${c.title || ""}</h3>
-        <p class="muted">${c.summary || ""}</p>
-        <div class="row-2">
-          <span class="badge">Level ${c.level}</span>
-          <span class="badge">${c.credits || 0} credits</span>
-        </div>
-        <div class="row-2" style="margin-top:.6rem">
-          <button class="btn small" data-action="preview" data-id="${
-            c.id
-          }">Details</button>
-          <button class="btn small ghost" data-action="enroll" data-id="${
-            c.id
-          }">Enroll</button>
-        </div>
-      </article>
-    `
-    );
+    host.insertAdjacentHTML("beforeend", courseCardHTML(c));
   }
 
-  host
-    .querySelectorAll("button[data-action='preview']")
-    .forEach((b) =>
-      b.addEventListener("click", (e) => openCourse(e.target.dataset.id))
-    );
-  host
-    .querySelectorAll("button[data-action='enroll']")
-    .forEach((b) =>
-      b.addEventListener("click", (e) => enrollCourse(e.target.dataset.id))
-    );
+  host.querySelectorAll("[data-action='details']").forEach(b =>
+    b.addEventListener("click", e => openCourse(e.currentTarget.dataset.id))
+  );
+  host.querySelectorAll("[data-action='enroll']").forEach(b =>
+    b.addEventListener("click", e => enrollCourse(e.currentTarget.dataset.id))
+  );
 }
+
+function replaceBrokenPlaceholders(root = document) {
+  root.querySelectorAll('img').forEach(img => {
+    const s = (img.getAttribute('src') || '').trim();
+    if (!s || s.endsWith('/img/placeholder.png')) {
+      img.setAttribute('src', PLACEHOLDER_IMG); // ✅ no 404 calls
+    }
+    // If any image still errors → fallback
+    img.addEventListener('error', () => {
+      img.onerror = null;
+      img.src = PLACEHOLDER_IMG;
+    }, { once:true });
+  });
+}
+
+// each render end:
+replaceBrokenPlaceholders(appEl);
 
 // import { jsPDF } from "jspdf";
 
@@ -724,7 +698,10 @@ async function renderStudentDashboard() {
   const uid = auth.currentUser.uid;
 
   // Enrollments (progress per course)
-  const q1 = query(collection(db, 'users', uid, 'enrollments'), orderBy('ts','desc'));
+  const q1 = query(
+    collection(db, "users", uid, "enrollments"),
+    orderBy("ts", "desc")
+  );
   const snap1 = await getDocs(q1);
   const courses = [];
   for (const d of snap1.docs) {
@@ -809,9 +786,307 @@ window.renderDashboard = function renderDashboard() {
   return renderStudentDashboard();
 };
 
-function renderCourses() {
-  appEl.innerHTML = `<h2>Courses</h2><section class="grid cards" id="courseList"></section>`;
-  renderCourseCards("#courseList");
+async function renderCourses() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <section class="card max">
+      <h2>Courses</h2>
+      <div id="courseGrid" class="course-grid"></div>
+    </section>`;
+
+  const qy = query(
+    collection(db, "courses"),
+    orderBy("level", "asc"),
+    orderBy("title", "asc")
+  );
+  const snap = await getDocs(qy);
+  const grid = document.getElementById("courseGrid");
+  grid.innerHTML = "";
+  snap.forEach((d) => {
+    const c = { id: d.id, ...d.data() };
+    grid.insertAdjacentHTML("beforeend", courseCardHTML(c));
+  });
+
+  // delegate clicks for details/enroll
+  grid.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const cid = btn.getAttribute("data-cid");
+    if (btn.dataset.act === "details") {
+      openCourseDetails(cid);
+    } else if (btn.dataset.act === "enroll") {
+      enrollCourse(cid);
+    }
+  });
+
+  ensureCourseDetailsDialog();
+}
+
+function ensureCourseDetailsDialog() {
+  if (document.getElementById("courseDetails")) return;
+  const dlg = document.createElement("dialog");
+  dlg.id = "courseDetails";
+  dlg.innerHTML = `
+    <div class="dlg-head">
+      <strong id="cdTitle">Course</strong>
+      <button class="btn small ghost" id="cdClose">Close</button>
+    </div>
+    <img id="cdCover" class="dlg-cover" alt="">
+    <div class="dlg-body" id="cdBody"></div>
+    <div class="dlg-foot">
+      <button class="btn ghost" id="cdDetails">Open details page</button>
+      <button class="btn" id="cdEnroll">Enroll</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.querySelector("#cdClose").addEventListener("click", () => dlg.close());
+}
+
+async function openCourseDetails(courseId) {
+  ensureCourseDetailsDialog();
+  const dlg = document.getElementById("courseDetails");
+  // load full doc
+  const ref = doc(db, "courses", courseId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    alert("Course not found.");
+    return;
+  }
+  const c = { id: snap.id, ...snap.data() };
+
+  dlg.querySelector("#cdTitle").textContent = c.title || "Course";
+  dlg.querySelector("#cdCover").src = c.img || "/img/placeholder.png";
+
+  const benefits = (c.benefits || [])
+    .map((b) => `<li>${escapeHtml(b)}</li>`)
+    .join("");
+  const price =
+    typeof c.price === "number" ? `$${c.price.toFixed(2)}` : c.price || "Free";
+  const lvl =
+    ["Beginner", "Intermediate", "Advanced", "Pro"][c.level | 0] ||
+    `Lv.${c.level | 0}`;
+
+  dlg.querySelector("#cdBody").innerHTML = `
+    <p class="muted">${escapeHtml(c.summary || "")}</p>
+    <h4>Full Description</h4>
+    <p>${escapeHtml(c.description || c.summary || "")}</p>
+    <h4>Benefits</h4>
+    <ul>${benefits || "<li>No benefits listed.</li>"}</ul>
+    <p class="muted">Level: <strong>${lvl}</strong> · Credits: <strong>${
+    c.credits ?? 0
+  }</strong> · Price: <strong>${price}</strong></p>
+  `;
+
+  dlg.querySelector("#cdEnroll").onclick = () => enrollCourse(c.id);
+  dlg.querySelector("#cdDetails").onclick = () => {
+    location.hash = `#/courses/${c.id}`;
+    dlg.close();
+  };
+  dlg.showModal();
+}
+
+// === Admin: open "New / Edit Course" form ===
+async function openAdminCourseForm(courseId = null) {
+  const dlg =
+    document.getElementById("adminCourseDlg") || createAdminCourseDialog();
+  dlg.showModal();
+
+  const form = dlg.querySelector("#adminCourseForm");
+  form.reset();
+  form.dataset.id = courseId || "";
+
+  // default preview image
+  dlg.querySelector("#acImgPreview").src = "/img/placeholder.png";
+
+  // Prefill for edit
+  if (courseId) {
+    const snap = await getDoc(doc(db, "courses", courseId));
+    if (!snap.exists()) {
+      alert("Course not found");
+      return;
+    }
+    const c = { id: snap.id, ...snap.data() };
+
+    form.title.value = c.title || "";
+    form.summary.value = c.summary || "";
+    form.description.value = c.description || "";
+    form.credits.value = c.credits ?? 0;
+    form.level.value = c.level ?? 0;
+    form.price.value = typeof c.price === "number" ? c.price : "";
+    form.benefits.value = Array.isArray(c.benefits)
+      ? c.benefits.join("\n")
+      : "";
+    form.imageUrl.value = c.img || "";
+    if (c.img) dlg.querySelector("#acImgPreview").src = c.img;
+  }
+
+  // live preview for URL change
+  form.imageUrl.addEventListener(
+    "input",
+    (e) => {
+      dlg.querySelector("#acImgPreview").src =
+        e.target.value || "/img/placeholder.png";
+    },
+    { once: true }
+  );
+}
+
+function createAdminCourseDialog() {
+  const dlg = document.createElement("dialog");
+  dlg.id = "adminCourseDlg";
+  dlg.innerHTML = `
+    <form id="adminCourseForm" method="dialog" class="card" style="width:min(920px,95vw)">
+      <h3 style="margin-top:0">Course ${
+        /* new vs edit */ ""
+      }<span id="acMode"></span></h3>
+
+      <div class="grid-2">
+        <div>
+          <label>Title<input name="title" required /></label>
+          <label>Short summary (card)
+            <textarea name="summary" rows="3" placeholder="2–3 lines"></textarea>
+          </label>
+          <label>Full description (Details dialog)
+            <textarea name="description" rows="8"></textarea>
+          </label>
+          <label>Benefits (one per line)
+            <textarea name="benefits" rows="5" placeholder="Benefit 1&#10;Benefit 2"></textarea>
+          </label>
+        </div>
+        <div>
+          <img id="acImgPreview" class="cover" alt="" style="width:100%;aspect-ratio:16/9;object-fit:cover;background:#f3f3f3;border-radius:10px;margin-bottom:.5rem">
+          <label>Image URL
+            <input name="imageUrl" placeholder="https://…" />
+          </label>
+
+          <div class="row-2">
+            <label>Level
+              <select name="level">
+                <option value="0">Beginner</option>
+                <option value="1">Intermediate</option>
+                <option value="2">Advanced</option>
+                <option value="3">Pro</option>
+              </select>
+            </label>
+            <label>Credits
+              <input type="number" name="credits" min="0" step="1" />
+            </label>
+          </div>
+
+          <label>Price (leave blank = Free)
+            <input type="number" name="price" step="0.01" min="0" />
+          </label>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:flex-end; gap:.5rem; margin-top:.75rem">
+        <button type="button" class="btn ghost" id="acCancel">Cancel</button>
+        <button type="submit" class="btn" id="acSave">Save</button>
+      </div>
+    </form>
+  `;
+  document.body.appendChild(dlg);
+
+  // close
+  dlg.querySelector("#acCancel").addEventListener("click", () => dlg.close());
+
+  // submit → create / update
+  dlg
+    .querySelector("#adminCourseForm")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const id = f.dataset.id || null;
+
+      const payload = {
+        title: f.title.value.trim(),
+        summary: f.summary.value.trim(),
+        description: f.description.value.trim(),
+        benefits: f.benefits.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        img: f.imageUrl.value.trim(),
+        level: Number(f.level.value || 0),
+        credits: Number(f.credits.value || 0),
+        ts: serverTimestamp(),
+      };
+      const priceVal = f.price.value.trim();
+      if (priceVal !== "") payload.price = Number(priceVal);
+
+      if (!payload.title) {
+        alert("Title is required");
+        return;
+      }
+
+      if (id) {
+        await setDoc(doc(db, "courses", id), payload, { merge: true });
+      } else {
+        const ref = await addDoc(collection(db, "courses"), payload);
+        // optional: use custom ID logic if you prefer slug
+        console.log("New course id:", ref.id);
+      }
+      dlg.close();
+      // refresh courses/admin lists
+      if (typeof renderCourses === "function") renderCourses();
+      if (typeof renderAdmin === "function") renderAdmin();
+    });
+
+  return dlg;
+}
+
+// Hook “Edit” buttons in Admin list
+function bindAdminCourseList(){
+  const list = document.getElementById("adminCourseList");
+  if(!list) return;
+
+  list.addEventListener("click", async (e)=>{
+    const btn = e.target.closest("button[data-action]");
+    if(!btn) return;
+    const act = btn.dataset.action;
+    const id  = btn.dataset.id;
+
+    if (act === "edit"){
+      const s = await getDoc(doc(db,"courses", id));
+      if (s.exists()) fillCourseForm({ id: s.id, ...s.data() });
+    }
+    if (act === "delete"){
+      if (confirm("Delete this course?")) {
+        await deleteDoc(doc(db,"courses", id));
+        await loadAdminCourses();
+      }
+    }
+  });
+
+  // form submit/save
+  const form = document.getElementById("courseForm");
+  form?.addEventListener("submit", async (ev)=>{
+    ev.preventDefault();
+    const data = formToCourse(form);
+    const id   = data.id || crypto.randomUUID();
+
+    await setDoc(doc(db,"courses", id), {
+      title: data.title || "",
+      summary: data.summary || "",
+      description: data.description || "",
+      level: Number(data.level ?? 0),
+      credits: Number(data.credits ?? 0),
+      price: Number(data.price ?? 0),
+      img: data.img || "",
+      benefits: normBenefits(data.benefits) // store as array
+    }, { merge:true });
+
+    alert("Saved.");
+    fillCourseForm({});    // reset
+    await loadAdminCourses();
+  });
+
+  document.getElementById("btnResetCourse")?.addEventListener("click", ()=> fillCourseForm({}));
+}
+
+function formToCourse(form){
+  const o = Object.fromEntries(new FormData(form).entries());
+  // benefits: keep raw but normalize when saving
+  return o;
 }
 
 function $$(s) {
@@ -1100,37 +1375,73 @@ async function openLesson(lessonId) {
 
 // ---------- Dashboard ----------
 async function renderDashboard() {
-  const user = auth?.currentUser;
-  if (!user) {
-    authDlg?.showModal?.();
-    return;
-  }
+  const u = auth.currentUser;
+  if (!u) { location.hash = "#/"; return; }
 
-  const appEl = document.getElementById("app");
-  appEl.innerHTML = `
+  const app = document.getElementById("app");
+  app.innerHTML = `
     <section class="card max">
       <h2>Dashboard</h2>
-
       <div class="grid-2">
+        <div>
+          <h3>My Courses</h3>
+          <div id="myCourses" class="course-grid"></div>
+        </div>
         <div>
           <h3>Announcements</h3>
           <div id="annList">Loading…</div>
-        </div>
-
-        <div>
-          <h3>Messages</h3>
+          <h3 style="margin-top:1rem">Messages</h3>
           <div id="msgList">Loading…</div>
         </div>
       </div>
     </section>
   `;
 
-  /* -------------------- Announcements (public) -------------------- */
+  /* ---------- My Enrollments ---------- */
   try {
-    // single-field orderBy သာမန်အတွက် composite index မလို
+    const eq = query(collection(db, "users", u.uid, "enrollments"), orderBy("ts", "desc"));
+    const es = await getDocs(eq);
+
+    const my = document.getElementById("myCourses");
+    if (es.empty) {
+      my.innerHTML = `<div class="card muted">No enrollments yet.</div>`;
+    } else {
+      // parallel load course docs
+      const enrolls = es.docs.map(d => ({ id: d.id, ...d.data() }));
+      const coursePromises = enrolls.map(async e => {
+        const cRef = doc(db, "courses", e.courseId);
+        const cs = await getDoc(cRef);
+        return cs.exists() ? { id: cs.id, ...cs.data() } : { id: e.courseId, title: e.courseTitle || "Course" };
+      });
+      const courses = await Promise.all(coursePromises);
+
+      let html = "";
+      for (const c of courses) {
+        // courseCardHTML က buttonတွေမှာ data-act="enroll" data-cid="${c.id}" ထည့်ထားပြီးသားဖြစ်ရပါမယ်
+        const card = courseCardHTML(c)
+          .replace('data-act="enroll"', 'data-act="open"')
+          .replace(">Enroll<", ">Open<");
+        html += card;
+      }
+      my.innerHTML = html;
+
+      // open click → go to course reader page
+      my.addEventListener("click", (e) => {
+        const btn = e.target.closest('button[data-act="open"]');
+        if (!btn) return;
+        const cid = btn.getAttribute("data-cid");
+        if (cid) location.hash = `#/courses/${cid}`;
+      });
+    }
+  } catch (e) {
+    console.error("[dashboard] enrollments:", e);
+    document.getElementById("myCourses").innerHTML = `<div class="card error">Can't load courses.</div>`;
+  }
+
+  /* ---------- Announcements (public) ---------- */
+  try {
     const aq = query(collection(db, "announcements"), orderBy("ts", "desc"));
     const as = await getDocs(aq);
-
     const annBox = document.getElementById("annList");
     if (as.empty) {
       annBox.innerHTML = `<div class="card muted">No announcements.</div>`;
@@ -1138,46 +1449,31 @@ async function renderDashboard() {
       annBox.innerHTML = "";
       as.forEach((d) => {
         const a = d.data();
-        annBox.insertAdjacentHTML(
-          "beforeend",
-          `
-            <article class="card">
-              <strong>${escapeHtml(a.title || "")}</strong>
-              <p class="muted" style="margin:.25rem 0">
-                ${a.ts?.toDate ? a.ts.toDate().toLocaleString() : ""}
-              </p>
-              <p>${escapeHtml(a.body || "")}</p>
-            </article>
-          `
-        );
+        const when = a.ts?.toDate ? a.ts.toDate().toLocaleString() : "";
+        annBox.insertAdjacentHTML("beforeend", `
+          <article class="card">
+            <strong>${escapeHtml(a.title || "")}</strong>
+            <p class="muted" style="margin:.25rem 0">${when}</p>
+            <p>${escapeHtml(a.body || "")}</p>
+          </article>
+        `);
       });
     }
   } catch (e) {
     console.error("[dashboard] announcements:", e);
-    document.getElementById(
-      "annList"
-    ).innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    document.getElementById("annList").innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
-  /* -------------------- Messages (to me + broadcast '*') -------------------- */
+  /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
-    // composite index မတောင်းအောင်: where + client-side sort
-    const mineQ = query(
-      collection(db, "messages"),
-      where("to", "==", user.uid)
-    );
-    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
-
-    const [mineSnap, broadSnap] = await Promise.all([
-      getDocs(mineQ),
-      getDocs(allQ),
-    ]);
+    const mineQ = query(collection(db, "messages"), where("to", "==", u.uid));
+    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([getDocs(mineQ), getDocs(allQ)]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     broadSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
 
-    // robust sort by timestamp
     items.sort((a, b) => {
       const ta = a.ts?.toMillis ? a.ts.toMillis() : (a.ts?.seconds || 0) * 1000;
       const tb = b.ts?.toMillis ? b.ts.toMillis() : (b.ts?.seconds || 0) * 1000;
@@ -1185,27 +1481,17 @@ async function renderDashboard() {
     });
 
     const msgBox = document.getElementById("msgList");
-    if (!items.length) {
-      msgBox.innerHTML = `<div class="card muted">No messages.</div>`;
-    } else {
-      msgBox.innerHTML = items
-        .map(
-          (m) => `
-        <article class="card">
-          <p class="muted" style="margin:0 0 .25rem">
-            ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
-          </p>
-          <p>${escapeHtml(m.text || "")}</p>
-        </article>
-      `
-        )
-        .join("");
-    }
+    msgBox.innerHTML = items.length
+      ? items.map(m => `
+          <article class="card">
+            <p class="muted" style="margin:0 0 .25rem">${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}</p>
+            <p>${escapeHtml(m.text || "")}</p>
+          </article>
+        `).join("")
+      : `<div class="card muted">No messages.</div>`;
   } catch (e) {
     console.error("[dashboard] messages:", e);
-    document.getElementById(
-      "msgList"
-    ).innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    document.getElementById("msgList").innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
@@ -1223,18 +1509,22 @@ function requireStaff() {
 
 async function renderAdmin() {
   if (!requireStaff()) return;
+
   const app = document.getElementById("app");
   app.innerHTML = `
-    <section class="card max">
+    <section class="card max" id="adminConsole">
       <h2>Admin Console</h2>
+
       <div class="tabs">
         <button class="tab is-active" data-tab="courses">Courses</button>
         <button class="tab" data-tab="ann">Announcements</button>
         <button class="tab" data-tab="msg">Message Students</button>
       </div>
 
+      <!-- COURSES -->
       <div id="tab-courses">
         <form id="formCourse" class="form grid-2">
+          <input type="hidden" name="id" />
           <label>Title <input name="title" required></label>
           <label>Level
             <select name="level">
@@ -1246,11 +1536,23 @@ async function renderAdmin() {
           </label>
           <label>Credits <input name="credits" type="number" min="0" value="10"></label>
           <label>Summary <textarea name="summary" class="summary-lg"></textarea></label>
-          <button class="btn" type="submit">Save course</button>
+
+          <!-- optional extras -->
+          <label>Price (USD) <input name="price" type="number" step="0.01" min="0" value="0"></label>
+          <label>Image URL <input name="img" placeholder="https://…"></label>
+          <label>Benefits (comma-separated) <input name="benefits" placeholder="A, B, C"></label>
+
+          <div style="grid-column:1/-1; display:flex; gap:.5rem; justify-content:flex-end">
+            <button type="button" id="btnResetCourse" class="btn ghost">Reset</button>
+            <button class="btn" type="submit">Save course</button>
+          </div>
         </form>
-        <div id="adminCourses" class="grid"></div>
+
+        <!-- ✅ use this exact id in JS -->
+        <div id="adminCourseList" class="grid"></div>
       </div>
 
+      <!-- ANNOUNCEMENTS -->
       <div id="tab-ann" class="hidden">
         <form id="formAnn" class="form">
           <label>Title <input name="title" required></label>
@@ -1269,11 +1571,10 @@ async function renderAdmin() {
         <div id="adminAnns" class="stack"></div>
       </div>
 
+      <!-- MESSAGES -->
       <div id="tab-msg" class="hidden">
         <form id="formMsg" class="form">
-          <label>To
-            <input name="to" placeholder="user uid or * for broadcast" required>
-          </label>
+          <label>To <input name="to" placeholder="user uid or * for broadcast" required></label>
           <label>Message <textarea name="text" required></textarea></label>
           <button class="btn" type="submit">Send</button>
         </form>
@@ -1282,198 +1583,212 @@ async function renderAdmin() {
     </section>
   `;
 
-  // tabs
-  app.querySelectorAll(".tab").forEach((btn) => {
+  /* ---------------- Tabs ---------------- */
+  app.querySelectorAll(".tab").forEach(btn => {
     btn.addEventListener("click", () => {
-      app
-        .querySelectorAll(".tab")
-        .forEach((b) => b.classList.remove("is-active"));
+      app.querySelectorAll(".tab").forEach(b => b.classList.remove("is-active"));
       btn.classList.add("is-active");
       const k = btn.dataset.tab;
-      app
-        .querySelector("#tab-courses")
-        .classList.toggle("hidden", k !== "courses");
+      app.querySelector("#tab-courses").classList.toggle("hidden", k !== "courses");
       app.querySelector("#tab-ann").classList.toggle("hidden", k !== "ann");
       app.querySelector("#tab-msg").classList.toggle("hidden", k !== "msg");
     });
   });
 
-  // CRUD — Courses
-  document
-    .getElementById("formCourse")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const f = e.target;
-      const data = {
-        title: f.title.value.trim(),
-        level: Number(f.level.value || 0),
-        credits: Number(f.credits.value || 0),
-        summary: f.summary.value.trim(),
-        ts: serverTimestamp(),
-      };
-      await addDoc(collection(db, "courses"), data);
-      f.reset();
-      loadAdminCourses();
-    });
+  /* --------------- COURSES: load/list/bind --------------- */
+  const listEl = document.getElementById("adminCourseList");
+  const formCourse = document.getElementById("formCourse");
 
-  async function loadAdminCourses() {
-    const box = document.getElementById("adminCourses");
-    box.innerHTML = "";
-    const snap = await getDocs(
-      query(collection(db, "courses"), orderBy("title", "asc"))
-    );
-    snap.forEach((d) => {
-      const c = d.data();
-      box.insertAdjacentHTML(
-        "beforeend",
-        `
-        <article class="card">
-          <h3>${c.title}</h3>
-          <p class="muted">${c.summary || ""}</p>
-          <div class="row-2">
-            <span class="badge">Level ${c.level}</span>
-            <span class="badge">${c.credits || 0} credits</span>
-          </div>
-          <div class="row">
-            <button class="btn small" data-action="edit-course" data-edit="${
-              d.id
-            }">Edit</button>
-            <button class="btn small danger" data-action="delete-course" data-del="${
-              d.id
-            }">Delete</button>
-          </div>
-        </article>
-      `
-      );
-    });
-    // delete
-    box.querySelectorAll("[data-del]").forEach((b) => {
-      b.addEventListener("click", async () => {
-        await deleteDoc(doc(db, "courses", b.dataset.del));
-        loadAdminCourses();
-      });
-    });
-    // (edit flow ကိုနောက်တစ်ဖက် ဆက်ဖြည့်နိုင်)
+  function normBenefits(b){
+    if (Array.isArray(b)) return b;
+    return String(b||"").split(",").map(s=>s.trim()).filter(Boolean);
   }
-  loadAdminCourses();
 
-  // event delegation (once)
-  const adminList = document.getElementById("adminCourseList"); // container id you render into
-  if (adminList && !adminList.__wired) {
-    adminList.__wired = true;
-    adminList.addEventListener("click", async (e) => {
+  function courseCardAdminHTML(c){
+    const price = Number(c.price ?? 0);
+    const priceLabel = price > 0 ? `$${price.toFixed(2)}` : "Free";
+    return `
+      <article class="course-card" data-id="${c.id}">
+        <img src="${c.img || '/img/placeholder.png'}" class="cover" alt="">
+        <div class="body">
+          <h3>${c.title || ''}</h3>
+          <p class="desc">${c.short || c.summary || ''}</p>
+          <ul class="meta">
+            <li>Level: ${c.level ?? 0}</li>
+            <li>Credits: ${c.credits ?? 0}</li>
+            <li>Benefits: ${(c.benefits || []).slice(0,3).join(" • ")}</li>
+          </ul>
+          <div class="footer">
+            <span class="price">${priceLabel}</span>
+            <div class="actions">
+              <button class="btn ghost" data-action="edit" data-id="${c.id}">Edit</button>
+              <button class="btn danger" data-action="delete" data-id="${c.id}">Delete</button>
+            </div>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  async function loadAdminCourses(){
+    if (!listEl) return;
+    listEl.innerHTML = "Loading…";
+    const snap = await getDocs(query(collection(db,"courses"), orderBy("title","asc")));
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    listEl.innerHTML = rows.map(courseCardAdminHTML).join("");
+  }
+
+  function fillCourseForm(c = {}){
+    formCourse.id.value        = c.id || "";
+    formCourse.title.value     = c.title || "";
+    formCourse.level.value     = (typeof c.level === "number") ? c.level : 0;
+    formCourse.credits.value   = (typeof c.credits === "number") ? c.credits : 10;
+    formCourse.summary.value   = c.summary || c.short || "";
+    formCourse.price.value     = (typeof c.price === "number") ? c.price : 0;
+    formCourse.img.value       = c.img || "";
+    formCourse.benefits.value  = Array.isArray(c.benefits) ? c.benefits.join(", ") : (c.benefits || "");
+  }
+
+  document.getElementById("btnResetCourse")?.addEventListener("click", ()=> fillCourseForm({}));
+
+  formCourse.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const f = e.target;
+    const id = f.id.value || crypto.randomUUID();
+    const data = {
+      title: f.title.value.trim(),
+      level: Number(f.level.value || 0),
+      credits: Number(f.credits.value || 0),
+      summary: f.summary.value.trim(),
+      price: Number(f.price.value || 0),
+      img: f.img.value.trim(),
+      benefits: normBenefits(f.benefits.value),
+      ts: serverTimestamp(),
+    };
+    await setDoc(doc(db,"courses", id), data, { merge:true });
+    alert("Saved.");
+    fillCourseForm({});
+    await loadAdminCourses();
+  });
+
+  // ✅ one-time delegation on the list container
+  if (listEl && !listEl.__wired){
+    listEl.__wired = true;
+    listEl.addEventListener("click", async (e)=>{
       const btn = e.target.closest("button[data-action]");
       if (!btn) return;
-      const id = btn.getAttribute("data-id");
-      const act = btn.getAttribute("data-action");
-
-      if (act === "edit-course") {
-        openCourseEditor(id); // -> ပဲလုပ်သင့်တဲ့ function (form ဖြင့်နေရာတစ်ခုကို ပြ)
-      } else if (act === "delete-course") {
+      const id = btn.dataset.id;
+      const act = btn.dataset.action;
+      if (act === "edit"){
+        const s = await getDoc(doc(db,"courses", id));
+        if (s.exists()) fillCourseForm({ id:s.id, ...s.data() });
+      } else if (act === "delete"){
         if (confirm("Delete this course?")) {
-          await deleteCourse(id);
-          renderAdmin(); // refresh list
+          await deleteDoc(doc(db,"courses", id));
+          await loadAdminCourses();
         }
       }
     });
   }
 
-  // Announcements
-  document.getElementById("formAnn").addEventListener("submit", async (e) => {
+  await loadAdminCourses();
+
+  /* --------------- ANNOUNCEMENTS --------------- */
+  const formAnn = document.getElementById("formAnn");
+  formAnn.addEventListener("submit", async (e)=>{
     e.preventDefault();
     const f = e.target;
-    const data = {
+    await addDoc(collection(db,"announcements"), {
       title: f.title.value.trim(),
-      level: f.level.value, // '*' or '0..3'
-      body: f.body.value.trim(),
+      level: f.level.value,     // '*' or '0..3'
+      body:  f.body.value.trim(),
       ts: serverTimestamp(),
-    };
-    await addDoc(collection(db, "announcements"), data);
+    });
     f.reset();
-    loadAdminAnns();
+    await loadAdminAnns();
   });
 
-  async function loadAdminAnns() {
+  async function loadAdminAnns(){
     const box = document.getElementById("adminAnns");
-    box.innerHTML = "";
-    const snap = await getDocs(
-      query(collection(db, "announcements"), orderBy("ts", "desc"))
-    );
-    snap.forEach((d) => {
-      const a = d.data();
-      box.insertAdjacentHTML(
-        "beforeend",
-        `
-        <div class="card">
-          <strong>${a.title}</strong>
-          <div class="muted">Level: ${a.level}</div>
-          <p>${a.body}</p>
-          <button class="btn small danger" data-del="${d.id}">Delete</button>
-        </div>
-      `
-      );
-    });
-    box.querySelectorAll("[data-del]").forEach((b) => {
-      b.addEventListener("click", async () => {
-        await deleteDoc(doc(db, "announcements", b.dataset.del));
-        loadAdminAnns();
+    box.innerHTML = "Loading…";
+    const snap = await getDocs(query(collection(db,"announcements"), orderBy("ts","desc")));
+    const rows = [];
+    snap.forEach(d => rows.push({ id:d.id, ...d.data() }));
+    box.innerHTML = rows.map(a => `
+      <div class="card" data-id="${a.id}">
+        <strong>${a.title}</strong>
+        <div class="muted">Level: ${a.level}</div>
+        <p>${a.body}</p>
+        <button class="btn small danger" data-del="${a.id}">Delete</button>
+      </div>
+    `).join("");
+
+    box.querySelectorAll("[data-del]").forEach(b=>{
+      b.addEventListener("click", async ()=>{
+        await deleteDoc(doc(db,"announcements", b.dataset.del));
+        await loadAdminAnns();
       });
     });
   }
-  loadAdminAnns();
+  await loadAdminAnns();
 
-  // Message Students
-  document.getElementById("formMsg").addEventListener("submit", async (e) => {
+  /* --------------- MESSAGES --------------- */
+  const formMsg = document.getElementById("formMsg");
+  formMsg.addEventListener("submit", async (e)=>{
     e.preventDefault();
     const f = e.target;
-    const msg = {
-      from: currentUser.uid,
-      to: f.to.value.trim(), // uid or "*"
+    await addDoc(collection(db,"messages"), {
+      from: auth.currentUser.uid,
+      to:   f.to.value.trim(),   // uid or "*"
       text: f.text.value.trim(),
       ts: serverTimestamp(),
-    };
-    await addDoc(collection(db, "messages"), msg);
+    });
     f.reset();
-    loadAdminMsgs();
+    await loadAdminMsgs();
   });
 
-  async function loadAdminMsgs() {
+  async function loadAdminMsgs(){
     const box = document.getElementById("adminMsgs");
-    box.innerHTML = "";
-    const snap = await getDocs(
-      query(collection(db, "messages"), orderBy("ts", "desc"))
-    );
-    snap.forEach((d) => {
-      const m = d.data();
-      box.insertAdjacentHTML(
-        "beforeend",
-        `
-        <div class="card">
-          <div><strong>To:</strong> ${m.to}</div>
-          <p>${m.text}</p>
-        </div>
-      `
-      );
-    });
+    box.innerHTML = "Loading…";
+    const snap = await getDocs(query(collection(db,"messages"), orderBy("ts","desc")));
+    const rows = [];
+    snap.forEach(d => rows.push(d.data()));
+    box.innerHTML = rows.map(m => `
+      <div class="card">
+        <div><strong>To:</strong> ${m.to}</div>
+        <p>${m.text}</p>
+      </div>
+    `).join("");
   }
-  loadAdminMsgs();
+  await loadAdminMsgs();
 }
 
-async function openCourseEditor(id){
+async function openCourseEditor(id) {
   const ref = doc(db, "courses", id);
   const snap = await getDoc(ref);
-  if (!snap.exists()){ alert("Course not found"); return; }
+  if (!snap.exists()) {
+    alert("Course not found");
+    return;
+  }
   const c = snap.data();
 
   // တည်ရှိနေတဲ့ admin card အတွင်းက editor panel ကိုပြ
-  const host = document.getElementById('adminEditor');
+  const host = document.getElementById("adminEditor");
   host.innerHTML = `
     <div class="card">
       <h3>Edit: ${escapeHtml(c.title || "")}</h3>
-      <label>Title <input id="editTitle" value="${escapeHtml(c.title||"")}"></label>
-      <label>Level <input id="editLevel" type="number" min="0" max="3" value="${c.level ?? 0}"></label>
-      <label>Credits <input id="editCredits" type="number" min="0" max="100" value="${c.credits ?? 0}"></label>
-      <label>Summary <textarea id="editSummary">${escapeHtml(c.summary||"")}</textarea></label>
+      <label>Title <input id="editTitle" value="${escapeHtml(
+        c.title || ""
+      )}"></label>
+      <label>Level <input id="editLevel" type="number" min="0" max="3" value="${
+        c.level ?? 0
+      }"></label>
+      <label>Credits <input id="editCredits" type="number" min="0" max="100" value="${
+        c.credits ?? 0
+      }"></label>
+      <label>Summary <textarea id="editSummary">${escapeHtml(
+        c.summary || ""
+      )}</textarea></label>
       <div class="row" style="gap:.5rem">
         <button class="btn" id="btnSaveCourse">Save</button>
         <button class="btn ghost" id="btnCancelEdit">Cancel</button>
@@ -1481,21 +1796,23 @@ async function openCourseEditor(id){
     </div>
   `;
 
-  document.getElementById('btnCancelEdit')?.addEventListener('click', ()=> {
+  document.getElementById("btnCancelEdit")?.addEventListener("click", () => {
     host.innerHTML = "";
   });
 
-  document.getElementById('btnSaveCourse')?.addEventListener('click', async ()=>{
-    await updateDoc(ref, {
-      title: document.getElementById('editTitle').value.trim(),
-      level: Number(document.getElementById('editLevel').value || 0),
-      credits: Number(document.getElementById('editCredits').value || 0),
-      summary: document.getElementById('editSummary').value.trim()
+  document
+    .getElementById("btnSaveCourse")
+    ?.addEventListener("click", async () => {
+      await updateDoc(ref, {
+        title: document.getElementById("editTitle").value.trim(),
+        level: Number(document.getElementById("editLevel").value || 0),
+        credits: Number(document.getElementById("editCredits").value || 0),
+        summary: document.getElementById("editSummary").value.trim(),
+      });
+      alert("Saved");
+      host.innerHTML = "";
+      renderAdmin(); // refresh list
     });
-    alert("Saved");
-    host.innerHTML = "";
-    renderAdmin(); // refresh list
-  });
 }
 
 // ---------- small helpers ----------
@@ -1777,8 +2094,11 @@ function renderSettings() {
   });
 }
 
-async function renderCertificates(){
-  if (!auth?.currentUser){ location.hash = "#/"; return; }
+async function renderCertificates() {
+  if (!auth?.currentUser) {
+    location.hash = "#/";
+    return;
+  }
   const uid = auth.currentUser.uid;
 
   const box = document.getElementById("app");
@@ -1788,43 +2108,52 @@ async function renderCertificates(){
       <div id="certList">Loading…</div>
     </section>`;
 
-  try{
+  try {
     const q = query(
-      collection(db, "users", uid, "completions"),        // ✅ top-level
-      where("userId","==", uid),
-      orderBy("ts","desc")
+      collection(db, "users", uid, "completions"), // ✅ top-level
+      where("userId", "==", uid),
+      orderBy("ts", "desc")
     );
     const snap = await getDocs(q);
     const list = document.getElementById("certList");
-    if (snap.empty){
+    if (snap.empty) {
       list.innerHTML = `<div class="card muted">No certificates yet.</div>`;
       return;
     }
     list.innerHTML = "";
-    snap.forEach(d=>{
+    snap.forEach((d) => {
       const c = d.data();
-      list.insertAdjacentHTML("beforeend", `
+      list.insertAdjacentHTML(
+        "beforeend",
+        `
         <div class="card row-between">
           <div>
             <strong>${c.courseTitle || c.courseId}</strong>
             <div class="muted">Credits: ${c.credits ?? 0}</div>
           </div>
           <div class="row" style="gap:.5rem">
-            <button class="btn small" onclick="makeCertPDF('${d.id}')">Download PDF</button>
+            <button class="btn small" onclick="makeCertPDF('${
+              d.id
+            }')">Download PDF</button>
           </div>
         </div>
-      `);
+      `
+      );
     });
-  }catch(err){
+  } catch (err) {
     console.error("[certs]", err);
-    document.getElementById("certList").innerHTML =
-      `<div class="card error">Can't load certificates (permissions?).</div>`;
+    document.getElementById(
+      "certList"
+    ).innerHTML = `<div class="card error">Can't load certificates (permissions?).</div>`;
   }
 }
 window.renderCertificates = renderCertificates;
 
-async function renderTranscripts(){
-  if (!auth?.currentUser){ location.hash = "#/"; return; }
+async function renderTranscripts() {
+  if (!auth?.currentUser) {
+    location.hash = "#/";
+    return;
+  }
   const uid = auth.currentUser.uid;
 
   const box = document.getElementById("app");
@@ -1834,22 +2163,24 @@ async function renderTranscripts(){
       <div id="txList">Loading…</div>
     </section>`;
 
-  try{
+  try {
     const q = query(
-      collection(db, "users", uid, "attempts"),          // ✅ top-level
-      where("userId","==", uid),
-      orderBy("ts","desc")
+      collection(db, "users", uid, "attempts"), // ✅ top-level
+      where("userId", "==", uid),
+      orderBy("ts", "desc")
     );
     const snap = await getDocs(q);
     const list = document.getElementById("txList");
-    if (snap.empty){
+    if (snap.empty) {
       list.innerHTML = `<div class="card muted">No attempts yet.</div>`;
       return;
     }
     list.innerHTML = "";
-    snap.forEach(d=>{
+    snap.forEach((d) => {
       const a = d.data();
-      list.insertAdjacentHTML("beforeend", `
+      list.insertAdjacentHTML(
+        "beforeend",
+        `
         <div class="card">
           <div class="row-between">
             <strong>${a.courseTitle || a.courseId}</strong>
@@ -1857,12 +2188,14 @@ async function renderTranscripts(){
           </div>
           <div class="muted">Lesson: ${a.lessonTitle || a.lessonId}</div>
         </div>
-      `);
+      `
+      );
     });
-  }catch(err){
+  } catch (err) {
     console.error("[transcripts]", err);
-    document.getElementById("txList").innerHTML =
-      `<div class="card error">Can't load transcripts (permissions?).</div>`;
+    document.getElementById(
+      "txList"
+    ).innerHTML = `<div class="card error">Can't load transcripts (permissions?).</div>`;
   }
 }
 window.renderTranscripts = renderTranscripts;
@@ -1870,6 +2203,58 @@ window.renderTranscripts = renderTranscripts;
 // ====== Not Found ======
 function renderNotFound() {
   app.innerHTML = `<section class="card"><h2>Not found</h2></section>`;
+}
+
+function normBenefits(b) {
+  // array / comma-separated / string → array
+  let arr = Array.isArray(b) ? b : String(b || "").split(",").map(s=>s.trim()).filter(Boolean);
+  // show at least 3 lines (pad with em-dash)
+  while (arr.length < 3) arr.push("—");
+  return arr.slice(0, 3);
+}
+
+function priceLabel(c) {
+  const p = Number(c.price ?? 0);
+  return p > 0 ? `$${p.toFixed(2)}` : "Free";
+}
+
+function levelLabel(c) {
+  // Home မှာ 0 လို့ပေါ်တာကို တား — number မဖြစ်ရင် မပြ
+  return (typeof c.level === "number" && !Number.isNaN(c.level)) ? `Level: ${c.level}` : "";
+}
+
+function courseCardHTML(c) {
+  const src = (c.img && String(c.img).trim()) ? c.img : PLACEHOLDER_IMG;
+  const benefits = normBenefits(c.benefits);
+
+  return `
+  <article class="course-card" data-cid="${c.id}">
+    <img class="cover"
+         alt="${(c.title || 'Course').replace(/"/g,'&quot;')}"
+         src="${src}"
+         onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
+    <div class="body">
+      <h3>${c.title || "Untitled Course"}</h3>
+      <p class="desc">${c.summary || ""}</p>
+
+      <ul class="meta">
+        ${levelLabel(c) ? `<li>${levelLabel(c)}</li>` : ""}
+        <li>Credits: ${c.credits ?? 0}</li>
+      </ul>
+
+      <div class="benefits">
+        ${benefits.map(b => `<div class="benefit">• ${b}</div>`).join("")}
+      </div>
+
+      <div class="footer">
+        <span class="price">${priceLabel(c)}</span>
+        <div class="actions">
+          <button class="btn ghost" data-action="details" data-id="${c.id}">Details</button>
+          <button class="btn" data-action="enroll"  data-id="${c.id}">Enroll</button>
+        </div>
+      </div>
+    </div>
+  </article>`;
 }
 
 // ---------- PayPal (demo button) ----------
