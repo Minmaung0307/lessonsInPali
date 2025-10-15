@@ -1,0 +1,21 @@
+{
+  "lesson": { "id": "l01", "title": "Vowels & Consonants", "order": 1 },
+  "reading": "Short reading text (supports markdown/plain).",
+  "contents": [
+    { "type": "video", "url": "https://youtu.be/xxxx", "caption": "Intro" },
+    { "type": "audio", "url": "https://.../audio.mp3", "caption": "Pronunciation" }
+  ],
+  "quiz": {
+    "title": "Lesson 1 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      {
+        "text": "Which is a vowel?",
+        "choices": ["ka", "a", "ta", "ma"],
+        "answerIndex": 1,
+        "points": 1
+      }
+    ]
+  }
+}

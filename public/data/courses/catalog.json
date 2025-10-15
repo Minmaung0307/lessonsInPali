@@ -1,0 +1,14 @@
+{
+  "courses": [
+    {
+      "id": "pali",
+      "title": "Pāli Basics",
+      "level": 0,
+      "credits": 10,
+      "price": 0,
+      "img": "/img/pali.png",
+      "summary": "Start reading Pāli.",
+      "chaptersUrl": "/data/courses/pali/chapters.json"
+    }
+  ]
+}

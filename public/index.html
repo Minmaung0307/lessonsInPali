@@ -91,15 +91,37 @@
     <!-- ===== App content ===== -->
     <main id="app" class="container">
       <!-- Admin Console -->
-      <section id="adminCourses">
+      <!-- <section id="adminCourses">
         <h2>Manage Courses</h2>
         <div class="toolbar">
           <button class="btn" data-act="new">New Course</button>
         </div>
         <div id="adminCourseList" class="course-grid">
-          <!-- JS will insert cards here -->
         </div>
-      </section>
+      </section> -->
+
+      <!-- <section id="tab-import" class="hidden">
+        <h3>Import Course JSON</h3>
+        <textarea
+          id="importJson"
+          rows="10"
+          placeholder="Paste catalog/chapters/lesson json here"
+        ></textarea>
+        <div class="row" style="gap: 0.5rem">
+          <button id="btnImportCourse" class="btn">Import</button>
+          <button
+            id="btnImportFolder"
+            class="btn ghost"
+            title="Sequential: catalog → chapters → lessons"
+          >
+            Quick Import
+          </button>
+        </div>
+        <p class="muted">
+          Tip: Start with catalog.json, then chapters.json, then each lesson
+          json.
+        </p>
+      </section> -->
       <!-- <section
         class="card maxw"
         id="adminConsole"
@@ -181,7 +203,7 @@
         </p>
       </section> -->
 
-      <section
+      <!-- <section
         class="card maxw"
         id="studentDash"
         style="max-width: 980px; margin-inline: auto"
@@ -192,7 +214,7 @@
 
         <h3>Certificates</h3>
         <div id="myCerts" class="list"></div>
-      </section>
+      </section> -->
     </main>
 
     <!-- <main class="container">
@@ -265,7 +287,7 @@
     </dialog>
 
     <!-- Reusable PayPal Modal -->
-    <dialog id="buyDlg" class="card" style="max-width: 520px; width: 95%">
+    <!-- <dialog id="buyDlg" class="card" style="max-width: 520px; width: 95%">
       <h3 id="buyTitle" style="margin-top: 0">Purchase course</h3>
       <div id="paypal-buttons" style="margin-top: 1rem"></div>
       <div class="row" style="justify-content: flex-end; margin-top: 1rem">
@@ -276,10 +298,10 @@
           Close
         </button>
       </div>
-    </dialog>
+    </dialog> -->
     <!-- Buy dialog -->
     <dialog id="buyDlg" class="modal">
-      <form method="dialog" class="card" style="min-width: min(520px, 92vw)">
+      <form method="dialog" class="card">
         <h3 id="buyTitle">Purchase course</h3>
         <div id="paypal-buttons" style="margin-top: 0.75rem"></div>
         <menu

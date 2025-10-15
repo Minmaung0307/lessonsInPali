@@ -1,0 +1,7 @@
+{
+  "course": { "id": "pali", "title": "Pāli Basics" },
+  "chapters": [
+    { "id": "c1", "title": "Alphabet & Sounds", "order": 1, "lessonsUrl": "/data/courses/pali/lessons/l01.json" },
+    { "id": "c2", "title": "Basic Grammar",   "order": 2, "lessonsUrl": "/data/courses/pali/lessons/l02.json" }
+  ]
+}

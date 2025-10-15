@@ -272,27 +272,68 @@ btnMenu?.addEventListener("keydown", (e) => {
   }
 });
 
+/* ---------------- Tabs (robust) ---------------- */
+// const tabButtons = app.querySelectorAll('.tab');
+// const panes = {
+//   courses: app.querySelector('#tab-courses'),
+//   posts:   app.querySelector('#tab-posts'),
+//   ann:     app.querySelector('#tab-ann'),
+//   msg:     app.querySelector('#tab-msg'),
+// };
+
+// function activateTab(key){
+//   // buttons active state
+//   tabButtons.forEach(b => b.classList.toggle('is-active', b.dataset.tab === key));
+//   // panes show/hide (null-safe)
+//   Object.entries(panes).forEach(([k, el]) => {
+//     if (el) el.classList.toggle('hidden', k !== key);
+//   });
+// }
+
+// tabButtons.forEach(btn => {
+//   btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+// });
+
+// // initial state
+// activateTab('courses');
+
 // ===== Router (single, duplicate-safe) =====
 if (!window.__APP_ROUTER__) {
   window.__APP_ROUTER__ = true;
 
   window.route = async function route() {
-    const hash = location.hash.replace(/^#/, "") || "/";
+    const hash = (location.hash || '#/').replace(/^#/, '');
 
-    if (hash === "/") return renderHome?.();
-    if (hash.startsWith("/courses")) return renderCourses?.();
-    if (hash.startsWith("/dashboard")) return renderDashboard?.();
-    if (hash.startsWith("/admin")) return renderAdmin?.();
-    if (hash.startsWith("/profile")) return renderProfile?.();
-    if (hash.startsWith("/settings")) return renderSettings?.();
-    if (hash.startsWith("/certs")) return renderCertificates?.();
-    if (hash.startsWith("/transcripts")) return renderTranscripts?.();
-    if (hash.startsWith("/search")) return renderSearch?.();   // ✅ move this UP
+    if (hash === '/' || hash === '') return renderHome?.();
+
+    // ✅ 1) lesson page: /courses/:id/lesson/:lid
+    if (hash.startsWith('/courses/') && hash.includes('/lesson/')) {
+      const [, , courseId, , lessonId] = hash.split('/');
+      return renderCourseDetail?.(courseId, lessonId);
+    }
+
+    // ✅ 2) course detail: /courses/:id
+    if (/^\/courses\/[^/]+$/.test(hash)) {
+      const [, , courseId] = hash.split('/');
+      return renderCourseDetail?.(courseId);
+    }
+
+    // ✅ 3) courses list
+    if (hash.startsWith('/courses')) return renderCourses?.();
+
+    if (hash.startsWith('/dashboard'))   return renderDashboard?.();
+    if (hash.startsWith('/admin'))       return renderAdmin?.();
+    if (hash.startsWith('/profile'))     return renderProfile?.();
+    if (hash.startsWith('/settings'))    return renderSettings?.();
+    if (hash.startsWith('/certs'))       return renderCertificates?.();
+    if (hash.startsWith('/transcripts')) return renderTranscripts?.();
+    if (hash.startsWith('/search'))      return renderSearch?.();
+
     return renderNotFound?.();
   };
 
-  window.addEventListener("hashchange", window.route);
-  window.addEventListener("load", window.route);
+  window.addEventListener('hashchange', window.route);
+  window.addEventListener('load', window.route);
 }
 
 function defaultsProfile(d = {}) {
@@ -1073,24 +1114,10 @@ async function renderCourses() {
   const snap = await getDocs(qy);
   const grid = document.getElementById("courseGrid");
   grid.innerHTML = "";
-  snap.forEach((d) => {
-    const c = { id: d.id, ...d.data() };
-    grid.insertAdjacentHTML("beforeend", courseCardHTML(c));
-  });
+  snap.forEach(d => grid.insertAdjacentHTML("beforeend", courseCardHTML({ id:d.id, ...d.data() })));
 
-  // delegate clicks for details/enroll
-  grid.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-act]");
-    if (!btn) return;
-    const cid = btn.getAttribute("data-cid");
-    if (btn.dataset.act === "details") {
-      openCourseDetails(cid);
-    } else if (btn.dataset.act === "enroll") {
-      enrollCourse(cid);
-    }
-  });
-
-  ensureCourseDetailsDialog();
+  // one call does details/enroll/buy/open handling for us
+  wireCourseCardEvents("#courseGrid");
 }
 
 function ensureCourseDetailsDialog() {
@@ -1664,8 +1691,7 @@ async function openLesson(lessonId) {
 
 // ---------- Dashboard ----------
 async function renderDashboard() {
-  const u = auth.currentUser;
-  if (!u) {
+  if (!auth.currentUser) {
     location.hash = "#/";
     return;
   }
@@ -1674,6 +1700,7 @@ async function renderDashboard() {
   app.innerHTML = `
     <section class="card max">
       <h2>Dashboard</h2>
+
       <div class="grid-2">
         <div>
           <h3>My Courses</h3>
@@ -1689,52 +1716,57 @@ async function renderDashboard() {
     </section>
   `;
 
-  /* ---------- My Enrollments ---------- */
+  /* ---------- My Courses (enrollments) ---------- */
+  const uid = auth.currentUser.uid;
   try {
-    const eq = query(
-      collection(db, "users", u.uid, "enrollments"),
-      orderBy("ts", "desc")
-    );
+    const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
     const es = await getDocs(eq);
-
     const my = document.getElementById("myCourses");
-    if (es.empty) {
-      my.innerHTML = `<div class="card muted">No enrollments yet.</div>`;
-    } else {
-      // parallel load course docs
-      const enrolls = es.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const coursePromises = enrolls.map(async (e) => {
+    if (my) {
+      my.innerHTML = "";
+      for (const d of es.docs) {
+        const e = d.data();
         const cRef = doc(db, "courses", e.courseId);
-        const cs = await getDoc(cRef);
-        return cs.exists()
-          ? { id: cs.id, ...cs.data() }
-          : { id: e.courseId, title: e.courseTitle || "Course" };
-      });
-      const courses = await Promise.all(coursePromises);
+        const cs   = await getDoc(cRef);
+        const c    = cs.exists() ? { id: cs.id, ...cs.data() }
+                                 : { id: e.courseId, title: e.courseTitle };
 
-      let html = "";
-      for (const c of courses) {
-        // courseCardHTML က buttonတွေမှာ data-act="enroll" data-cid="${c.id}" ထည့်ထားပြီးသားဖြစ်ရပါမယ်
-        const card = courseCardHTML(c)
-          .replace('data-act="enroll"', 'data-act="open"')
-          .replace(">Enroll<", ">Open<");
-        html += card;
+        const html = `
+          <article class="course-card" data-cid="${c.id}">
+            <img class="cover" src="${(c.img || PLACEHOLDER_IMG)}"
+                 onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
+            <div class="body">
+              <h3>${c.title || "Untitled Course"}</h3>
+              <p class="desc">${c.summary || ""}</p>
+              <ul class="meta">
+                ${levelLabel(c) ? `<li>${levelLabel(c)}</li>` : ""}
+                <li>Credits: ${c.credits ?? 0}</li>
+              </ul>
+              <div class="footer">
+                <span class="price"></span>
+                <div class="actions">
+                  <button class="btn" data-action="open" data-id="${c.id}">Open</button>
+                </div>
+              </div>
+            </div>
+          </article>`;
+        my.insertAdjacentHTML("beforeend", html);
       }
-      my.innerHTML = html;
-
-      // open click → go to course reader page
-      my.addEventListener("click", (e) => {
-        const btn = e.target.closest('button[data-act="open"]');
-        if (!btn) return;
-        const cid = btn.getAttribute("data-cid");
-        if (cid) location.hash = `#/courses/${cid}`;
-      });
+      // delegate (exists ဆိုရင်ပဲ ခေါ်)
+      if (typeof wireCourseCardEvents === "function") {
+        wireCourseCardEvents("#myCourses");
+      } else {
+        // minimal fallback: open btn only
+        my.addEventListener("click", (e) => {
+          const btn = e.target.closest('button[data-action="open"]');
+          if (!btn) return;
+          const id = btn.getAttribute("data-id");
+          location.hash = `#/courses/${id}`;
+        });
+      }
     }
   } catch (e) {
-    console.error("[dashboard] enrollments:", e);
-    document.getElementById(
-      "myCourses"
-    ).innerHTML = `<div class="card error">Can't load courses.</div>`;
+    console.error("[dashboard] my courses:", e);
   }
 
   /* ---------- Announcements (public) ---------- */
@@ -1742,40 +1774,37 @@ async function renderDashboard() {
     const aq = query(collection(db, "announcements"), orderBy("ts", "desc"));
     const as = await getDocs(aq);
     const annBox = document.getElementById("annList");
-    if (as.empty) {
-      annBox.innerHTML = `<div class="card muted">No announcements.</div>`;
-    } else {
-      annBox.innerHTML = "";
-      as.forEach((d) => {
-        const a = d.data();
-        const when = a.ts?.toDate ? a.ts.toDate().toLocaleString() : "";
-        annBox.insertAdjacentHTML(
-          "beforeend",
-          `
-          <article class="card">
-            <strong>${escapeHtml(a.title || "")}</strong>
-            <p class="muted" style="margin:.25rem 0">${when}</p>
-            <p>${escapeHtml(a.body || "")}</p>
-          </article>
-        `
-        );
-      });
+    if (annBox) {
+      if (as.empty) {
+        annBox.innerHTML = `<div class="card muted">No announcements.</div>`;
+      } else {
+        const parts = [];
+        as.forEach((d) => {
+          const a = d.data();
+          const when = a.ts?.toDate ? a.ts.toDate().toLocaleString() : "";
+          parts.push(`
+            <article class="card">
+              <strong>${escapeHtml(a.title || "")}</strong>
+              <p class="muted" style="margin:.25rem 0">${when}</p>
+              <p>${escapeHtml(a.body || "")}</p>
+            </article>
+          `);
+        });
+        annBox.innerHTML = parts.join("");
+      }
     }
   } catch (e) {
     console.error("[dashboard] announcements:", e);
-    document.getElementById(
-      "annList"
-    ).innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    const el = document.getElementById("annList");
+    if (el) el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
   /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
-    const mineQ = query(collection(db, "messages"), where("to", "==", u.uid));
-    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
-    const [mineSnap, broadSnap] = await Promise.all([
-      getDocs(mineQ),
-      getDocs(allQ),
-    ]);
+    // 🔧 FIX: u.uid -> uid
+    const mineQ = query(collection(db, "messages"), where("to", "==", uid));
+    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([ getDocs(mineQ), getDocs(allQ) ]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -1788,25 +1817,22 @@ async function renderDashboard() {
     });
 
     const msgBox = document.getElementById("msgList");
-    msgBox.innerHTML = items.length
-      ? items
-          .map(
-            (m) => `
-          <article class="card">
-            <p class="muted" style="margin:0 0 .25rem">${
-              m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""
-            }</p>
-            <p>${escapeHtml(m.text || "")}</p>
-          </article>
-        `
-          )
-          .join("")
-      : `<div class="card muted">No messages.</div>`;
+    if (msgBox) {
+      msgBox.innerHTML = items.length
+        ? items.map((m) => `
+            <article class="card">
+              <p class="muted" style="margin:0 0 .25rem">
+                ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
+              </p>
+              <p>${escapeHtml(m.text || "")}</p>
+            </article>
+          `).join("")
+        : `<div class="card muted">No messages.</div>`;
+    }
   } catch (e) {
     console.error("[dashboard] messages:", e);
-    document.getElementById(
-      "msgList"
-    ).innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    const box = document.getElementById("msgList");
+    if (box) box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
@@ -1839,6 +1865,7 @@ async function renderAdmin() {
         <button class="tab" data-tab="posts">Posts</button>
         <button class="tab" data-tab="ann">Announcements</button>
         <button class="tab" data-tab="msg">Message Students</button>
+        <button class="tab" data-tab="import">Import</button>
       </div>
 
       <!-- COURSES -->
@@ -1936,21 +1963,111 @@ async function renderAdmin() {
         </form>
         <div id="adminMsgs" class="stack"></div>
       </div>
+
+      <!-- IMPORT -->
+      <div id="tab-import" class="hidden">
+        <h3>Import Course JSON</h3>
+        <textarea id="importJson" rows="10" placeholder="Paste catalog/chapters/lesson json here"></textarea>
+        <div class="row" style="gap:.5rem">
+          <button id="btnImportCourse" class="btn">Import</button>
+          <button id="btnImportFolder" class="btn ghost">Quick Import</button>
+        </div>
+        <p class="muted">Tip: Start with catalog.json, then chapters.json, then each lesson json.</p>
+      </div>
     </section>
   `;
 
-  /* ---------------- Tabs ---------------- */
-  app.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      app.querySelectorAll(".tab").forEach(b => b.classList.remove("is-active"));
-      btn.classList.add("is-active");
-      const k = btn.dataset.tab;
-      app.querySelector("#tab-courses").classList.toggle("hidden", k!=="courses");
-      app.querySelector("#tab-posts").classList.toggle("hidden",   k!=="posts");
-      app.querySelector("#tab-ann").classList.toggle("hidden",     k!=="ann");
-      app.querySelector("#tab-msg").classList.toggle("hidden",     k!=="msg");
+  // Tabs (null-safe)
+  const tabBtns = app.querySelectorAll('.tab');
+  const paneKeys = ['courses','posts','ann','msg','import'];
+
+  function showTab(k) {
+    // buttons
+    tabBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tab === k));
+    // panes (null-safe)
+    paneKeys.forEach(key => {
+      const el = app.querySelector(`#tab-${key}`);
+      if (el) el.classList.toggle('hidden', key !== k);
     });
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => showTab(btn.dataset.tab));
   });
+
+  // initial
+  showTab('courses');
+
+
+  // Inside renderAdmin(), after HTML is set:
+    document.getElementById('btnImportCourse')?.addEventListener('click', async ()=>{
+      try {
+        let raw = document.getElementById('importJson')?.value ?? '';
+        raw = raw.trim().replace(/^\uFEFF/, ''); // strip BOM
+
+        // Guard: empty
+        if (!raw) return alert('Paste some JSON');
+
+        // Support: some people paste multiple JSON roots at once.
+        // If so, try to detect and split safely.
+        const tryMany = [];
+        if (raw.startsWith('[')) {
+          // Top-level array of objects allowed too
+          const arr = JSON.parse(raw);
+          if (!Array.isArray(arr)) throw new Error('Top array expected');
+          for (const x of arr) tryMany.push(x);
+        } else {
+          // Attempt single object; if fails, try to split by "}\n{"
+          try {
+            tryMany.push(JSON.parse(raw));
+          } catch {
+            // naive splitter for multiple roots pasted together
+            const pieces = raw
+              .split(/}\s*[\r\n]+\s*{/g)
+              .map((s,i,arr)=> (i===0? s + '}' : '{' + s + (i===arr.length-1?'':'}')));
+            for (const p of pieces) tryMany.push(JSON.parse(p));
+          }
+        }
+
+        // Import each piece & log which branch importer took
+        for (const j of tryMany) {
+          console.log('[import] candidate:', j);
+          await importAnyJson(j);   // your function
+          console.log('[import] ok');
+        }
+
+        alert('Imported ✅');
+      } catch (e) {
+        console.error('[import] failed:', e);
+        alert('Invalid JSON or import error: ' + (e?.message || e));
+      }
+    });
+
+    // (optional) Quick Import demo
+    document.getElementById('btnImportFolder')?.addEventListener('click', async ()=>{
+      alert('Wire this to fetch /data/courses/... files and call importAnyJson sequentially.');
+    });
+
+    // (optional) Clear button, only if you have it in HTML
+    document.getElementById('btnClearImport')
+      ?.addEventListener('click', () => {
+        const ta = document.getElementById('importJson');
+        if (ta) ta.value = '';
+      });
+
+  /* ---------------- Tabs ---------------- */
+  // app.querySelectorAll(".tab").forEach((btn) => {
+  //   btn.addEventListener("click", () => {
+  //     app.querySelectorAll(".tab").forEach(b => b.classList.remove("is-active"));
+  //     btn.classList.add("is-active");
+  //     const k = btn.dataset.tab;
+  //     app.querySelector("#tab-courses").classList.toggle("hidden", k!=="courses");
+  //     app.querySelector("#tab-posts").classList.toggle("hidden",   k!=="posts");
+  //     app.querySelector("#tab-ann").classList.toggle("hidden",     k!=="ann");
+  //     app.querySelector("#tab-msg").classList.toggle("hidden",     k!=="msg");
+  //     app.querySelector("#tab-import").classList.toggle("hidden",  k!=="import");
+  //   });
+  // });
 
   /* --------------- COURSES: load/list/bind --------------- */
   const listEl = document.getElementById("adminCourseList");
@@ -2197,20 +2314,9 @@ async function renderAdmin() {
     const snap = await getDocs(query(collection(db,'posts'), orderBy('ts','desc'), limit(50)));
     const items = [];
     snap.forEach(d=>items.push({ id:d.id, ...d.data() }));
-    box.innerHTML = items.length ? items.map(p => `
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items:center">
-          <strong>${escapeHtml(p.title||'(no title)')} <span class="badge">${p.type||'text'}</span></strong>
-          <div class="row" style="gap:.5rem">
-            <button class="btn small ghost" data-act="edit" data-id="${p.id}">Edit</button>
-            <button class="btn small danger" data-act="del"  data-id="${p.id}">Delete</button>
-          </div>
-        </div>
-        <div class="muted" style="margin:.25rem 0">${p.ts?.toDate ? p.ts.toDate().toLocaleString():''}</div>
-        ${p.mediaUrl ? `<div class="muted" style="word-break:break-all">${p.mediaUrl}</div>` : ''}
-        ${p.body ? `<p>${escapeHtml(p.body)}</p>` : ''}
-      </div>
-    `).join('') : `<div class="card muted">No posts yet.</div>`;
+    box.innerHTML = items.length
+  ? items.map(renderPostCard).join('')
+  : `<div class="card muted">No posts yet.</div>`;
 
     // delegate: delete
     box.querySelectorAll('[data-act="del"]').forEach(b=>{
@@ -2321,25 +2427,440 @@ async function renderAdmin() {
   });
 
   async function loadAdminMsgs() {
-    const box = document.getElementById("adminMsgs");
-    box.innerHTML = "Loading…";
-    const snap = await getDocs(
-      query(collection(db, "messages"), orderBy("ts", "desc"))
-    );
-    const rows = [];
-    snap.forEach((d) => rows.push(d.data()));
-    box.innerHTML = rows
-      .map(
-        (m) => `
-      <div class="card">
-        <div><strong>To:</strong> ${m.to}</div>
-        <p>${m.text}</p>
+      const box = document.getElementById("adminMsgs");
+      box.innerHTML = "Loading…";
+      const snap = await getDocs(
+        query(collection(db, "messages"), orderBy("ts", "desc"))
+      );
+      const rows = [];
+      snap.forEach((d) => rows.push(d.data()));
+      box.innerHTML = rows
+        .map(
+          (m) => `
+        <div class="card">
+          <div><strong>To:</strong> ${m.to}</div>
+          <p>${m.text}</p>
+        </div>
+      `
+        )
+        .join("");
+    }
+    await loadAdminMsgs();
+}
+
+async function renderCourseDetail(courseId, lessonId = null) {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <section class="card max" id="courseReader" data-cid="${courseId}">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h2 id="crsTitle">Course</h2>
+        <a class="btn ghost" href="#/dashboard">← Back to Dashboard</a>
       </div>
-    `
-      )
-      .join("");
+
+      <div class="grid-2" style="gap:1rem; align-items:flex-start">
+        <aside id="crsSidebar" class="card" style="padding:0.5rem; max-height:70vh; overflow:auto"></aside>
+        <main id="crsMain" class="card" style="min-height:50vh">Loading…</main>
+      </div>
+    </section>
+  `;
+
+  // Load course meta (title/img etc.)
+  try {
+    const s = await getDoc(doc(db, "courses", courseId));
+    if (s.exists()) {
+      const c = s.data();
+      document.getElementById("crsTitle").textContent = c.title || "Course";
+    }
+  } catch (_) {}
+
+  // Load course tree (chapters → lessons)
+  const chapters = await loadCourseTree(courseId); // you already have this helper
+  // Build sidebar
+  const sb = document.getElementById("crsSidebar");
+  if (!chapters.length) {
+    sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
+    document.getElementById("crsMain").innerHTML = `<div class="muted">No lessons.</div>`;
+    return;
   }
-  await loadAdminMsgs();
+  const flat = [];
+  sb.innerHTML = chapters.map(ch => {
+    const items = (ch.lessons || []).map(ls => {
+      flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || '' });
+      const active = (lessonId && ls.id === lessonId) ? ' class="active"' : '';
+      return `<li${active}>
+        <a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a>
+      </li>`;
+    }).join("");
+    return `
+      <details open class="blk">
+        <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
+        <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
+      </details>
+    `;
+  }).join("");
+
+  // Default select first lesson if none
+  if (!lessonId && flat.length) {
+    lessonId = flat[0].lsId;
+    // update hash (so sidebar highlight works on reload)
+    location.hash = `#/courses/${courseId}/lesson/${lessonId}`;
+    return; // route() will re-run and land here again
+  }
+
+  // Find current index + compute prev/next
+  const idx  = flat.findIndex(x => x.lsId === lessonId);
+  const prev = idx > 0 ? flat[idx - 1] : null;
+  const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
+
+  // 🔧 Pick a chapter id safely (handles idx === -1)
+  const safeChId = idx >= 0 ? flat[idx].chId : (chapters[0]?.id);
+
+  // Load lesson bundle (doc + contents + quiz)
+  const main = document.getElementById("crsMain");
+  if (!main) return;
+
+  try {
+    // … later, use safeChId for ALL paths …
+    const lessonRef = doc(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId);
+    const lsSnap = await getDoc(lessonRef);
+    if (!lsSnap.exists()) {
+      main.innerHTML = `<div class="card error">Lesson not found.</div>`;
+      return;
+    }
+    const L = { id: lsSnap.id, ...lsSnap.data() };
+
+    // contents
+    const contents = [];
+    const csnap = await getDocs(query(
+      collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'contents'),
+      orderBy('order','asc')
+    ));
+    csnap.forEach(d => contents.push({ id:d.id, ...d.data() }));
+
+    // quiz (single doc under /quizzes/* + sub questions/*)
+    let quiz = null, questions = [];
+    const qsnap = await getDocs(collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'quizzes'));
+    qsnap.forEach(qd => { if (!quiz) quiz = { id: qd.id, ...qd.data() }; });
+    if (quiz) {
+      const qsn = await getDocs(collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'quizzes', quiz.id, 'questions'));
+      qsn.forEach(d => questions.push({ id:d.id, ...d.data() }));
+    }
+
+    // Render lesson
+    main.innerHTML = `
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">${L.title || 'Lesson'}</h3>
+        <div class="row" style="gap:.5rem">
+          <button class="btn ghost" ${prev ? '' : 'disabled'}
+            data-nav="prev">← Prev</button>
+          <button class="btn" ${next ? '' : 'disabled'}
+            data-nav="next">Next →</button>
+        </div>
+      </div>
+
+      ${L.reading ? `<p style="margin:.5rem 0">
+        <a class="btn small" href="${L.reading}" target="_blank" rel="noopener">Open handout (PDF)</a>
+      </p>` : ''}
+
+      <div id="lessonBlocks" class="stack" style="margin-top:.5rem"></div>
+
+      ${quiz ? `
+        <div class="card">
+          <strong>${quiz.title || 'Quiz'}</strong>
+          <p class="muted">${questions.length} questions · Pass ${quiz.passPct ?? 70}%</p>
+          <button class="btn" id="btnStartQuiz">Start Quiz</button>
+        </div>
+      ` : ''}
+    `;
+
+    // Render content blocks
+    const host = document.getElementById("lessonBlocks");
+    host.innerHTML = contents.map(b => {
+      const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
+      switch ((b.type || '').toLowerCase()) {
+        case 'video':
+          return `<div class="card">
+            <video src="${b.url}" controls style="width:100%;border-radius:12px"></video>${cap}
+          </div>`;
+        case 'audio':
+          return `<div class="card">
+            <audio src="${b.url}" controls style="width:100%"></audio>${cap}
+          </div>`;
+        case 'image':
+          return `<div class="card">
+            <img src="${b.url}" alt="" style="max-width:100%;height:auto;border-radius:12px">${cap}
+          </div>`;
+        case 'text':
+        default:
+          return `<div class="card">
+            <a href="${b.url}" target="_blank" rel="noopener">${escapeHtml(b.url)}</a>${cap}
+          </div>`;
+      }
+    }).join("");
+
+    // Prev/Next handlers
+    main.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
+      if (!prev) return;
+      location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`;
+    });
+    main.querySelector('[data-nav="next"]')?.addEventListener('click', () => {
+      if (!next) return;
+      location.hash = `#/courses/${courseId}/lesson/${next.lsId}`;
+    });
+
+    // (optional) quiz start
+    document.getElementById('btnStartQuiz')?.addEventListener('click', () => {
+      alert('Quiz UI coming next: render questions[], record attempts, grade, pass/fail…');
+    });
+
+  } catch (e) {
+    console.error('[reader]', e);
+    main.innerHTML = `<div class="card error">Failed to load lesson.</div>`;
+  }
+
+  const host = document.getElementById('lessonBlocks');
+
+  // Resolve all URLs first (handle gs:// and /relative)
+  const resolved = await Promise.all(contents.map(async b => ({
+    ...b,
+    url: await resolveMediaUrl(b.url || '')
+  })));
+
+  // Clear and append cards
+  host.innerHTML = '';
+  for (const b of resolved) {
+    const card = mediaCard({
+      type: (b.type || 'text').toLowerCase(),
+      url: b.url,
+      caption: b.caption || ''
+    });
+    host.appendChild(card);
+  }
+
+}
+
+// gs:// , /relative, http(s):// — အကုန် handle
+async function resolveMediaUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('gs://')) {
+    // needs Firebase Storage (storage, getDownloadURL available in your app)
+    const r = sref(storage, url);
+    return await getDownloadURL(r);
+  }
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // relative path -> absolute
+  if (url.startsWith('/')) return location.origin + url;
+  return new URL(url, location.origin).toString();
+}
+
+// DOM builder with graceful fallback
+function mediaCard({type, url, caption}) {
+  const cap = caption ? `<div class="muted" style="margin-top:.25rem">${escapeHtml(caption)}</div>` : '';
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+
+  const fail = (msg) => {
+    wrap.innerHTML = `<div class="error">${msg}</div>${cap}`;
+  };
+
+  if (type === 'image') {
+    const img = new Image();
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.borderRadius = '12px';
+    img.src = url;
+    img.addEventListener('error', () => fail('Image unavailable.'));
+    wrap.appendChild(img);
+    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    return wrap;
+  }
+
+  if (type === 'video') {
+    const v = document.createElement('video');
+    v.controls = true;
+    v.style.width = '100%';
+    v.style.borderRadius = '12px';
+    v.src = url;
+    v.addEventListener('error', () => fail('Video unavailable.'));
+    wrap.appendChild(v);
+    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    return wrap;
+  }
+
+  if (type === 'audio') {
+    const a = document.createElement('audio');
+    a.controls = true;
+    a.style.width = '100%';
+    a.src = url;
+    a.addEventListener('error', () => fail('Audio unavailable.'));
+    wrap.appendChild(a);
+    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    return wrap;
+  }
+
+  // default: link/text
+  wrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(url)}</a>${cap}`;
+  return wrap;
+}
+
+// Render one lesson (reading + contents + quiz CTA)
+async function renderLesson(courseId, lessonId) {
+  const main = document.getElementById('courseMain');
+  if (!main) return;
+
+  // find which chapter contains this lesson
+  // (cheap scan)
+  let found = null, chId = null;
+  const chSnap = await getDocs(collection(db,'courses',courseId,'chapters'));
+  for (const chDoc of chSnap.docs) {
+    const lsRef = doc(db,'courses',courseId,'chapters',chDoc.id,'lessons',lessonId);
+    const lsSnap = await getDoc(lsRef);
+    if (lsSnap.exists()) { found = { id: lsSnap.id, ...lsSnap.data() }; chId = chDoc.id; break; }
+  }
+
+  if (!found) {
+    main.innerHTML = `<div class="card error">Lesson not found.</div>`;
+    return;
+  }
+
+  const lesson = found;
+
+  // contents
+  const ctSnap = await getDocs(
+    query(collection(db,'courses',courseId,'chapters',chId,'lessons',lessonId,'contents'), orderBy('order','asc'))
+  );
+  const contents = [];
+  ctSnap.forEach(d => contents.push({ id:d.id, ...d.data() }));
+
+  // quizzes (optional)
+  const qSnap = await getDocs(collection(db,'courses',courseId,'chapters',chId,'lessons',lessonId,'quizzes'));
+  const quizzes = [];
+  qSnap.forEach(d => quizzes.push({ id:d.id, ...d.data() }));
+
+  // UI
+  main.innerHTML = `
+    <article class="card">
+      <h2>${lesson.order ?? ''} ${lesson.title || 'Lesson'}</h2>
+      ${lesson.reading ? `<p><a class="btn small" href="${lesson.reading}" target="_blank" rel="noopener">Open reading (PDF)</a></p>` : ''}
+
+      <div class="stack" style="margin-top:.75rem">
+        ${contents.map(renderContentBlock).join('')}
+      </div>
+
+      ${quizzes.length ? `
+        <div class="row" style="margin-top:1rem; gap:.5rem">
+          ${quizzes.map(q => `<button class="btn" data-quiz="${q.id}">Start “${q.title||'Quiz'}”</button>`).join('')}
+        </div>` : ''
+      }
+    </article>
+    <div class="row" style="justify-content:space-between; margin-top:.75rem">
+      <button class="btn ghost" id="btnPrev">← Prev</button>
+      <button class="btn" id="btnNext">Next →</button>
+    </div>
+  `;
+
+  // (optional) Prev/Next wiring — you can compute neighbors by reusing chapter/lesson order list
+}
+
+function renderContentBlock(ct) {
+  const cap = ct.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(ct.caption)}</div>` : '';
+  if (ct.type === 'video')  return `<div class="card"><video src="${ct.url}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+  if (ct.type === 'audio')  return `<div class="card"><audio src="${ct.url}" controls style="width:100%"></audio>${cap}</div>`;
+  if (ct.type === 'image')  return `<div class="card"><img src="${ct.url}" alt="" style="width:100%;height:auto;border-radius:12px;display:block" />${cap}</div>`;
+  if (ct.type === 'text')   return `<div class="card"><a href="${ct.url}" target="_blank" rel="noopener">${escapeHtml(ct.url)}</a>${cap}</div>`;
+  return `<div class="card muted">Unknown block: ${escapeHtml(ct.type||'')}</div>`;
+}
+
+async function importAnyJson(json){
+  // catalog.json
+  if (Array.isArray(json.courses)) {
+    console.log('[importer] catalog, courses:', json.courses.length);
+    for (const c of json.courses) {
+      const id = c.id || crypto.randomUUID();
+      const data = { ...c }; delete data.chaptersUrl;
+      await setDoc(doc(db,'courses', id), data, { merge:true });
+
+      // optional: auto-follow chaptersUrl
+      if (c.chaptersUrl) {
+        try {
+          const r = await fetch(c.chaptersUrl, {cache:'no-store'});
+          if (r.ok) await importAnyJson(await r.json());
+        } catch(_) {}
+      }
+    }
+    return;
+  }
+
+  // chapters.json
+  if (Array.isArray(json.chapters) && json.course?.id) {
+    const cid = json.course.id;
+    console.log('[importer] chapters for', cid, 'count:', json.chapters.length);
+    for (const ch of json.chapters) {
+      const chid = ch.id || crypto.randomUUID();
+      await setDoc(doc(db,'courses', cid, 'chapters', chid), {
+        title: ch.title || '', order: ch.order ?? 1, summary: ch.summary || ''
+      }, { merge:true });
+
+      // follow lessonsUrl if provided (single-lesson JSON file)
+      if (ch.lessonsUrl) {
+        try {
+          const r = await fetch(ch.lessonsUrl, {cache:'no-store'});
+          if (r.ok) await importAnyJson({ ...await r.json(), _cid: cid, _chid: chid });
+        } catch(_) {}
+      }
+    }
+    return;
+  }
+
+  // lesson.json (expects: lesson + reading + contents + quiz)
+  if (json.lesson && (json._cid || json.courseId)) {
+    const cid  = json._cid || json.courseId;
+    const chid = json._chid || json.chapterId || 'c1';
+    console.log('[importer] lesson for', cid, chid, 'title:', json.lesson?.title);
+    const l    = json.lesson;
+    const lid  = l.id || crypto.randomUUID();
+
+    await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid), {
+      title: l.title || '', order: l.order ?? 1, reading: json.reading || ''
+    }, { merge:true });
+
+    // contents
+    for (const ct of (json.contents || [])) {
+      const id = crypto.randomUUID();
+      await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'contents', id), {
+        type: ct.type, url: ct.url, caption: ct.caption || '', order: ct.order ?? 1
+      });
+    }
+
+    // quiz
+    if (json.quiz) {
+      const qid = crypto.randomUUID();
+      await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid), {
+        title: json.quiz.title || 'Quiz', shuffle: !!json.quiz.shuffle, passPct: json.quiz.passPct ?? 70
+      });
+      for (const q of (json.quiz.questions || [])) {
+        const id = crypto.randomUUID();
+        await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid, 'questions', id), {
+          text: q.text, choices: q.choices, answerIndex: q.answerIndex, points: q.points ?? 1
+        });
+      }
+    }
+    return;
+  }
+
+  throw new Error('JSON shape not recognized.');
+}
+
+async function loadCourseTree(courseId){
+  const chapters = [];
+  const chSnap = await getDocs(query(collection(db,'courses',courseId,'chapters'), orderBy('order','asc')));
+  for (const ch of chSnap.docs) {
+    const lessons = [];
+    const lsSnap = await getDocs(query(collection(db,'courses',courseId,'chapters',ch.id,'lessons'), orderBy('order','asc')));
+    lsSnap.forEach(d => lessons.push({ id:d.id, ...d.data() }));
+    chapters.push({ id: ch.id, ...ch.data(), lessons });
+  }
+  return chapters;
 }
 
 async function openCourseEditor(id) {
@@ -2898,12 +3419,13 @@ function levelLabel(c) {
 
 function courseCardHTML(c) {
   const src = c.img && String(c.img).trim() ? c.img : PLACEHOLDER_IMG;
-  const benefits = normBenefits(c.benefits || []);
-  const priceNum = Number(c.price ?? 0);
-  const priceText = priceNum > 0 ? `$${priceNum.toFixed(2)}` : "Free";
+  const benefits = normBenefits(c.benefits);
+  const price = Number(c.price ?? 0);
+  const priceTxt = price > 0 ? `$${price.toFixed(2)}` : 'Free';
+  const ctaLabel = price > 0 ? 'Buy' : 'Enroll';
 
   return `
-  <article class="course-card" data-cid="${c.id}">
+  <article class="course-card" data-cid="${c.id}" data-price="${price}">
     <img class="cover"
          alt="${(c.title || "Course").replace(/"/g, "&quot;")}"
          src="${src}"
@@ -2918,27 +3440,59 @@ function courseCardHTML(c) {
       </ul>
 
       <div class="benefits">
-        ${benefits
-          .slice(0, 3)
-          .map((b) => `<div class="benefit">• ${b}</div>`)
-          .join("")}
+        ${benefits.map((b) => `<div class="benefit">• ${b}</div>`).join("")}
       </div>
 
       <div class="footer">
-        <span class="price">${priceText}</span>
+        <span class="price">${priceTxt}</span>
         <div class="actions">
-          <button class="btn ghost" data-action="details" data-id="${c.id}">
-            Details
-          </button>
-          <button class="btn" data-action="enroll" data-id="${
-            c.id
-          }" data-price="${priceNum}">
-            ${priceNum > 0 ? "Buy" : "Enroll"}
-          </button>
+          <button class="btn ghost"
+                  data-action="details"
+                  data-id="${c.id}">Details</button>
+          <button class="btn"
+                  data-action="enroll"
+                  data-id="${c.id}"
+                  data-price="${price}">${ctaLabel}</button>
         </div>
       </div>
     </div>
   </article>`;
+}
+
+function wireCourseCardEvents(rootSel = "#app") {
+  const root = typeof rootSel === "string" ? document.querySelector(rootSel) : rootSel;
+  if (!root) return;
+  if (root.__cardWired) return;      // prevent double binding
+  root.__cardWired = true;
+
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+
+    const act   = btn.dataset.action;
+    const id    = btn.dataset.id || btn.closest("[data-cid]")?.dataset.cid;
+    const price = parseFloat(btn.dataset.price || btn.closest("[data-price]")?.dataset.price || "0");
+
+    if (!id) return;
+
+    switch (act) {
+      case "details":
+        openCourse?.(id);                   // course detail page
+        break;
+
+      case "enroll":
+        if (price > 0) {
+          openBuyDialog?.(id, price);       // paid → PayPal
+        } else {
+          enrollCourse?.(id);               // free → enroll direct
+        }
+        break;
+
+      case "open":
+        location.hash = `#/courses/${id}`;  // dashboard cards → open reader
+        break;
+    }
+  });
 }
 
 // ---------- PayPal (demo button) ----------

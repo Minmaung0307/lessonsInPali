@@ -621,7 +621,7 @@ h3 {
   display: none !important;
 }
 .footer {
-  padding: 2rem 1rem;
+  /* padding: 2rem 1rem; */
   color: var(--muted);
   text-align: center;
 }
