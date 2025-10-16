@@ -2012,3 +2012,53 @@ dialog.modal .sheet {
   border-radius: 12px;
 }
 .post .post-body p { margin: .35rem 0; }
+
+/* certificate & transcript */
+.certificate {
+  text-align: center;
+  border: 10px solid gold;
+  padding: 40px;
+  border-radius: 20px;
+  background: #fffef7;
+  max-width: 700px;
+  margin: 2rem auto;
+  box-shadow: 0 0 20px rgba(0,0,0,0.2);
+}
+.certificate h1 {
+  font-size: 2em;
+  color: #b58900;
+}
+.signatures {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 2rem;
+}
+.signatures hr {
+  width: 150px;
+  border: 1px solid #333;
+}
+
+.transcript {
+  max-width: 800px;
+  margin: 2rem auto;
+  background: #fff;
+  border: 2px solid #444;
+  border-radius: 10px;
+  padding: 30px;
+}
+.transcript h1 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.transcript table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.transcript th, .transcript td {
+  border: 1px solid #aaa;
+  padding: 10px;
+  text-align: center;
+}
+.transcript th {
+  background: #f4f4f4;
+}

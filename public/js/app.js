@@ -1758,6 +1758,135 @@ async function cleanupOrphanEnrollments(uid) {
   return n;
 }
 
+// --- Certificate & Transcript (GLOBAL) ---
+// Make them global because your buttons use inline onclick=""
+window.renderCertificate = async function (courseId) {
+  try {
+    if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+    const uid = auth.currentUser.uid;
+
+    // user display name
+    let student = auth.currentUser.email || uid;
+    try {
+      const us = await getDoc(doc(db, 'users', uid));
+      if (us.exists()) {
+        const u = us.data();
+        student = u.displayName || u.name || student;
+      }
+    } catch (_) {}
+
+    // course info
+    let courseTitle = courseId;
+    let credits = '';
+    try {
+      const cs = await getDoc(doc(db, 'courses', courseId));
+      if (cs.exists()) {
+        const c = cs.data();
+        courseTitle = c.title || courseTitle;
+        credits = (c.credits ?? '') ? ` · ${c.credits} credits` : '';
+      }
+    } catch (_) {}
+
+    // jsPDF
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) { alert('PDF library not loaded'); return; }
+
+    const pdf = new jsPDF('l','pt','a4');
+    pdf.setFontSize(28);
+    pdf.text('Certificate of Completion', 60, 90);
+    pdf.setFontSize(18);
+    pdf.text(`This certifies that`, 60, 140);
+    pdf.setFontSize(26);
+    pdf.text(student, 60, 180);
+    pdf.setFontSize(18);
+    pdf.text(`has successfully completed`, 60, 220);
+    pdf.setFontSize(22);
+    pdf.text(`${courseTitle}${credits}`, 60, 260);
+    pdf.setFontSize(12);
+    const dt = new Date().toLocaleDateString();
+    pdf.text(`Date: ${dt}`, 60, 310);
+    pdf.text(`Course ID: ${courseId}`, 60, 330);
+
+    pdf.save(`certificate-${courseId}.pdf`);
+  } catch (e) {
+    console.error('[renderCertificate]', e);
+    alert('Failed to generate certificate.');
+  }
+};
+
+window.renderTranscript = async function () {
+  try {
+    if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+    const uid = auth.currentUser.uid;
+
+    // fetch enrollments
+    const snap = await getDocs(collection(db, 'users', uid, 'enrollments'));
+    const rows = [];
+    for (const d of snap.docs) {
+      const e = d.data();
+      let title = e.courseTitle || e.courseId;
+      let credits = e.credits ?? '';
+      // try fill from course doc (title/credits)
+      try {
+        const cs = await getDoc(doc(db, 'courses', e.courseId));
+        if (cs.exists()) {
+          const c = cs.data();
+          title = c.title || title;
+          if (credits === '' && c.credits != null) credits = c.credits;
+        }
+      } catch (_) {}
+      rows.push({
+        title,
+        courseId: e.courseId,
+        credits,
+        grade: e.grade ?? '',
+        status: e.status ?? '',
+        ts: e.ts?.toDate ? e.ts.toDate().toLocaleDateString() : ''
+      });
+    }
+
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) { alert('PDF library not loaded'); return; }
+
+    const pdf = new jsPDF('p','pt','a4');
+    let y = 70;
+    pdf.setFontSize(22);
+    pdf.text('Transcript', 60, y); y += 30;
+
+    pdf.setFontSize(12);
+    pdf.text(`Student: ${auth.currentUser.email || uid}`, 60, y); y += 20;
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, 60, y); y += 30;
+
+    // table header
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Course', 60, y);
+    pdf.text('ID', 300, y);
+    pdf.text('Credits', 420, y);
+    pdf.text('Grade', 490, y);
+    pdf.text('Status', 550, y);
+    pdf.text('Date', 610, y);
+    pdf.setFont(undefined, 'normal');
+    y += 16;
+
+    for (const r of rows) {
+      pdf.text(String(r.title || ''), 60, y, { maxWidth: 220 });
+      pdf.text(String(r.courseId || ''), 300, y, { maxWidth: 100 });
+      pdf.text(String(r.credits || ''), 420, y);
+      pdf.text(String(r.grade || ''), 490, y);
+      pdf.text(String(r.status || ''), 550, y);
+      pdf.text(String(r.ts || ''), 610, y);
+
+      y += 18;
+      if (y > 780) { pdf.addPage(); y = 60; }
+    }
+
+    pdf.save('transcript.pdf');
+  } catch (e) {
+    console.error('[renderTranscript]', e);
+    alert('Failed to generate transcript.');
+  }
+};
+
 // ---------- Dashboard ----------
 async function renderDashboard() {
   if (!auth.currentUser) {
@@ -1770,13 +1899,24 @@ async function renderDashboard() {
     <section class="card max">
       <h2>Dashboard</h2>
       <div class="grid-2">
+        <!-- Left: My Courses -->
         <div>
           <h3>My Courses</h3>
           <div id="myCourses" class="course-grid"></div>
         </div>
+
+        <!-- Right: Docs + Announcements + Messages -->
         <div>
-          <h3>Announcements</h3>
+          <h3>Documents</h3>
+          <div class="row" style="gap:.5rem; flex-wrap:wrap">
+            <!-- ✅ မင်းတင်ပေးထားတဲ့ buttons ကို တင်သလိုပဲ ထည့်ထားပါတယ် 
+            <button class="btn" onclick="renderCertificate('pali-beg-1')">View Certificate</button>
+            <button class="btn ghost" onclick="renderTranscript()">View Transcript</button> -->
+          </div>
+
+          <h3 style="margin-top:1rem">Announcements</h3>
           <div id="annList">Loading…</div>
+
           <h3 style="margin-top:1rem">Messages</h3>
           <div id="msgList">Loading…</div>
         </div>
@@ -1787,23 +1927,14 @@ async function renderDashboard() {
   /* ---------- My Courses ---------- */
   const uid = auth.currentUser.uid;
   try {
-    // cleanup once (optional, but useful)
     await cleanupOrphanEnrollments(uid);
 
-    // force fresh read for enrollments → onSnapshot အသုံးပြု
     const my = document.getElementById("myCourses");
     if (my) my.innerHTML = `<div class="muted">Loading…</div>`;
 
-    const eq = query(
-      collection(db, "users", uid, "enrollments"),
-      orderBy("ts", "desc")
-    );
+    const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
     onSnapshot(eq, async (snap) => {
-      // server-vs-cache check
-      if (snap.metadata.fromCache && navigator.onLine) {
-        // wait for server roundtrip
-        return;
-      }
+      if (snap.metadata.fromCache && navigator.onLine) return;
       if (!my) return;
 
       if (snap.empty) {
@@ -1816,15 +1947,12 @@ async function renderDashboard() {
         const e = d.data();
         const cRef = doc(db, "courses", e.courseId);
         const cs = await getDoc(cRef);
-        const c = cs.exists()
-          ? { id: cs.id, ...cs.data() }
-          : { id: e.courseId, title: e.courseTitle };
-        my.insertAdjacentHTML(
-          "beforeend",
-          `
+        const c  = cs.exists() ? { id: cs.id, ...cs.data() } : { id: e.courseId, title: e.courseTitle };
+
+        my.insertAdjacentHTML("beforeend", `
           <article class="course-card" data-cid="${c.id}">
             <img class="cover" src="${c.img || PLACEHOLDER_IMG}"
-                onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
+                 onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
             <div class="body">
               <h3>${c.title || "Untitled Course"}</h3>
               <p class="desc">${c.summary || ""}</p>
@@ -1833,20 +1961,14 @@ async function renderDashboard() {
                 <li>Credits: ${c.credits ?? 0}</li>
               </ul>
               <div class="footer two-btn-footer">
-                <button class="btn btn-open" data-action="open" data-id="${
-                  c.id
-                }">Open</button>
-                <button class="btn btn-unenroll" data-action="unenroll" data-id="${
-                  c.id
-                }">Unenroll</button>
+                <button class="btn btn-open"     data-action="open"     data-id="${c.id}">Open</button>
+                <button class="btn btn-unenroll" data-action="unenroll" data-id="${c.id}">Unenroll</button>
               </div>
             </div>
           </article>
-        `
-        );
+        `);
       }
 
-      // delegate (open/unenroll)
       if (!my.__wired) {
         my.__wired = true;
         my.addEventListener("click", async (e) => {
@@ -1859,11 +1981,7 @@ async function renderDashboard() {
           } else if (act === "unenroll") {
             const ok = confirm("Remove this course from your dashboard?");
             if (!ok) return;
-            // try doc id == courseId first
-            try {
-              await deleteDoc(doc(db, "users", uid, "enrollments", cid));
-            } catch (_) {}
-            // fallback where
+            try { await deleteDoc(doc(db, "users", uid, "enrollments", cid)); } catch(_) {}
             const base = collection(db, "users", uid, "enrollments");
             const qs = await getDocs(query(base, where("courseId", "==", cid)));
             qs.forEach((d) => deleteDoc(d.ref));
@@ -1877,9 +1995,7 @@ async function renderDashboard() {
 
   /* ---------- Announcements (public) ---------- */
   try {
-    const as = await getDocs(
-      query(collection(db, "announcements"), orderBy("ts", "desc"))
-    );
+    const as = await getDocs(query(collection(db, "announcements"), orderBy("ts", "desc")));
     const annBox = document.getElementById("annList");
     if (annBox) {
       if (as.empty) {
@@ -1903,18 +2019,14 @@ async function renderDashboard() {
   } catch (e) {
     console.error("[dashboard] announcements:", e);
     const el = document.getElementById("annList");
-    if (el)
-      el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    if (el) el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
   /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
     const mineQ = query(collection(db, "messages"), where("to", "==", uid));
-    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
-    const [mineSnap, broadSnap] = await Promise.all([
-      getDocs(mineQ),
-      getDocs(allQ),
-    ]);
+    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([ getDocs(mineQ), getDocs(allQ) ]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -1928,25 +2040,20 @@ async function renderDashboard() {
     const msgBox = document.getElementById("msgList");
     if (msgBox) {
       msgBox.innerHTML = items.length
-        ? items
-            .map(
-              (m) => `
+        ? items.map((m) => `
             <article class="card">
               <p class="muted" style="margin:0 0 .25rem">
                 ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
               </p>
               <p>${escapeHtml(m.text || "")}</p>
             </article>
-          `
-            )
-            .join("")
+          `).join("")
         : `<div class="card muted">No messages.</div>`;
     }
   } catch (e) {
     console.error("[dashboard] messages:", e);
     const box = document.getElementById("msgList");
-    if (box)
-      box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    if (box) box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
@@ -1982,6 +2089,7 @@ async function renderAdmin() {
         <button class="tab" data-tab="ann">Announcements</button>
         <button class="tab" data-tab="msg">Message Students</button>
         <button class="tab" data-tab="import">Import</button>
+        <button class="tab" data-tab="certs">Certificates</button>
       </div>
 
       <!-- COURSES -->
@@ -2090,12 +2198,30 @@ async function renderAdmin() {
         </div>
         <p class="muted">Tip: Start with catalog.json, then chapters.json, then each lesson json.</p>
       </div>
+
+      <!-- ✅ NEW: CERTIFICATES (Admin-only preview tools) -->
+      <div id="tab-certs" class="hidden">
+        <h3>Certificates / Transcript (Admin preview)</h3>
+        <form id="certForm" class="form grid-2" onsubmit="return false;">
+          <label>User UID
+            <input id="certUid" placeholder="user uid (leave blank = current admin)" />
+          </label>
+          <label>Course
+            <select id="certCourse"></select>
+          </label>
+          <div style="grid-column:1/-1; display:flex; gap:.5rem">
+            <button class="btn" id="btnViewCert">View Certificate (PDF)</button>
+            <button class="btn ghost" id="btnViewTranscript">View Transcript (PDF)</button>
+          </div>
+          <p class="muted">Tip: Course list loads from Firestore “courses”. If blank UID, current admin uid will be used just for preview.</p>
+        </form>
+      </div>
     </section>
   `;
 
   // Tabs (null-safe)
   const tabBtns = app.querySelectorAll(".tab");
-  const paneKeys = ["courses", "posts", "ann", "msg", "import"];
+  const paneKeys = ["courses", "posts", "ann", "msg", "import",'certs'];
 
   function showTab(k) {
     // buttons
@@ -2115,6 +2241,49 @@ async function renderAdmin() {
 
   // initial
   showTab("courses");
+
+  /* ---------- CERTS tab (admin preview) ---------- */
+  try {
+    // populate course list
+    const sel = document.getElementById('certCourse');
+    if (sel) {
+      sel.innerHTML = `<option value="">Loading…</option>`;
+      const cs = await getDocs(query(collection(db,'courses'), orderBy('title','asc')));
+      const opts = [];
+      cs.forEach(d => {
+        const c = { id:d.id, ...d.data() };
+        opts.push(`<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`);
+      });
+      sel.innerHTML = opts.join('') || `<option value="">(no courses)</option>`;
+    }
+
+    // wire buttons
+    document.getElementById('btnViewCert')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return; // guard
+      const uid = (document.getElementById('certUid')?.value || '').trim() || auth.currentUser?.uid || '';
+      const cid = document.getElementById('certCourse')?.value || '';
+      if (!cid) return alert('Choose a course');
+      try {
+        await renderCertificate?.(cid, uid); // global function
+      } catch (e) {
+        console.error('[cert-preview]', e);
+        alert('Failed to render certificate.');
+      }
+    });
+
+    document.getElementById('btnViewTranscript')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return; // guard
+      const uid = (document.getElementById('certUid')?.value || '').trim() || auth.currentUser?.uid || '';
+      try {
+        await renderTranscript?.(uid); // global function
+      } catch (e) {
+        console.error('[transcript-preview]', e);
+        alert('Failed to render transcript.');
+      }
+    });
+  } catch(e) {
+    console.warn('[admin certs]', e);
+  }
 
   // Inside renderAdmin(), after HTML is set:
   document
@@ -3327,6 +3496,150 @@ async function openCourseEditor(id) {
       renderAdmin(); // refresh list
     });
 }
+
+// Certificate Template (with PDF export)
+async function renderCertificate(courseId) {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Please sign in first.");
+    return;
+  }
+
+  const uid = user.uid;
+  const userSnap = await getDoc(doc(db, "users", uid));
+  const userData = userSnap.exists() ? userSnap.data() : { name: user.displayName };
+
+  // course info
+  const courseSnap = await getDoc(doc(db, "courses", courseId));
+  if (!courseSnap.exists()) {
+    alert("Course not found.");
+    return;
+  }
+  const course = { id: courseSnap.id, ...courseSnap.data() };
+
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <section class="certificate" id="certCard">
+      <h1>Certificate of Completion</h1>
+      <p>This certifies that</p>
+      <h2>${userData.displayName || userData.name || "Student"}</h2>
+      <p>has successfully completed the course</p>
+      <h3>${course.title}</h3>
+      <p>on ${new Date().toLocaleDateString()}</p>
+
+      <div class="signatures">
+        <div>
+          <hr />
+          <p>Instructor</p>
+        </div>
+        <div>
+          <hr />
+          <p>Director</p>
+        </div>
+      </div>
+
+      <button class="btn" id="btnCertPdf" style="margin-top:1rem">Download PDF</button>
+    </section>
+  `;
+
+  document.getElementById("btnCertPdf").addEventListener("click", async () => {
+    const el = document.getElementById("certCard");
+    const canvas = await html2canvas(el, { scale: 2 });
+    const pdf = new jspdf.jsPDF("p", "pt", "a4");
+    const imgData = canvas.toDataURL("image/png");
+    const imgWidth = 595;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+    pdf.save(`${course.title}_certificate.pdf`);
+  });
+}
+
+// Transcript Template (with PDF export)
+async function renderTranscript() {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Please sign in first.");
+    return;
+  }
+
+  const uid = user.uid;
+  const userSnap = await getDoc(doc(db, "users", uid));
+  const userData = userSnap.exists() ? userSnap.data() : { name: user.displayName };
+
+  const app = document.getElementById("app");
+  app.innerHTML = `<section class="transcript" id="transCard"><h1>Loading transcript...</h1></section>`;
+  const transCard = document.getElementById("transCard");
+
+  const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
+  const snap = await getDocs(eq);
+  if (snap.empty) {
+    transCard.innerHTML = `<div class="card muted">No completed courses found.</div>`;
+    return;
+  }
+
+  const records = [];
+  for (const d of snap.docs) {
+    const e = d.data();
+    const cRef = doc(db, "courses", e.courseId);
+    const cSnap = await getDoc(cRef);
+    const c = cSnap.exists() ? cSnap.data() : {};
+    records.push({
+      title: c.title || e.courseTitle,
+      credits: c.credits ?? 3,
+      grade: e.grade ?? "A",
+      completedAt: e.completedAt?.toDate?.() || e.ts?.toDate?.() || new Date(),
+    });
+  }
+
+  transCard.innerHTML = `
+    <h1>Academic Transcript</h1>
+    <p><strong>Name:</strong> ${userData.displayName || userData.name || "Student"}</p>
+    <p><strong>Student ID:</strong> ${uid}</p>
+    <p><strong>Program:</strong> Pāli Language Studies</p>
+
+    <table>
+      <thead>
+        <tr><th>Course</th><th>Credits</th><th>Grade</th><th>Completed</th></tr>
+      </thead>
+      <tbody>
+        ${records.map(r => `
+          <tr>
+            <td>${r.title}</td>
+            <td>${r.credits}</td>
+            <td>${r.grade}</td>
+            <td>${r.completedAt.toLocaleDateString()}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+
+    <button class="btn" id="btnTransPdf" style="margin-top:1rem">Download PDF</button>
+  `;
+
+  // PDF Export
+  document.getElementById("btnTransPdf").addEventListener("click", async () => {
+    const el = document.getElementById("transCard");
+    const canvas = await html2canvas(el, { scale: 2 });
+    const pdf = new jspdf.jsPDF("p", "pt", "a4");
+    const imgData = canvas.toDataURL("image/png");
+    const imgWidth = 595;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+    pdf.save(`${userData.displayName}_transcript.pdf`);
+  });
+}
+
+// Certificate Example
+const user = auth.currentUser;
+const course = { title: "Pāli Beginner I" };
+renderCertificate(user, course);
+
+// Transcript Example
+const records = [
+  { courseTitle: "Pāli Beginner I", credits: 3, grade: "A", completedAt: Date.now() },
+  { courseTitle: "Pāli Beginner II", credits: 3, grade: "A-", completedAt: Date.now() }
+];
+renderTranscript(user, records);
 
 // ---------- small helpers ----------
 function profileViewHTML(p = {}) {
