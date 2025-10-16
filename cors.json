@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://pali-lessons.web.app",
+      "https://pali-lessons.firebaseapp.com",
+      "http://localhost:5000",
+      "http://localhost:5173"
+    ],
+    "method": [ "GET", "HEAD", "OPTIONS" ],
+    "responseHeader": [ "Content-Type", "x-goog-meta-*", "x-goog-acl" ],
+    "maxAgeSeconds": 3600
+  }
+]

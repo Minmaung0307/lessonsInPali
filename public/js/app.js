@@ -169,10 +169,6 @@ const PLACEHOLDER_IMG =
     </svg>
   `);
 
-// const escapeHtml = (s='') => String(s)
-//   .replaceAll('&','&amp;').replaceAll('<','&lt;')
-//   .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
-
 const short = (s = "", n = 140) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ---------- Utils ----------
@@ -194,27 +190,22 @@ const applyTheme = (v) =>
   (document.documentElement.dataset.theme = v || "pali");
 const applyFontSize = (v) => (document.documentElement.dataset.fs = v || "md");
 
-async function ensureUserDoc(u){
+async function ensureUserDoc(u) {
   const r = doc(db, "users", u.uid);
   const s = await getDoc(r);
   if (!s.exists()) {
-    await setDoc(r, {
-      email: u.email || "",
-      displayName: u.displayName || "",
-      role: "student",
-      ts: serverTimestamp(),
-    }, { merge: true });
+    await setDoc(
+      r,
+      {
+        email: u.email || "",
+        displayName: u.displayName || "",
+        role: "student",
+        ts: serverTimestamp(),
+      },
+      { merge: true }
+    );
   }
 }
-
-// ===== Sticky offsets: set --topbarH dynamically =====
-// function updateTopbarHeight(){
-//   const h = document.getElementById('topbar')?.offsetHeight || 64;
-//   document.documentElement.style.setProperty('--topbarH', String(h)); // number only
-// }
-// window.addEventListener('load', updateTopbarHeight);
-// window.addEventListener('resize', updateTopbarHeight);
-// new ResizeObserver(updateTopbarHeight).observe(document.getElementById('topbar'));
 
 // ===== Mobile menu toggle =====
 const underNav = document.getElementById("underNav");
@@ -272,68 +263,43 @@ btnMenu?.addEventListener("keydown", (e) => {
   }
 });
 
-/* ---------------- Tabs (robust) ---------------- */
-// const tabButtons = app.querySelectorAll('.tab');
-// const panes = {
-//   courses: app.querySelector('#tab-courses'),
-//   posts:   app.querySelector('#tab-posts'),
-//   ann:     app.querySelector('#tab-ann'),
-//   msg:     app.querySelector('#tab-msg'),
-// };
-
-// function activateTab(key){
-//   // buttons active state
-//   tabButtons.forEach(b => b.classList.toggle('is-active', b.dataset.tab === key));
-//   // panes show/hide (null-safe)
-//   Object.entries(panes).forEach(([k, el]) => {
-//     if (el) el.classList.toggle('hidden', k !== key);
-//   });
-// }
-
-// tabButtons.forEach(btn => {
-//   btn.addEventListener('click', () => activateTab(btn.dataset.tab));
-// });
-
-// // initial state
-// activateTab('courses');
-
 // ===== Router (single, duplicate-safe) =====
 if (!window.__APP_ROUTER__) {
   window.__APP_ROUTER__ = true;
 
   window.route = async function route() {
-    const hash = (location.hash || '#/').replace(/^#/, '');
+    const hash = (location.hash || "#/").replace(/^#/, "");
 
-    if (hash === '/' || hash === '') return renderHome?.();
+    if (hash === "/" || hash === "") return renderHome?.();
 
     // ✅ 1) lesson page: /courses/:id/lesson/:lid
-    if (hash.startsWith('/courses/') && hash.includes('/lesson/')) {
-      const [, , courseId, , lessonId] = hash.split('/');
+    if (hash.startsWith("/courses/") && hash.includes("/lesson/")) {
+      const [, , courseId, , lessonId] = hash.split("/");
       return renderCourseDetail?.(courseId, lessonId);
     }
 
     // ✅ 2) course detail: /courses/:id
     if (/^\/courses\/[^/]+$/.test(hash)) {
-      const [, , courseId] = hash.split('/');
+      const [, , courseId] = hash.split("/");
       return renderCourseDetail?.(courseId);
     }
 
     // ✅ 3) courses list
-    if (hash.startsWith('/courses')) return renderCourses?.();
+    if (hash.startsWith("/courses")) return renderCourses?.();
 
-    if (hash.startsWith('/dashboard'))   return renderDashboard?.();
-    if (hash.startsWith('/admin'))       return renderAdmin?.();
-    if (hash.startsWith('/profile'))     return renderProfile?.();
-    if (hash.startsWith('/settings'))    return renderSettings?.();
-    if (hash.startsWith('/certs'))       return renderCertificates?.();
-    if (hash.startsWith('/transcripts')) return renderTranscripts?.();
-    if (hash.startsWith('/search'))      return renderSearch?.();
+    if (hash.startsWith("/dashboard")) return renderDashboard?.();
+    if (hash.startsWith("/admin")) return renderAdmin?.();
+    if (hash.startsWith("/profile")) return renderProfile?.();
+    if (hash.startsWith("/settings")) return renderSettings?.();
+    if (hash.startsWith("/certs")) return renderCertificates?.();
+    if (hash.startsWith("/transcripts")) return renderTranscripts?.();
+    if (hash.startsWith("/search")) return renderSearch?.();
 
     return renderNotFound?.();
   };
 
-  window.addEventListener('hashchange', window.route);
-  window.addEventListener('load', window.route);
+  window.addEventListener("hashchange", window.route);
+  window.addEventListener("load", window.route);
 }
 
 function defaultsProfile(d = {}) {
@@ -355,19 +321,6 @@ function defaultsProfile(d = {}) {
   };
 }
 
-// Logout button
-// document.getElementById('btnLogout')?.addEventListener('click', async () => {
-//   try {
-//     await signOut(auth);                  // ← use the imported signOut
-//     // UI cleanup after logout (optional)
-//     document.getElementById('underNav')?.classList.remove('open');
-//     // route() ကို သင့်စနစ်တက် ပြန်ခေါ်ချင်ရင်
-//     // route();
-//   } catch (e) {
-//     console.error(e);
-//     alert("Logout failed: " + (e?.message || ""));
-//   }
-// });
 document
   .getElementById("btnLogout")
   ?.addEventListener("click", () => signOut(auth));
@@ -397,11 +350,11 @@ function applyAuthVisibility(user, role) {
 }
 
 // ✅ getUserRole() — current user’s role ကို Firestore မှာ query လုပ်ပြီး ပြန်ပေးမယ်
-async function getUserRole(){
+async function getUserRole() {
   const u = auth.currentUser;
   if (!u) return "guest";
   const s = await getDoc(doc(db, "users", u.uid));
-  return s.exists() ? (s.data().role || "student") : "student";
+  return s.exists() ? s.data().role || "student" : "student";
 }
 
 async function loadProfile() {
@@ -592,7 +545,7 @@ onAuthStateChanged(auth, async (u) => {
   let role = "guest";
   if (u) {
     try {
-      role = await getUserRole();   // users/{uid}.role
+      role = await getUserRole(); // users/{uid}.role
       if (!role) role = "student";
       console.log("✅ Logged in as:", u.email, "Role:", role);
     } catch (e) {
@@ -678,13 +631,13 @@ async function renderHome() {
   `;
 
   // 🔹 Mount banner slider right away
-  mountHeroSlider('#heroBanner');
+  mountHeroSlider("#heroBanner");
 
   const feed = document.getElementById("homeFeed");
   feed.innerHTML = `<div class="muted">Loading posts…</div>`;
 
   if (!window.db) {
-    console.error('[home] Firestore not initialized');
+    console.error("[home] Firestore not initialized");
     feed.innerHTML = `<div class="card error">App not initialized.</div>`;
     return;
   }
@@ -693,7 +646,7 @@ async function renderHome() {
     const q1 = query(collection(db, "posts"), orderBy("ts", "desc"), limit(50));
     const snap = await getDocs(q1);
     const items = [];
-    snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
 
     feed.innerHTML = items.length
       ? items.map(postCardHTML).join("")
@@ -708,19 +661,19 @@ async function renderHome() {
 
 // Local images (public/img/… ထဲ ထားပြီး firebase deploy လုပ်ထားရန်)
 const LOCAL_BANNERS = [
-  '/img/banner1.svg',
-  '/img/banner2.svg',
-  '/img/banner3.svg',
-  '/img/banner4.png',
+  "/img/banner1.svg",
+  "/img/banner2.svg",
+  "/img/banner3.svg",
+  "/img/banner4.png",
 ];
 
 // Unsplash random (no API key) — reload တစ်ခါချင်း마다 အသစ်တွေ လာနိုင်
 // အလိုရှိသလို keyword တွေပြောင်းနိုင်ပါတယ်
 const UNSPLASH_RANDOM = [
-  'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=1600&q=80',
-  'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1600&q=80',
-  'https://images.unsplash.com/photo-1528819622765-d6bcf132f793?auto=format&fit=crop&w=1600&q=80',
-  'https://images.unsplash.com/photo-1504203700686-0c3b9dba4991?auto=format&fit=crop&w=1600&q=80'
+  "https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1528819622765-d6bcf132f793?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1504203700686-0c3b9dba4991?auto=format&fit=crop&w=1600&q=80",
 ];
 
 // Mix local + online (သင်မလိုတယ်ဆိုရင် တစ်မျိုးတည်းသုံး)
@@ -737,7 +690,11 @@ function preload(src) {
 }
 
 // Main mount
-async function mountHeroSlider(targetSel, images = BANNER_SOURCES, intervalMs = 6000) {
+async function mountHeroSlider(
+  targetSel,
+  images = BANNER_SOURCES,
+  intervalMs = 6000
+) {
   const host = document.querySelector(targetSel);
   if (!host) return;
 
@@ -756,25 +713,36 @@ async function mountHeroSlider(targetSel, images = BANNER_SOURCES, intervalMs = 
   }
 
   // build DOM
-  const slides = loaded.map((src, idx) =>
-    `<div class="slide${idx===0?' is-active':''}"><img src="${src}" alt=""></div>`
-  ).join('');
-  const dots = loaded.map((_, idx) =>
-    `<div class="dot${idx===0?' is-active':''}" data-i="${idx}"></div>`
-  ).join('');
+  const slides = loaded
+    .map(
+      (src, idx) =>
+        `<div class="slide${
+          idx === 0 ? " is-active" : ""
+        }"><img src="${src}" alt=""></div>`
+    )
+    .join("");
+  const dots = loaded
+    .map(
+      (_, idx) =>
+        `<div class="dot${
+          idx === 0 ? " is-active" : ""
+        }" data-i="${idx}"></div>`
+    )
+    .join("");
 
   host.innerHTML = slides + `<div class="dots">${dots}</div>`;
 
-  const slideEls = Array.from(host.querySelectorAll('.slide'));
-  const dotEls   = Array.from(host.querySelectorAll('.dot'));
-  let i = 0, timer = null;
+  const slideEls = Array.from(host.querySelectorAll(".slide"));
+  const dotEls = Array.from(host.querySelectorAll(".dot"));
+  let i = 0,
+    timer = null;
 
   const go = (next) => {
-    slideEls[i]?.classList.remove('is-active');
-    dotEls[i]?.classList.remove('is-active');
+    slideEls[i]?.classList.remove("is-active");
+    dotEls[i]?.classList.remove("is-active");
     i = next;
-    slideEls[i]?.classList.add('is-active');
-    dotEls[i]?.classList.add('is-active');
+    slideEls[i]?.classList.add("is-active");
+    dotEls[i]?.classList.add("is-active");
   };
 
   const tick = () => {
@@ -785,112 +753,83 @@ async function mountHeroSlider(targetSel, images = BANNER_SOURCES, intervalMs = 
   timer = setInterval(tick, intervalMs);
 
   // dot click → jump
-  dotEls.forEach(d => {
-    d.addEventListener('click', () => {
+  dotEls.forEach((d) => {
+    d.addEventListener("click", () => {
       clearInterval(timer);
       go(Number(d.dataset.i));
       timer = setInterval(tick, intervalMs); // resume
     });
   });
 }
-// Admin Posts form submit
-// formPosts.addEventListener('submit', async (e)=>{
-//   e.preventDefault();
-//   const f = e.target;
-//   const type = f.type.value;          // text | image | video | audio | link
-//   const text = (f.text?.value || '').trim();
-//   const file = f.media?.files?.[0] || null;
 
-//   let mediaUrl = '';
-//   let mediaType = '';
-
-//   if (file) {
-//     const ext = (file.name.split('.').pop() || '').toLowerCase();
-//     const path = `posts/${auth.currentUser.uid}/${Date.now()}-${file.name}`;
-//     const r = sref(storage, path);
-//     const task = uploadBytesResumable(r, file, { contentType: file.type || `application/octet-stream` });
-//     await new Promise((res, rej)=> task.on('state_changed', null, rej, res));
-//     mediaUrl = await getDownloadURL(task.snapshot.ref);
-//     mediaType = file.type; // e.g. "image/png", "video/mp4"
-//   }
-
-//   // Save Firestore doc
-//   await addDoc(collection(db, 'posts'), {
-//     type, text, mediaUrl, mediaType,
-//     createdBy: auth.currentUser.uid,
-//     ts: serverTimestamp(),
-//     // optional extra fields
-//     title: f.title?.value || '',
-//     tags: (f.tags?.value || '').split(',').map(s=>s.trim()).filter(Boolean)
-//   });
-
-//   f.reset();
-//   alert('Post published ✅');
-//   loadPosts(); // refresh list
-// });
-
-function postItemHTML(p){
-  const safeText = escapeHtml(p.text || '');
-  if (p.type === 'image') {
+function postItemHTML(p) {
+  const safeText = escapeHtml(p.text || "");
+  if (p.type === "image") {
     return `
       <article class="card post">
-        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
+        <div class="post-meta">${
+          p.ts?.toDate?.().toLocaleString?.() || ""
+        }</div>
         <img class="post-img" src="${p.mediaUrl}"
-             alt="${(p.title||'').replace(/"/g,'&quot;')}"
+             alt="${(p.title || "").replace(/"/g, "&quot;")}"
              onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'">
-        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ""}
       </article>`;
   }
-  if (p.type === 'video') {
+  if (p.type === "video") {
     return `
       <article class="card post">
-        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
-        <video class="post-video" src="${p.mediaUrl}" controls preload="metadata"></video>
-        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+        <div class="post-meta">${
+          p.ts?.toDate?.().toLocaleString?.() || ""
+        }</div>
+        <video class="post-video" src="${
+          p.mediaUrl
+        }" controls preload="metadata"></video>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ""}
       </article>`;
   }
-  if (p.type === 'audio') {
+  if (p.type === "audio") {
     return `
       <article class="card post">
-        <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
-        <audio class="post-audio" src="${p.mediaUrl}" controls preload="metadata"></audio>
-        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+        <div class="post-meta">${
+          p.ts?.toDate?.().toLocaleString?.() || ""
+        }</div>
+        <audio class="post-audio" src="${
+          p.mediaUrl
+        }" controls preload="metadata"></audio>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ""}
       </article>`;
   }
-  if (p.type === 'link') {
+  if (p.type === "link") {
     // simplest: just anchor
     return `
       <article class="card post">
-        <a href="${p.mediaUrl}" target="_blank" rel="noopener noreferrer">${p.mediaUrl}</a>
-        ${safeText ? `<p class="post-text">${safeText}</p>` : ''}
+        <a href="${p.mediaUrl}" target="_blank" rel="noopener noreferrer">${
+      p.mediaUrl
+    }</a>
+        ${safeText ? `<p class="post-text">${safeText}</p>` : ""}
       </article>`;
   }
   // default: text
   return `
     <article class="card post">
-      <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ''}</div>
-      <p class="post-text">${safeText || '(empty)'}</p>
+      <div class="post-meta">${p.ts?.toDate?.().toLocaleString?.() || ""}</div>
+      <p class="post-text">${safeText || "(empty)"}</p>
     </article>`;
 }
 
 async function loadPosts() {
-  const box = document.getElementById('homePosts');
-  box.innerHTML = 'Loading…';
-  const qSnap = await getDocs(query(collection(db,'posts'), orderBy('ts','desc')));
-  box.innerHTML = '';
-  qSnap.forEach(d => {
+  const box = document.getElementById("homePosts");
+  box.innerHTML = "Loading…";
+  const qSnap = await getDocs(
+    query(collection(db, "posts"), orderBy("ts", "desc"))
+  );
+  box.innerHTML = "";
+  qSnap.forEach((d) => {
     const p = { id: d.id, ...d.data() };
-    box.insertAdjacentHTML('beforeend', postItemHTML(p));
+    box.insertAdjacentHTML("beforeend", postItemHTML(p));
   });
 }
-
-// const typeSel = document.querySelector('#postType');
-// const mediaRow = document.querySelector('#rowMedia');
-// typeSel.addEventListener('change', ()=>{
-//   const t = typeSel.value;
-//   // text-only → hide file input
-//   mediaRow.classList.toggle('hidden', (t==='text'));
-// });
 
 // ---------- Courses (cards) ----------
 async function renderCourseCards(sel) {
@@ -1106,80 +1045,151 @@ async function renderCourses() {
       <div id="courseGrid" class="course-grid"></div>
     </section>`;
 
-  const qy = query(
-    collection(db, "courses"),
-    orderBy("level", "asc"),
-    orderBy("title", "asc")
+  const snap = await getDocs(
+    query(
+      collection(db, "courses"),
+      orderBy("level", "asc"),
+      orderBy("title", "asc")
+    )
   );
-  const snap = await getDocs(qy);
+
   const grid = document.getElementById("courseGrid");
   grid.innerHTML = "";
-  snap.forEach(d => grid.insertAdjacentHTML("beforeend", courseCardHTML({ id:d.id, ...d.data() })));
+  snap.forEach((d) =>
+    grid.insertAdjacentHTML(
+      "beforeend",
+      courseCardHTML({ id: d.id, ...d.data() })
+    )
+  );
 
-  // one call does details/enroll/buy/open handling for us
+  ensureCourseDetailsDialog();
   wireCourseCardEvents("#courseGrid");
 }
 
 function ensureCourseDetailsDialog() {
-  if (document.getElementById("courseDetails")) return;
+  const old = document.getElementById("courseDetails");
+  if (old) return;
+
   const dlg = document.createElement("dialog");
   dlg.id = "courseDetails";
   dlg.innerHTML = `
-    <div class="dlg-head">
+    <header class="dlg-head">
       <strong id="cdTitle">Course</strong>
-      <button class="btn small ghost" id="cdClose">Close</button>
+      <button class="btn small ghost" id="cdClose" type="button">Close</button>
+    </header>
+
+    <div class="dlg-body">
+      <div>
+        <img id="cdCover" class="dlg-cover" alt="">
+      </div>
+      <div class="dlg-scroll">
+        <div id="cdBody" class="stack"></div>
+        <div class="row meta" style="gap:.5rem; margin-top:.75rem" id="cdMeta"></div>
+      </div>
     </div>
-    <img id="cdCover" class="dlg-cover" alt="">
-    <div class="dlg-body" id="cdBody"></div>
-    <div class="dlg-foot">
-      <button class="btn ghost" id="cdDetails">Open details page</button>
-      <button class="btn" id="cdEnroll">Enroll</button>
-    </div>`;
+
+    <footer class="dlg-foot">
+      <div class="row" id="cdMetaChips" style="gap:.5rem"></div>
+      <menu style="display:flex; gap:.5rem; margin:0">
+        <button class="btn ghost" id="cdOpenPage" type="button">Open details page</button>
+        <button class="btn" id="cdEnroll" type="button">Enroll</button>
+      </menu>
+    </footer>
+  `;
   document.body.appendChild(dlg);
+
   dlg.querySelector("#cdClose").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", (e) => {
+    const body = dlg.querySelector(".dlg-body");
+    if (body && !body.contains(e.target) && e.target === dlg) dlg.close();
+  });
 }
 
 async function openCourseDetails(courseId) {
   ensureCourseDetailsDialog();
   const dlg = document.getElementById("courseDetails");
-  // load full doc
-  const ref = doc(db, "courses", courseId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    alert("Course not found.");
-    return;
+  const title = dlg.querySelector("#cdTitle");
+  const cover = dlg.querySelector("#cdCover");
+  const body = dlg.querySelector("#cdBody");
+  const chips = dlg.querySelector("#cdMetaChips");
+  const btnOpen = dlg.querySelector("#cdOpenPage");
+  const btnEnr = dlg.querySelector("#cdEnroll");
+
+  // fetch
+  const s = await getDoc(doc(db, "courses", courseId));
+  if (!s.exists()) {
+    title.textContent = "Course not found";
+    body.innerHTML = `<p class="error">This course no longer exists.</p>`;
+    btnEnr.disabled = true;
+    return dlg.showModal();
   }
-  const c = { id: snap.id, ...snap.data() };
+  const c = { id: s.id, ...s.data() };
 
-  dlg.querySelector("#cdTitle").textContent = c.title || "Course";
-  dlg.querySelector("#cdCover").src = c.img || "/img/placeholder.png";
+  // fill
+  title.textContent = c.title || "Course";
+  const FALLBACK = "/img/placeholder.png";
+  cover.src = (c.img || "").trim() || FALLBACK;
+  cover.onerror = () => {
+    cover.onerror = null;
+    cover.src = FALLBACK;
+  };
 
-  const benefits = (c.benefits || [])
-    .map((b) => `<li>${escapeHtml(b)}</li>`)
-    .join("");
-  const price =
-    typeof c.price === "number" ? `$${c.price.toFixed(2)}` : c.price || "Free";
-  const lvl =
-    ["Beginner", "Intermediate", "Advanced", "Pro"][c.level | 0] ||
-    `Lv.${c.level | 0}`;
+  const benefits = Array.isArray(c.benefits)
+    ? c.benefits
+    : String(c.benefits || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
 
-  dlg.querySelector("#cdBody").innerHTML = `
-    <p class="muted">${escapeHtml(c.summary || "")}</p>
-    <h4>Full Description</h4>
-    <p>${escapeHtml(c.description || c.summary || "")}</p>
-    <h4>Benefits</h4>
-    <ul>${benefits || "<li>No benefits listed.</li>"}</ul>
-    <p class="muted">Level: <strong>${lvl}</strong> · Credits: <strong>${
-    c.credits ?? 0
-  }</strong> · Price: <strong>${price}</strong></p>
+  body.innerHTML = `
+    ${c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : ""}
+    ${c.description ? `<p>${escapeHtml(c.description)}</p>` : ""}
+    ${
+      benefits.length
+        ? `<h4>Benefits</h4><ul class="list">${benefits
+            .map((b) => `<li>${escapeHtml(b)}</li>`)
+            .join("")}</ul>`
+        : ""
+    }
   `;
 
-  dlg.querySelector("#cdEnroll").onclick = () => enrollCourse(c.id);
-  dlg.querySelector("#cdDetails").onclick = () => {
+  const lvlIdx = Number(c.level ?? 0);
+  const lvlTxt =
+    ["Beginner", "Intermediate", "Advanced", "Pro"][lvlIdx] ??
+    `Level ${lvlIdx}`;
+  const priceN = Number(c.price || 0);
+  const priceStr = priceN > 0 ? `$${priceN.toFixed(2)}` : "Free";
+
+  chips.innerHTML = `
+    <span class="badge">${lvlTxt}</span>
+    <span class="badge">Credits: ${c.credits ?? 0}</span>
+    <span class="badge ${
+      priceN > 0 ? "price-paid" : "price-free"
+    }">${priceStr}</span>
+  `;
+
+  // actions
+  btnOpen.onclick = () => {
     location.hash = `#/courses/${c.id}`;
     dlg.close();
   };
+  btnEnr.onclick = () => {
+    enrollCourse?.(c.id);
+  };
+
   dlg.showModal();
+}
+window.openCourseDetails = openCourseDetails;
+
+const grid = document.getElementById("courseGrid");
+if (grid) {
+  grid.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const cid = btn.getAttribute("data-cid");
+    if (btn.dataset.act === "details") openCourseDetails(cid);
+    if (btn.dataset.act === "enroll") enrollCourse(cid);
+  });
 }
 
 // === Admin: open "New / Edit Course" form ===
@@ -1689,6 +1699,27 @@ async function openLesson(lessonId) {
   });
 }
 
+// Cleanup + Server-true UI Guard
+async function cleanupOrphanEnrollments(uid) {
+  const base = collection(db, "users", uid, "enrollments");
+  const es = await getDocs(base); // may read from cache first
+  let n = 0;
+  for (const d of es.docs) {
+    const e = d.data();
+    const cRef = doc(db, "courses", e.courseId);
+    const cs = await getDoc(cRef);
+    if (!cs.exists()) {
+      // course မရှိတော့ -> orphan
+      try {
+        await deleteDoc(d.ref);
+        n++;
+      } catch (_) {}
+    }
+  }
+  console.log(`[cleanup] removed ${n} orphan enrollments`);
+  return n;
+}
+
 // ---------- Dashboard ----------
 async function renderDashboard() {
   if (!auth.currentUser) {
@@ -1700,7 +1731,6 @@ async function renderDashboard() {
   app.innerHTML = `
     <section class="card max">
       <h2>Dashboard</h2>
-
       <div class="grid-2">
         <div>
           <h3>My Courses</h3>
@@ -1716,25 +1746,47 @@ async function renderDashboard() {
     </section>
   `;
 
-  /* ---------- My Courses (enrollments) ---------- */
+  /* ---------- My Courses ---------- */
   const uid = auth.currentUser.uid;
   try {
-    const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
-    const es = await getDocs(eq);
+    // cleanup once (optional, but useful)
+    await cleanupOrphanEnrollments(uid);
+
+    // force fresh read for enrollments → onSnapshot အသုံးပြု
     const my = document.getElementById("myCourses");
-    if (my) {
+    if (my) my.innerHTML = `<div class="muted">Loading…</div>`;
+
+    const eq = query(
+      collection(db, "users", uid, "enrollments"),
+      orderBy("ts", "desc")
+    );
+    onSnapshot(eq, async (snap) => {
+      // server-vs-cache check
+      if (snap.metadata.fromCache && navigator.onLine) {
+        // wait for server roundtrip
+        return;
+      }
+      if (!my) return;
+
+      if (snap.empty) {
+        my.innerHTML = `<div class="card muted">No courses yet.</div>`;
+        return;
+      }
+
       my.innerHTML = "";
-      for (const d of es.docs) {
+      for (const d of snap.docs) {
         const e = d.data();
         const cRef = doc(db, "courses", e.courseId);
-        const cs   = await getDoc(cRef);
-        const c    = cs.exists() ? { id: cs.id, ...cs.data() }
-                                 : { id: e.courseId, title: e.courseTitle };
-
-        const html = `
+        const cs = await getDoc(cRef);
+        const c = cs.exists()
+          ? { id: cs.id, ...cs.data() }
+          : { id: e.courseId, title: e.courseTitle };
+        my.insertAdjacentHTML(
+          "beforeend",
+          `
           <article class="course-card" data-cid="${c.id}">
-            <img class="cover" src="${(c.img || PLACEHOLDER_IMG)}"
-                 onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
+            <img class="cover" src="${c.img || PLACEHOLDER_IMG}"
+                onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
             <div class="body">
               <h3>${c.title || "Untitled Course"}</h3>
               <p class="desc">${c.summary || ""}</p>
@@ -1742,37 +1794,54 @@ async function renderDashboard() {
                 ${levelLabel(c) ? `<li>${levelLabel(c)}</li>` : ""}
                 <li>Credits: ${c.credits ?? 0}</li>
               </ul>
-              <div class="footer">
-                <span class="price"></span>
-                <div class="actions">
-                  <button class="btn" data-action="open" data-id="${c.id}">Open</button>
-                </div>
+              <div class="footer two-btn-footer">
+                <button class="btn btn-open" data-action="open" data-id="${
+                  c.id
+                }">Open</button>
+                <button class="btn btn-unenroll" data-action="unenroll" data-id="${
+                  c.id
+                }">Unenroll</button>
               </div>
             </div>
-          </article>`;
-        my.insertAdjacentHTML("beforeend", html);
+          </article>
+        `
+        );
       }
-      // delegate (exists ဆိုရင်ပဲ ခေါ်)
-      if (typeof wireCourseCardEvents === "function") {
-        wireCourseCardEvents("#myCourses");
-      } else {
-        // minimal fallback: open btn only
-        my.addEventListener("click", (e) => {
-          const btn = e.target.closest('button[data-action="open"]');
+
+      // delegate (open/unenroll)
+      if (!my.__wired) {
+        my.__wired = true;
+        my.addEventListener("click", async (e) => {
+          const btn = e.target.closest("button[data-action]");
           if (!btn) return;
-          const id = btn.getAttribute("data-id");
-          location.hash = `#/courses/${id}`;
+          const act = btn.dataset.action;
+          const cid = btn.dataset.id;
+          if (act === "open") {
+            location.hash = `#/courses/${cid}`;
+          } else if (act === "unenroll") {
+            const ok = confirm("Remove this course from your dashboard?");
+            if (!ok) return;
+            // try doc id == courseId first
+            try {
+              await deleteDoc(doc(db, "users", uid, "enrollments", cid));
+            } catch (_) {}
+            // fallback where
+            const base = collection(db, "users", uid, "enrollments");
+            const qs = await getDocs(query(base, where("courseId", "==", cid)));
+            qs.forEach((d) => deleteDoc(d.ref));
+          }
         });
       }
-    }
+    });
   } catch (e) {
     console.error("[dashboard] my courses:", e);
   }
 
   /* ---------- Announcements (public) ---------- */
   try {
-    const aq = query(collection(db, "announcements"), orderBy("ts", "desc"));
-    const as = await getDocs(aq);
+    const as = await getDocs(
+      query(collection(db, "announcements"), orderBy("ts", "desc"))
+    );
     const annBox = document.getElementById("annList");
     if (annBox) {
       if (as.empty) {
@@ -1796,20 +1865,22 @@ async function renderDashboard() {
   } catch (e) {
     console.error("[dashboard] announcements:", e);
     const el = document.getElementById("annList");
-    if (el) el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    if (el)
+      el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
   /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
-    // 🔧 FIX: u.uid -> uid
     const mineQ = query(collection(db, "messages"), where("to", "==", uid));
-    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
-    const [mineSnap, broadSnap] = await Promise.all([ getDocs(mineQ), getDocs(allQ) ]);
+    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([
+      getDocs(mineQ),
+      getDocs(allQ),
+    ]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     broadSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-
     items.sort((a, b) => {
       const ta = a.ts?.toMillis ? a.ts.toMillis() : (a.ts?.seconds || 0) * 1000;
       const tb = b.ts?.toMillis ? b.ts.toMillis() : (b.ts?.seconds || 0) * 1000;
@@ -1819,33 +1890,40 @@ async function renderDashboard() {
     const msgBox = document.getElementById("msgList");
     if (msgBox) {
       msgBox.innerHTML = items.length
-        ? items.map((m) => `
+        ? items
+            .map(
+              (m) => `
             <article class="card">
               <p class="muted" style="margin:0 0 .25rem">
                 ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
               </p>
               <p>${escapeHtml(m.text || "")}</p>
             </article>
-          `).join("")
+          `
+            )
+            .join("")
         : `<div class="card muted">No messages.</div>`;
     }
   } catch (e) {
     console.error("[dashboard] messages:", e);
     const box = document.getElementById("msgList");
-    if (box) box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    if (box)
+      box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
 // ---------- Admin (CRUD) ----------
-function requireStaff(){
+function requireStaff() {
   const app = document.getElementById("app");
-  if (!auth.currentUser){
+  if (!auth.currentUser) {
     // login dialog ရှိရင် ပြ
-    try { authDlg?.showModal?.(); } catch {}
+    try {
+      authDlg?.showModal?.();
+    } catch {}
     app.innerHTML = `<section class="card max"><h2>Admin</h2><p class="error">Please login.</p></section>`;
     return false;
   }
-  if (!["admin","ta"].includes(currentRole)){
+  if (!["admin", "ta"].includes(currentRole)) {
     app.innerHTML = `<section class="card max"><h2>Admin</h2><p class="error">Admin only.</p></section>`;
     return false;
   }
@@ -1978,43 +2056,46 @@ async function renderAdmin() {
   `;
 
   // Tabs (null-safe)
-  const tabBtns = app.querySelectorAll('.tab');
-  const paneKeys = ['courses','posts','ann','msg','import'];
+  const tabBtns = app.querySelectorAll(".tab");
+  const paneKeys = ["courses", "posts", "ann", "msg", "import"];
 
   function showTab(k) {
     // buttons
-    tabBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tab === k));
+    tabBtns.forEach((b) =>
+      b.classList.toggle("is-active", b.dataset.tab === k)
+    );
     // panes (null-safe)
-    paneKeys.forEach(key => {
+    paneKeys.forEach((key) => {
       const el = app.querySelector(`#tab-${key}`);
-      if (el) el.classList.toggle('hidden', key !== k);
+      if (el) el.classList.toggle("hidden", key !== k);
     });
   }
 
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => showTab(btn.dataset.tab));
+  tabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => showTab(btn.dataset.tab));
   });
 
   // initial
-  showTab('courses');
-
+  showTab("courses");
 
   // Inside renderAdmin(), after HTML is set:
-    document.getElementById('btnImportCourse')?.addEventListener('click', async ()=>{
+  document
+    .getElementById("btnImportCourse")
+    ?.addEventListener("click", async () => {
       try {
-        let raw = document.getElementById('importJson')?.value ?? '';
-        raw = raw.trim().replace(/^\uFEFF/, ''); // strip BOM
+        let raw = document.getElementById("importJson")?.value ?? "";
+        raw = raw.trim().replace(/^\uFEFF/, ""); // strip BOM
 
         // Guard: empty
-        if (!raw) return alert('Paste some JSON');
+        if (!raw) return alert("Paste some JSON");
 
         // Support: some people paste multiple JSON roots at once.
         // If so, try to detect and split safely.
         const tryMany = [];
-        if (raw.startsWith('[')) {
+        if (raw.startsWith("[")) {
           // Top-level array of objects allowed too
           const arr = JSON.parse(raw);
-          if (!Array.isArray(arr)) throw new Error('Top array expected');
+          if (!Array.isArray(arr)) throw new Error("Top array expected");
           for (const x of arr) tryMany.push(x);
         } else {
           // Attempt single object; if fails, try to split by "}\n{"
@@ -2024,57 +2105,51 @@ async function renderAdmin() {
             // naive splitter for multiple roots pasted together
             const pieces = raw
               .split(/}\s*[\r\n]+\s*{/g)
-              .map((s,i,arr)=> (i===0? s + '}' : '{' + s + (i===arr.length-1?'':'}')));
+              .map((s, i, arr) =>
+                i === 0 ? s + "}" : "{" + s + (i === arr.length - 1 ? "" : "}")
+              );
             for (const p of pieces) tryMany.push(JSON.parse(p));
           }
         }
 
         // Import each piece & log which branch importer took
         for (const j of tryMany) {
-          console.log('[import] candidate:', j);
-          await importAnyJson(j);   // your function
-          console.log('[import] ok');
+          console.log("[import] candidate:", j);
+          await importAnyJson(j); // your function
+          console.log("[import] ok");
         }
 
-        alert('Imported ✅');
+        alert("Imported ✅");
       } catch (e) {
-        console.error('[import] failed:', e);
-        alert('Invalid JSON or import error: ' + (e?.message || e));
+        console.error("[import] failed:", e);
+        alert("Invalid JSON or import error: " + (e?.message || e));
       }
     });
 
-    // (optional) Quick Import demo
-    document.getElementById('btnImportFolder')?.addEventListener('click', async ()=>{
-      alert('Wire this to fetch /data/courses/... files and call importAnyJson sequentially.');
+  // (optional) Quick Import demo
+  document
+    .getElementById("btnImportFolder")
+    ?.addEventListener("click", async () => {
+      alert(
+        "Wire this to fetch /data/courses/... files and call importAnyJson sequentially."
+      );
     });
 
-    // (optional) Clear button, only if you have it in HTML
-    document.getElementById('btnClearImport')
-      ?.addEventListener('click', () => {
-        const ta = document.getElementById('importJson');
-        if (ta) ta.value = '';
-      });
-
-  /* ---------------- Tabs ---------------- */
-  // app.querySelectorAll(".tab").forEach((btn) => {
-  //   btn.addEventListener("click", () => {
-  //     app.querySelectorAll(".tab").forEach(b => b.classList.remove("is-active"));
-  //     btn.classList.add("is-active");
-  //     const k = btn.dataset.tab;
-  //     app.querySelector("#tab-courses").classList.toggle("hidden", k!=="courses");
-  //     app.querySelector("#tab-posts").classList.toggle("hidden",   k!=="posts");
-  //     app.querySelector("#tab-ann").classList.toggle("hidden",     k!=="ann");
-  //     app.querySelector("#tab-msg").classList.toggle("hidden",     k!=="msg");
-  //     app.querySelector("#tab-import").classList.toggle("hidden",  k!=="import");
-  //   });
-  // });
+  // (optional) Clear button, only if you have it in HTML
+  document.getElementById("btnClearImport")?.addEventListener("click", () => {
+    const ta = document.getElementById("importJson");
+    if (ta) ta.value = "";
+  });
 
   /* --------------- COURSES: load/list/bind --------------- */
   const listEl = document.getElementById("adminCourseList");
   // bindAdminCourseList(listEl);
 
   const formCourse = document.getElementById("formCourse");
-  if (!formCourse) { console.warn('[admin] #formCourse not found'); return; }
+  if (!formCourse) {
+    console.warn("[admin] #formCourse not found");
+    return;
+  }
 
   function normBenefits(b) {
     if (Array.isArray(b)) return b;
@@ -2184,106 +2259,111 @@ async function renderAdmin() {
   await loadAdminCourses();
 
   /* --------------- POSTS --------------- */
-  const formPosts = app.querySelector('#formPosts');
-  const postType  = app.querySelector('#postType');
-  const rowMedia  = app.querySelector('#rowMedia');
+  const formPosts = app.querySelector("#formPosts");
+  const postType = app.querySelector("#postType");
+  const rowMedia = app.querySelector("#rowMedia");
 
   // type ပြောင်းသလောက် media row ပြ/ဖျောက်
   if (postType && rowMedia) {
     const syncMediaRow = () => {
-      rowMedia.classList.toggle('hidden', postType.value === 'text');
+      rowMedia.classList.toggle("hidden", postType.value === "text");
     };
-    postType.addEventListener('change', syncMediaRow);
+    postType.addEventListener("change", syncMediaRow);
     syncMediaRow(); // initial
   }
 
   // Publish handler (guard with if)
   if (formPosts) {
-    formPosts.addEventListener('submit', async (e) => {
+    formPosts.addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target;
 
-      const type  = f.type.value;
-      const title = (f.title.value || '').trim();
-      const body  = (f.body.value  || '').trim();
+      const type = f.type.value;
+      const title = (f.title.value || "").trim();
+      const body = (f.body.value || "").trim();
 
       // either URL or file
-      let mediaUrl  = (f.mediaUrl?.value || '').trim();
-      let mediaType = '';
+      let mediaUrl = (f.mediaUrl?.value || "").trim();
+      let mediaType = "";
 
       const file = f.media?.files?.[0];
       if (file) {
         const path = `posts/${auth.currentUser.uid}/${Date.now()}-${file.name}`;
         const r = sref(storage, path);
-        const task = uploadBytesResumable(r, file, { contentType: file.type || 'application/octet-stream' });
-        await new Promise((res, rej) => task.on('state_changed', null, rej, res));
-        mediaUrl  = await getDownloadURL(task.snapshot.ref);
-        mediaType = file.type || '';
+        const task = uploadBytesResumable(r, file, {
+          contentType: file.type || "application/octet-stream",
+        });
+        await new Promise((res, rej) =>
+          task.on("state_changed", null, rej, res)
+        );
+        mediaUrl = await getDownloadURL(task.snapshot.ref);
+        mediaType = file.type || "";
       }
 
-      await addDoc(collection(db, 'posts'), {
-        type, title, body, mediaUrl, mediaType, ts: serverTimestamp()
+      await addDoc(collection(db, "posts"), {
+        type,
+        title,
+        body,
+        mediaUrl,
+        mediaType,
+        ts: serverTimestamp(),
       });
 
-      alert('Post published ✅');
+      alert("Post published ✅");
       f.reset();
       // type ပြန်ချိန်ထား (text ဖြစ်ရင် media row ဖျောက်)
-      postType?.dispatchEvent(new Event('change'));
+      postType?.dispatchEvent(new Event("change"));
 
       // refresh list
-      if (typeof loadAdminPosts === 'function') loadAdminPosts();
+      if (typeof loadAdminPosts === "function") loadAdminPosts();
     });
   } else {
-    console.warn('[admin] #formPosts not found — make sure renderAdmin() ran and the HTML ids match.');
+    console.warn(
+      "[admin] #formPosts not found — make sure renderAdmin() ran and the HTML ids match."
+    );
   }
 
   // Upload helper
-  async function uploadAdminPostFile(){
-    const file = document.getElementById('postFile')?.files?.[0];
-    if(!file){ alert('Choose a file'); return; }
-    if(!auth.currentUser){ authDlg?.showModal?.(); return; }
-    const ext = (file.name.split('.').pop()||'bin').toLowerCase();
+  async function uploadAdminPostFile() {
+    const file = document.getElementById("postFile")?.files?.[0];
+    if (!file) {
+      alert("Choose a file");
+      return;
+    }
+    if (!auth.currentUser) {
+      authDlg?.showModal?.();
+      return;
+    }
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
     const uid = auth.currentUser.uid;
-    const r   = sref(storage, `posts/${uid}/${Date.now()}-${file.name}`);
-    const task= uploadBytesResumable(r, file, { contentType: file.type || `application/octet-stream`});
-    await new Promise((res, rej)=> task.on('state_changed', ()=>{}, rej, res));
+    const r = sref(storage, `posts/${uid}/${Date.now()}-${file.name}`);
+    const task = uploadBytesResumable(r, file, {
+      contentType: file.type || `application/octet-stream`,
+    });
+    await new Promise((res, rej) =>
+      task.on("state_changed", () => {}, rej, res)
+    );
     const url = await getDownloadURL(task.snapshot.ref);
-    const f = document.getElementById('formPost');
+    const f = document.getElementById("formPost");
     f.mediaUrl.value = url;
-    f.mediaType.value = file.type || '';
-    alert('Uploaded. URL filled in the form.');
+    f.mediaType.value = file.type || "";
+    alert("Uploaded. URL filled in the form.");
   }
-  document.getElementById('btnUploadPostFile')?.addEventListener('click', uploadAdminPostFile);
-
-  // Create post
-  // document.getElementById('formPost')?.addEventListener('submit', async (e)=>{
-  //   e.preventDefault();
-  //   const f = e.target;
-  //   const data = {
-  //     type:   (f.type.value || 'text'),
-  //     title:  f.title.value.trim(),
-  //     body:   f.body.value.trim(),
-  //     mediaUrl:  f.mediaUrl.value.trim(),
-  //     mediaType: f.mediaType.value.trim(),
-  //     authorId: auth.currentUser?.uid || '',
-  //     ts: serverTimestamp(),
-  //   };
-  //   await addDoc(collection(db,'posts'), data);
-  //   f.reset();
-  //   loadAdminPosts();
-  // });
+  document
+    .getElementById("btnUploadPostFile")
+    ?.addEventListener("click", uploadAdminPostFile);
 
   // List posts
   // helper: post card UI (type အလိုက် preview ပြ)
   function renderPostCard(p) {
-    const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : '';
-    let media = '';
+    const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
+    let media = "";
     if (p.mediaUrl) {
-      if ((p.mediaType || '').startsWith('image/')) {
+      if ((p.mediaType || "").startsWith("image/")) {
         media = `<img src="${p.mediaUrl}" alt="" style="max-width:100%;border-radius:12px;margin:.5rem 0">`;
-      } else if ((p.mediaType || '').startsWith('video/')) {
+      } else if ((p.mediaType || "").startsWith("video/")) {
         media = `<video src="${p.mediaUrl}" controls style="width:100%;border-radius:12px;margin:.5rem 0"></video>`;
-      } else if ((p.mediaType || '').startsWith('audio/')) {
+      } else if ((p.mediaType || "").startsWith("audio/")) {
         media = `<audio src="${p.mediaUrl}" controls style="width:100%;margin:.5rem 0"></audio>`;
       } else {
         media = `<div class="muted" style="word-break:break-all">${p.mediaUrl}</div>`;
@@ -2292,71 +2372,77 @@ async function renderAdmin() {
     return `
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
-          <strong>${escapeHtml(p.title || '(no title)')}
-            <span class="badge">${escapeHtml(p.type || 'text')}</span>
+          <strong>${escapeHtml(p.title || "(no title)")}
+            <span class="badge">${escapeHtml(p.type || "text")}</span>
           </strong>
           <div class="row" style="gap:.5rem">
-            <button class="btn small ghost"  data-act="edit" data-id="${p.id}">Edit</button>
-            <button class="btn small danger" data-act="del"  data-id="${p.id}">Delete</button>
+            <button class="btn small ghost"  data-act="edit" data-id="${
+              p.id
+            }">Edit</button>
+            <button class="btn small danger" data-act="del"  data-id="${
+              p.id
+            }">Delete</button>
           </div>
         </div>
         <div class="muted" style="margin:.25rem 0">${ts}</div>
         ${media}
-        ${p.body ? `<p>${escapeHtml(p.body)}</p>` : ''}
+        ${p.body ? `<p>${escapeHtml(p.body)}</p>` : ""}
       </div>
     `;
   }
 
-  async function loadAdminPosts(){
-    const box = app.querySelector('#adminPosts');
+  async function loadAdminPosts() {
+    const box = app.querySelector("#adminPosts");
     if (!box) return;
     box.innerHTML = `<div class="muted">Loading…</div>`;
-    const snap = await getDocs(query(collection(db,'posts'), orderBy('ts','desc'), limit(50)));
+    const snap = await getDocs(
+      query(collection(db, "posts"), orderBy("ts", "desc"), limit(50))
+    );
     const items = [];
-    snap.forEach(d=>items.push({ id:d.id, ...d.data() }));
+    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
     box.innerHTML = items.length
-  ? items.map(renderPostCard).join('')
-  : `<div class="card muted">No posts yet.</div>`;
+      ? items.map(renderPostCard).join("")
+      : `<div class="card muted">No posts yet.</div>`;
 
     // delegate: delete
-    box.querySelectorAll('[data-act="del"]').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-id');
-        if(confirm('Delete this post?')){
-          await deleteDoc(doc(db,'posts', id));
+    box.querySelectorAll('[data-act="del"]').forEach((b) => {
+      b.addEventListener("click", async () => {
+        const id = b.getAttribute("data-id");
+        if (confirm("Delete this post?")) {
+          await deleteDoc(doc(db, "posts", id));
           loadAdminPosts();
         }
       });
     });
 
     // delegate: edit → prefill form
-    box.querySelectorAll('[data-act="edit"]').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const id = b.getAttribute('data-id');
-        const s = await getDoc(doc(db,'posts', id));
-        if(!s.exists()) return;
+    box.querySelectorAll('[data-act="edit"]').forEach((b) => {
+      b.addEventListener("click", async () => {
+        const id = b.getAttribute("data-id");
+        const s = await getDoc(doc(db, "posts", id));
+        if (!s.exists()) return;
         const p = s.data();
-        const f = app.querySelector('#formPosts');
+        const f = app.querySelector("#formPosts");
         if (!f) return;
-        f.type.value      = p.type||'text';
-        f.title.value     = p.title||'';
-        f.body.value      = p.body||'';
-        f.mediaUrl.value  = p.mediaUrl||'';
-        postType?.dispatchEvent(new Event('change'));
+        f.type.value = p.type || "text";
+        f.title.value = p.title || "";
+        f.body.value = p.body || "";
+        f.mediaUrl.value = p.mediaUrl || "";
+        postType?.dispatchEvent(new Event("change"));
 
         // overwrite submit for update
-        f.onsubmit = async (e2)=>{
+        f.onsubmit = async (e2) => {
           e2.preventDefault();
           const upd = {
-            type:f.type.value,
-            title:(f.title.value||'').trim(),
-            body:(f.body.value||'').trim(),
-            mediaUrl:(f.mediaUrl.value||'').trim(),
-            mediaType:(p.mediaType||''),
+            type: f.type.value,
+            title: (f.title.value || "").trim(),
+            body: (f.body.value || "").trim(),
+            mediaUrl: (f.mediaUrl.value || "").trim(),
+            mediaType: p.mediaType || "",
             ts: serverTimestamp(),
           };
-          await updateDoc(doc(db,'posts', id), upd);
-          alert('Updated ✅');
+          await updateDoc(doc(db, "posts", id), upd);
+          alert("Updated ✅");
           f.reset();
           f.onsubmit = null; // restore default (addEventListener) next render
           loadAdminPosts();
@@ -2368,18 +2454,19 @@ async function renderAdmin() {
 
   /* --------------- ANNOUNCEMENTS --------------- */
   const formAnn = document.getElementById("formAnn");
-  if (formAnn) formAnn.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = e.target;
-    await addDoc(collection(db, "announcements"), {
-      title: f.title.value.trim(),
-      level: f.level.value, // '*' or '0..3'
-      body: f.body.value.trim(),
-      ts: serverTimestamp(),
+  if (formAnn)
+    formAnn.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      await addDoc(collection(db, "announcements"), {
+        title: f.title.value.trim(),
+        level: f.level.value, // '*' or '0..3'
+        body: f.body.value.trim(),
+        ts: serverTimestamp(),
+      });
+      f.reset();
+      await loadAdminAnns();
     });
-    f.reset();
-    await loadAdminAnns();
-  });
 
   async function loadAdminAnns() {
     const box = document.getElementById("adminAnns");
@@ -2413,39 +2500,40 @@ async function renderAdmin() {
 
   /* --------------- MESSAGES --------------- */
   const formMsg = document.getElementById("formMsg");
-  if (formMsg) formMsg.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = e.target;
-    await addDoc(collection(db, "messages"), {
-      from: auth.currentUser.uid,
-      to: f.to.value.trim(), // uid or "*"
-      text: f.text.value.trim(),
-      ts: serverTimestamp(),
+  if (formMsg)
+    formMsg.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      await addDoc(collection(db, "messages"), {
+        from: auth.currentUser.uid,
+        to: f.to.value.trim(), // uid or "*"
+        text: f.text.value.trim(),
+        ts: serverTimestamp(),
+      });
+      f.reset();
+      await loadAdminMsgs();
     });
-    f.reset();
-    await loadAdminMsgs();
-  });
 
   async function loadAdminMsgs() {
-      const box = document.getElementById("adminMsgs");
-      box.innerHTML = "Loading…";
-      const snap = await getDocs(
-        query(collection(db, "messages"), orderBy("ts", "desc"))
-      );
-      const rows = [];
-      snap.forEach((d) => rows.push(d.data()));
-      box.innerHTML = rows
-        .map(
-          (m) => `
+    const box = document.getElementById("adminMsgs");
+    box.innerHTML = "Loading…";
+    const snap = await getDocs(
+      query(collection(db, "messages"), orderBy("ts", "desc"))
+    );
+    const rows = [];
+    snap.forEach((d) => rows.push(d.data()));
+    box.innerHTML = rows
+      .map(
+        (m) => `
         <div class="card">
           <div><strong>To:</strong> ${m.to}</div>
           <p>${m.text}</p>
         </div>
       `
-        )
-        .join("");
-    }
-    await loadAdminMsgs();
+      )
+      .join("");
+  }
+  await loadAdminMsgs();
 }
 
 async function renderCourseDetail(courseId, lessonId = null) {
@@ -2479,25 +2567,36 @@ async function renderCourseDetail(courseId, lessonId = null) {
   const sb = document.getElementById("crsSidebar");
   if (!chapters.length) {
     sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
-    document.getElementById("crsMain").innerHTML = `<div class="muted">No lessons.</div>`;
+    document.getElementById(
+      "crsMain"
+    ).innerHTML = `<div class="muted">No lessons.</div>`;
     return;
   }
   const flat = [];
-  sb.innerHTML = chapters.map(ch => {
-    const items = (ch.lessons || []).map(ls => {
-      flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || '' });
-      const active = (lessonId && ls.id === lessonId) ? ' class="active"' : '';
-      return `<li${active}>
-        <a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a>
+  sb.innerHTML = chapters
+    .map((ch) => {
+      const items = (ch.lessons || [])
+        .map((ls) => {
+          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
+          const active =
+            lessonId && ls.id === lessonId ? ' class="active"' : "";
+          return `<li${active}>
+        <a href="#/courses/${courseId}/lesson/${ls.id}">${
+            ls.title || "Lesson"
+          }</a>
       </li>`;
-    }).join("");
-    return `
+        })
+        .join("");
+      return `
       <details open class="blk">
-        <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
-        <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
+        <summary><strong>${ch.order ?? ""} ${ch.title || ""}</strong></summary>
+        <ol class="list clean">${
+          items || '<li class="muted">No lessons</li>'
+        }</ol>
       </details>
     `;
-  }).join("");
+    })
+    .join("");
 
   // Default select first lesson if none
   if (!lessonId && flat.length) {
@@ -2508,20 +2607,34 @@ async function renderCourseDetail(courseId, lessonId = null) {
   }
 
   // Find current index + compute prev/next
-  const idx  = flat.findIndex(x => x.lsId === lessonId);
+  const idx = flat.findIndex((x) => x.lsId === lessonId);
   const prev = idx > 0 ? flat[idx - 1] : null;
   const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
 
   // 🔧 Pick a chapter id safely (handles idx === -1)
-  const safeChId = idx >= 0 ? flat[idx].chId : (chapters[0]?.id);
+  const safeChId = idx >= 0 ? flat[idx].chId : chapters[0]?.id;
 
   // Load lesson bundle (doc + contents + quiz)
   const main = document.getElementById("crsMain");
   if (!main) return;
 
+  // guard: lesson index not found
+  if (idx < 0) {
+    main.innerHTML = `<div class="card error">Lesson not found.</div>`;
+    return;
+  }
+
   try {
-    // … later, use safeChId for ALL paths …
-    const lessonRef = doc(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId);
+    const chId = flat[idx].chId; // ← make sure we use the right chapter id
+    const lessonRef = doc(
+      db,
+      "courses",
+      courseId,
+      "chapters",
+      chId,
+      "lessons",
+      lessonId
+    );
     const lsSnap = await getDoc(lessonRef);
     if (!lsSnap.exists()) {
       main.innerHTML = `<div class="card error">Lesson not found.</div>`;
@@ -2529,193 +2642,276 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
     const L = { id: lsSnap.id, ...lsSnap.data() };
 
-    // contents
+    // ---- contents (FIX: consistent name + resolve gs://) ----
     const contents = [];
-    const csnap = await getDocs(query(
-      collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'contents'),
-      orderBy('order','asc')
-    ));
-    csnap.forEach(d => contents.push({ id:d.id, ...d.data() }));
+    const csnap = await getDocs(
+      query(
+        collection(
+          db,
+          "courses",
+          courseId,
+          "chapters",
+          chId,
+          "lessons",
+          lessonId,
+          "contents"
+        ),
+        orderBy("order", "asc")
+      )
+    );
+    csnap.forEach((d) => contents.push({ id: d.id, ...d.data() }));
 
-    // quiz (single doc under /quizzes/* + sub questions/*)
-    let quiz = null, questions = [];
-    const qsnap = await getDocs(collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'quizzes'));
-    qsnap.forEach(qd => { if (!quiz) quiz = { id: qd.id, ...qd.data() }; });
+    // resolve gs:// to https
+    const contentsResolved = await Promise.all(
+      contents.map(async (b) => ({
+        ...b,
+        url: await resolveMediaUrl(b.url),
+      }))
+    );
+
+    // ---- quiz (unchanged, just keep your existing code) ----
+    let quiz = null,
+      questions = [];
+    const qsnap = await getDocs(
+      collection(
+        db,
+        "courses",
+        courseId,
+        "chapters",
+        chId,
+        "lessons",
+        lessonId,
+        "quizzes"
+      )
+    );
+    qsnap.forEach((qd) => {
+      if (!quiz) quiz = { id: qd.id, ...qd.data() };
+    });
     if (quiz) {
-      const qsn = await getDocs(collection(db, 'courses', courseId, 'chapters', safeChId, 'lessons', lessonId, 'quizzes', quiz.id, 'questions'));
-      qsn.forEach(d => questions.push({ id:d.id, ...d.data() }));
+      const qsn = await getDocs(
+        collection(
+          db,
+          "courses",
+          courseId,
+          "chapters",
+          chId,
+          "lessons",
+          lessonId,
+          "quizzes",
+          quiz.id,
+          "questions"
+        )
+      );
+      qsn.forEach((d) => questions.push({ id: d.id, ...d.data() }));
     }
 
-    // Render lesson
+    // ---- render lesson header ----
     main.innerHTML = `
       <div class="row" style="justify-content:space-between;align-items:center">
-        <h3 style="margin:0">${L.title || 'Lesson'}</h3>
+        <h3 style="margin:0">${L.title || "Lesson"}</h3>
         <div class="row" style="gap:.5rem">
-          <button class="btn ghost" ${prev ? '' : 'disabled'}
-            data-nav="prev">← Prev</button>
-          <button class="btn" ${next ? '' : 'disabled'}
-            data-nav="next">Next →</button>
+          <button class="btn ghost" ${
+            idx > 0 ? "" : "disabled"
+          } data-nav="prev">← Prev</button>
+          <button class="btn" ${
+            idx < flat.length - 1 ? "" : "disabled"
+          } data-nav="next">Next →</button>
         </div>
       </div>
 
-      ${L.reading ? `<p style="margin:.5rem 0">
+      ${
+        L.reading
+          ? `<p style="margin:.5rem 0">
         <a class="btn small" href="${L.reading}" target="_blank" rel="noopener">Open handout (PDF)</a>
-      </p>` : ''}
+      </p>`
+          : ""
+      }
 
       <div id="lessonBlocks" class="stack" style="margin-top:.5rem"></div>
 
-      ${quiz ? `
+      ${
+        quiz
+          ? `
         <div class="card">
-          <strong>${quiz.title || 'Quiz'}</strong>
-          <p class="muted">${questions.length} questions · Pass ${quiz.passPct ?? 70}%</p>
+          <strong>${quiz.title || "Quiz"}</strong>
+          <p class="muted">${questions.length} questions · Pass ${
+              quiz.passPct ?? 70
+            }%</p>
           <button class="btn" id="btnStartQuiz">Start Quiz</button>
         </div>
-      ` : ''}
+      `
+          : ""
+      }
     `;
 
-    // Render content blocks
+    // ---- render content blocks (use contentsResolved) ----
     const host = document.getElementById("lessonBlocks");
-    host.innerHTML = contents.map(b => {
-      const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
-      switch ((b.type || '').toLowerCase()) {
-        case 'video':
-          return `<div class="card">
-            <video src="${b.url}" controls style="width:100%;border-radius:12px"></video>${cap}
-          </div>`;
-        case 'audio':
-          return `<div class="card">
-            <audio src="${b.url}" controls style="width:100%"></audio>${cap}
-          </div>`;
-        case 'image':
-          return `<div class="card">
-            <img src="${b.url}" alt="" style="max-width:100%;height:auto;border-radius:12px">${cap}
-          </div>`;
-        case 'text':
-        default:
-          return `<div class="card">
-            <a href="${b.url}" target="_blank" rel="noopener">${escapeHtml(b.url)}</a>${cap}
-          </div>`;
-      }
-    }).join("");
+    host.innerHTML = contentsResolved
+      .map((b) => {
+        const cap = b.caption
+          ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
+              b.caption
+            )}</div>`
+          : "";
+        const u = b.url || "";
+        switch ((b.type || "").toLowerCase()) {
+          case "video":
+            return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+          case "audio":
+            return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+          case "image":
+            return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px"></div>${cap}`;
+          case "text":
+          default:
+            return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(
+              u
+            )}</a>${cap}</div>`;
+        }
+      })
+      .join("");
 
-    // Prev/Next handlers
-    main.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
-      if (!prev) return;
-      location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`;
+    // nav
+    main.querySelector('[data-nav="prev"]')?.addEventListener("click", () => {
+      if (idx > 0)
+        location.hash = `#/courses/${courseId}/lesson/${flat[idx - 1].lsId}`;
     });
-    main.querySelector('[data-nav="next"]')?.addEventListener('click', () => {
-      if (!next) return;
-      location.hash = `#/courses/${courseId}/lesson/${next.lsId}`;
-    });
-
-    // (optional) quiz start
-    document.getElementById('btnStartQuiz')?.addEventListener('click', () => {
-      alert('Quiz UI coming next: render questions[], record attempts, grade, pass/fail…');
+    main.querySelector('[data-nav="next"]')?.addEventListener("click", () => {
+      if (idx < flat.length - 1)
+        location.hash = `#/courses/${courseId}/lesson/${flat[idx + 1].lsId}`;
     });
 
+    // quiz btn (optional)
+    document.getElementById("btnStartQuiz")?.addEventListener("click", () => {
+      alert("Quiz UI coming soon…");
+    });
   } catch (e) {
-    console.error('[reader]', e);
+    console.error("[reader]", e);
     main.innerHTML = `<div class="card error">Failed to load lesson.</div>`;
   }
 
-  const host = document.getElementById('lessonBlocks');
+  const host = document.getElementById("lessonBlocks");
 
   // Resolve all URLs first (handle gs:// and /relative)
-  const resolved = await Promise.all(contents.map(async b => ({
-    ...b,
-    url: await resolveMediaUrl(b.url || '')
-  })));
+  const resolved = await Promise.all(
+    contents.map(async (b) => ({
+      ...b,
+      url: await resolveMediaUrl(b.url || ""),
+    }))
+  );
 
   // Clear and append cards
-  host.innerHTML = '';
+  host.innerHTML = "";
   for (const b of resolved) {
     const card = mediaCard({
-      type: (b.type || 'text').toLowerCase(),
+      type: (b.type || "text").toLowerCase(),
       url: b.url,
-      caption: b.caption || ''
+      caption: b.caption || "",
     });
     host.appendChild(card);
   }
-
 }
 
 // gs:// , /relative, http(s):// — အကုန် handle
-async function resolveMediaUrl(url) {
-  if (!url) return '';
-  if (url.startsWith('gs://')) {
-    // needs Firebase Storage (storage, getDownloadURL available in your app)
-    const r = sref(storage, url);
-    return await getDownloadURL(r);
+// put this near other helpers (global)
+async function resolveMediaUrl(u) {
+  if (!u) return "";
+  try {
+    // If it's a Firebase Storage gs:// URL -> get HTTPS download URL
+    if (u.startsWith("gs://")) {
+      // 'sref' is your alias of firebase/storage 'ref'
+      const r = sref(storage, u);
+      return await getDownloadURL(r);
+    }
+    // Already http(s) → return as-is
+    return u;
+  } catch (e) {
+    console.warn("[media] resolve failed:", u, e);
+    return "";
   }
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  // relative path -> absolute
-  if (url.startsWith('/')) return location.origin + url;
-  return new URL(url, location.origin).toString();
 }
 
 // DOM builder with graceful fallback
-function mediaCard({type, url, caption}) {
-  const cap = caption ? `<div class="muted" style="margin-top:.25rem">${escapeHtml(caption)}</div>` : '';
-  const wrap = document.createElement('div');
-  wrap.className = 'card';
+function mediaCard({ type, url, caption }) {
+  const cap = caption
+    ? `<div class="muted" style="margin-top:.25rem">${escapeHtml(
+        caption
+      )}</div>`
+    : "";
+  const wrap = document.createElement("div");
+  wrap.className = "card";
 
   const fail = (msg) => {
     wrap.innerHTML = `<div class="error">${msg}</div>${cap}`;
   };
 
-  if (type === 'image') {
+  if (type === "image") {
     const img = new Image();
-    img.style.maxWidth = '100%';
-    img.style.height = 'auto';
-    img.style.borderRadius = '12px';
+    img.style.maxWidth = "100%";
+    img.style.height = "auto";
+    img.style.borderRadius = "12px";
     img.src = url;
-    img.addEventListener('error', () => fail('Image unavailable.'));
+    img.addEventListener("error", () => fail("Image unavailable."));
     wrap.appendChild(img);
-    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    if (cap) wrap.insertAdjacentHTML("beforeend", cap);
     return wrap;
   }
 
-  if (type === 'video') {
-    const v = document.createElement('video');
+  if (type === "video") {
+    const v = document.createElement("video");
     v.controls = true;
-    v.style.width = '100%';
-    v.style.borderRadius = '12px';
+    v.style.width = "100%";
+    v.style.borderRadius = "12px";
     v.src = url;
-    v.addEventListener('error', () => fail('Video unavailable.'));
+    v.addEventListener("error", () => fail("Video unavailable."));
     wrap.appendChild(v);
-    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    if (cap) wrap.insertAdjacentHTML("beforeend", cap);
     return wrap;
   }
 
-  if (type === 'audio') {
-    const a = document.createElement('audio');
+  if (type === "audio") {
+    const a = document.createElement("audio");
     a.controls = true;
-    a.style.width = '100%';
+    a.style.width = "100%";
     a.src = url;
-    a.addEventListener('error', () => fail('Audio unavailable.'));
+    a.addEventListener("error", () => fail("Audio unavailable."));
     wrap.appendChild(a);
-    if (cap) wrap.insertAdjacentHTML('beforeend', cap);
+    if (cap) wrap.insertAdjacentHTML("beforeend", cap);
     return wrap;
   }
 
   // default: link/text
-  wrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(url)}</a>${cap}`;
+  wrap.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(
+    url
+  )}</a>${cap}`;
   return wrap;
 }
 
 // Render one lesson (reading + contents + quiz CTA)
 async function renderLesson(courseId, lessonId) {
-  const main = document.getElementById('courseMain');
+  const main = document.getElementById("courseMain");
   if (!main) return;
 
   // find which chapter contains this lesson
   // (cheap scan)
-  let found = null, chId = null;
-  const chSnap = await getDocs(collection(db,'courses',courseId,'chapters'));
+  let found = null,
+    chId = null;
+  const chSnap = await getDocs(collection(db, "courses", courseId, "chapters"));
   for (const chDoc of chSnap.docs) {
-    const lsRef = doc(db,'courses',courseId,'chapters',chDoc.id,'lessons',lessonId);
+    const lsRef = doc(
+      db,
+      "courses",
+      courseId,
+      "chapters",
+      chDoc.id,
+      "lessons",
+      lessonId
+    );
     const lsSnap = await getDoc(lsRef);
-    if (lsSnap.exists()) { found = { id: lsSnap.id, ...lsSnap.data() }; chId = chDoc.id; break; }
+    if (lsSnap.exists()) {
+      found = { id: lsSnap.id, ...lsSnap.data() };
+      chId = chDoc.id;
+      break;
+    }
   }
 
   if (!found) {
@@ -2727,30 +2923,67 @@ async function renderLesson(courseId, lessonId) {
 
   // contents
   const ctSnap = await getDocs(
-    query(collection(db,'courses',courseId,'chapters',chId,'lessons',lessonId,'contents'), orderBy('order','asc'))
+    query(
+      collection(
+        db,
+        "courses",
+        courseId,
+        "chapters",
+        chId,
+        "lessons",
+        lessonId,
+        "contents"
+      ),
+      orderBy("order", "asc")
+    )
   );
   const contents = [];
-  ctSnap.forEach(d => contents.push({ id:d.id, ...d.data() }));
+  ctSnap.forEach((d) => contents.push({ id: d.id, ...d.data() }));
 
   // quizzes (optional)
-  const qSnap = await getDocs(collection(db,'courses',courseId,'chapters',chId,'lessons',lessonId,'quizzes'));
+  const qSnap = await getDocs(
+    collection(
+      db,
+      "courses",
+      courseId,
+      "chapters",
+      chId,
+      "lessons",
+      lessonId,
+      "quizzes"
+    )
+  );
   const quizzes = [];
-  qSnap.forEach(d => quizzes.push({ id:d.id, ...d.data() }));
+  qSnap.forEach((d) => quizzes.push({ id: d.id, ...d.data() }));
 
   // UI
   main.innerHTML = `
     <article class="card">
-      <h2>${lesson.order ?? ''} ${lesson.title || 'Lesson'}</h2>
-      ${lesson.reading ? `<p><a class="btn small" href="${lesson.reading}" target="_blank" rel="noopener">Open reading (PDF)</a></p>` : ''}
+      <h2>${lesson.order ?? ""} ${lesson.title || "Lesson"}</h2>
+      ${
+        lesson.reading
+          ? `<p><a class="btn small" href="${lesson.reading}" target="_blank" rel="noopener">Open reading (PDF)</a></p>`
+          : ""
+      }
 
       <div class="stack" style="margin-top:.75rem">
-        ${contents.map(renderContentBlock).join('')}
+        ${contents.map(renderContentBlock).join("")}
       </div>
 
-      ${quizzes.length ? `
+      ${
+        quizzes.length
+          ? `
         <div class="row" style="margin-top:1rem; gap:.5rem">
-          ${quizzes.map(q => `<button class="btn" data-quiz="${q.id}">Start “${q.title||'Quiz'}”</button>`).join('')}
-        </div>` : ''
+          ${quizzes
+            .map(
+              (q) =>
+                `<button class="btn" data-quiz="${q.id}">Start “${
+                  q.title || "Quiz"
+                }”</button>`
+            )
+            .join("")}
+        </div>`
+          : ""
       }
     </article>
     <div class="row" style="justify-content:space-between; margin-top:.75rem">
@@ -2763,29 +2996,42 @@ async function renderLesson(courseId, lessonId) {
 }
 
 function renderContentBlock(ct) {
-  const cap = ct.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(ct.caption)}</div>` : '';
-  if (ct.type === 'video')  return `<div class="card"><video src="${ct.url}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-  if (ct.type === 'audio')  return `<div class="card"><audio src="${ct.url}" controls style="width:100%"></audio>${cap}</div>`;
-  if (ct.type === 'image')  return `<div class="card"><img src="${ct.url}" alt="" style="width:100%;height:auto;border-radius:12px;display:block" />${cap}</div>`;
-  if (ct.type === 'text')   return `<div class="card"><a href="${ct.url}" target="_blank" rel="noopener">${escapeHtml(ct.url)}</a>${cap}</div>`;
-  return `<div class="card muted">Unknown block: ${escapeHtml(ct.type||'')}</div>`;
+  const cap = ct.caption
+    ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
+        ct.caption
+      )}</div>`
+    : "";
+  if (ct.type === "video")
+    return `<div class="card"><video src="${ct.url}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+  if (ct.type === "audio")
+    return `<div class="card"><audio src="${ct.url}" controls style="width:100%"></audio>${cap}</div>`;
+  if (ct.type === "image")
+    return `<div class="card"><img src="${ct.url}" alt="" style="width:100%;height:auto;border-radius:12px;display:block" />${cap}</div>`;
+  if (ct.type === "text")
+    return `<div class="card"><a href="${
+      ct.url
+    }" target="_blank" rel="noopener">${escapeHtml(ct.url)}</a>${cap}</div>`;
+  return `<div class="card muted">Unknown block: ${escapeHtml(
+    ct.type || ""
+  )}</div>`;
 }
 
-async function importAnyJson(json){
+async function importAnyJson(json) {
   // catalog.json
   if (Array.isArray(json.courses)) {
-    console.log('[importer] catalog, courses:', json.courses.length);
+    console.log("[importer] catalog, courses:", json.courses.length);
     for (const c of json.courses) {
       const id = c.id || crypto.randomUUID();
-      const data = { ...c }; delete data.chaptersUrl;
-      await setDoc(doc(db,'courses', id), data, { merge:true });
+      const data = { ...c };
+      delete data.chaptersUrl;
+      await setDoc(doc(db, "courses", id), data, { merge: true });
 
       // optional: auto-follow chaptersUrl
       if (c.chaptersUrl) {
         try {
-          const r = await fetch(c.chaptersUrl, {cache:'no-store'});
+          const r = await fetch(c.chaptersUrl, { cache: "no-store" });
           if (r.ok) await importAnyJson(await r.json());
-        } catch(_) {}
+        } catch (_) {}
       }
     }
     return;
@@ -2794,19 +3040,30 @@ async function importAnyJson(json){
   // chapters.json
   if (Array.isArray(json.chapters) && json.course?.id) {
     const cid = json.course.id;
-    console.log('[importer] chapters for', cid, 'count:', json.chapters.length);
+    console.log("[importer] chapters for", cid, "count:", json.chapters.length);
     for (const ch of json.chapters) {
       const chid = ch.id || crypto.randomUUID();
-      await setDoc(doc(db,'courses', cid, 'chapters', chid), {
-        title: ch.title || '', order: ch.order ?? 1, summary: ch.summary || ''
-      }, { merge:true });
+      await setDoc(
+        doc(db, "courses", cid, "chapters", chid),
+        {
+          title: ch.title || "",
+          order: ch.order ?? 1,
+          summary: ch.summary || "",
+        },
+        { merge: true }
+      );
 
       // follow lessonsUrl if provided (single-lesson JSON file)
       if (ch.lessonsUrl) {
         try {
-          const r = await fetch(ch.lessonsUrl, {cache:'no-store'});
-          if (r.ok) await importAnyJson({ ...await r.json(), _cid: cid, _chid: chid });
-        } catch(_) {}
+          const r = await fetch(ch.lessonsUrl, { cache: "no-store" });
+          if (r.ok)
+            await importAnyJson({
+              ...(await r.json()),
+              _cid: cid,
+              _chid: chid,
+            });
+        } catch (_) {}
       }
     }
     return;
@@ -2814,50 +3071,121 @@ async function importAnyJson(json){
 
   // lesson.json (expects: lesson + reading + contents + quiz)
   if (json.lesson && (json._cid || json.courseId)) {
-    const cid  = json._cid || json.courseId;
-    const chid = json._chid || json.chapterId || 'c1';
-    console.log('[importer] lesson for', cid, chid, 'title:', json.lesson?.title);
-    const l    = json.lesson;
-    const lid  = l.id || crypto.randomUUID();
+    const cid = json._cid || json.courseId;
+    const chid = json._chid || json.chapterId || "c1";
+    console.log(
+      "[importer] lesson for",
+      cid,
+      chid,
+      "title:",
+      json.lesson?.title
+    );
+    const l = json.lesson;
+    const lid = l.id || crypto.randomUUID();
 
-    await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid), {
-      title: l.title || '', order: l.order ?? 1, reading: json.reading || ''
-    }, { merge:true });
+    await setDoc(
+      doc(db, "courses", cid, "chapters", chid, "lessons", lid),
+      {
+        title: l.title || "",
+        order: l.order ?? 1,
+        reading: json.reading || "",
+      },
+      { merge: true }
+    );
 
     // contents
-    for (const ct of (json.contents || [])) {
+    for (const ct of json.contents || []) {
       const id = crypto.randomUUID();
-      await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'contents', id), {
-        type: ct.type, url: ct.url, caption: ct.caption || '', order: ct.order ?? 1
-      });
+      await setDoc(
+        doc(
+          db,
+          "courses",
+          cid,
+          "chapters",
+          chid,
+          "lessons",
+          lid,
+          "contents",
+          id
+        ),
+        {
+          type: ct.type,
+          url: ct.url,
+          caption: ct.caption || "",
+          order: ct.order ?? 1,
+        }
+      );
     }
 
     // quiz
     if (json.quiz) {
       const qid = crypto.randomUUID();
-      await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid), {
-        title: json.quiz.title || 'Quiz', shuffle: !!json.quiz.shuffle, passPct: json.quiz.passPct ?? 70
-      });
-      for (const q of (json.quiz.questions || [])) {
+      await setDoc(
+        doc(
+          db,
+          "courses",
+          cid,
+          "chapters",
+          chid,
+          "lessons",
+          lid,
+          "quizzes",
+          qid
+        ),
+        {
+          title: json.quiz.title || "Quiz",
+          shuffle: !!json.quiz.shuffle,
+          passPct: json.quiz.passPct ?? 70,
+        }
+      );
+      for (const q of json.quiz.questions || []) {
         const id = crypto.randomUUID();
-        await setDoc(doc(db,'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid, 'questions', id), {
-          text: q.text, choices: q.choices, answerIndex: q.answerIndex, points: q.points ?? 1
-        });
+        await setDoc(
+          doc(
+            db,
+            "courses",
+            cid,
+            "chapters",
+            chid,
+            "lessons",
+            lid,
+            "quizzes",
+            qid,
+            "questions",
+            id
+          ),
+          {
+            text: q.text,
+            choices: q.choices,
+            answerIndex: q.answerIndex,
+            points: q.points ?? 1,
+          }
+        );
       }
     }
     return;
   }
 
-  throw new Error('JSON shape not recognized.');
+  throw new Error("JSON shape not recognized.");
 }
 
-async function loadCourseTree(courseId){
+async function loadCourseTree(courseId) {
   const chapters = [];
-  const chSnap = await getDocs(query(collection(db,'courses',courseId,'chapters'), orderBy('order','asc')));
+  const chSnap = await getDocs(
+    query(
+      collection(db, "courses", courseId, "chapters"),
+      orderBy("order", "asc")
+    )
+  );
   for (const ch of chSnap.docs) {
     const lessons = [];
-    const lsSnap = await getDocs(query(collection(db,'courses',courseId,'chapters',ch.id,'lessons'), orderBy('order','asc')));
-    lsSnap.forEach(d => lessons.push({ id:d.id, ...d.data() }));
+    const lsSnap = await getDocs(
+      query(
+        collection(db, "courses", courseId, "chapters", ch.id, "lessons"),
+        orderBy("order", "asc")
+      )
+    );
+    lsSnap.forEach((d) => lessons.push({ id: d.id, ...d.data() }));
     chapters.push({ id: ch.id, ...ch.data(), lessons });
   }
   return chapters;
@@ -3009,25 +3337,28 @@ function profileFormHTML(p = {}) {
 }
 
 // Topbar search -> router
-document.getElementById('searchForm')?.addEventListener('submit', (e)=>{
+document.getElementById("searchForm")?.addEventListener("submit", (e) => {
   e.preventDefault();
-  const q = document.getElementById('searchInput')?.value?.trim() || '';
-  location.hash = '#/search?q=' + encodeURIComponent(q);
+  const q = document.getElementById("searchInput")?.value?.trim() || "";
+  location.hash = "#/search?q=" + encodeURIComponent(q);
 });
 
-function highlight(hay, needle){
-  if(!needle) return escapeHtml(hay||'');
-  try{
-    const re = new RegExp('('+needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')+')','ig');
-    return escapeHtml(hay||'').replace(re, '<mark>$1</mark>');
-  }catch{
-    return escapeHtml(hay||'');
+function highlight(hay, needle) {
+  if (!needle) return escapeHtml(hay || "");
+  try {
+    const re = new RegExp(
+      "(" + needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")",
+      "ig"
+    );
+    return escapeHtml(hay || "").replace(re, "<mark>$1</mark>");
+  } catch {
+    return escapeHtml(hay || "");
   }
 }
 
-async function renderSearch(){
-  const params = new URLSearchParams((location.hash.split('?')[1]||''));
-  const kw = (params.get('q')||'').trim();
+async function renderSearch() {
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const kw = (params.get("q") || "").trim();
   appEl.innerHTML = `
     <section class="card max">
       <h2>Search</h2>
@@ -3046,52 +3377,81 @@ async function renderSearch(){
   `;
 
   // Fetch recent datasets then filter client-side
-  try{
+  try {
     const [ps, cs] = await Promise.all([
-      getDocs(query(collection(db,'posts'), orderBy('ts','desc'), limit(100))),
-      getDocs(query(collection(db,'courses'), orderBy('level','asc'), limit(100))),
+      getDocs(
+        query(collection(db, "posts"), orderBy("ts", "desc"), limit(100))
+      ),
+      getDocs(
+        query(collection(db, "courses"), orderBy("level", "asc"), limit(100))
+      ),
     ]);
 
     const ql = kw.toLowerCase();
     const posts = [];
-    ps.forEach(d=>posts.push({id:d.id, ...d.data()}));
+    ps.forEach((d) => posts.push({ id: d.id, ...d.data() }));
     const courses = [];
-    cs.forEach(d=>courses.push({id:d.id, ...d.data()}));
+    cs.forEach((d) => courses.push({ id: d.id, ...d.data() }));
 
-    const pFiltered = kw ? posts.filter(p =>
-      (p.title||'').toLowerCase().includes(ql) ||
-      (p.body||'').toLowerCase().includes(ql)
-    ) : posts;
-    const cFiltered = kw ? courses.filter(c =>
-      (c.title||'').toLowerCase().includes(ql) ||
-      (c.summary||'').toLowerCase().includes(ql) ||
-      (Array.isArray(c.benefits)? c.benefits.join(' ').toLowerCase() : '').includes(ql)
-    ) : courses;
+    const pFiltered = kw
+      ? posts.filter(
+          (p) =>
+            (p.title || "").toLowerCase().includes(ql) ||
+            (p.body || "").toLowerCase().includes(ql)
+        )
+      : posts;
+    const cFiltered = kw
+      ? courses.filter(
+          (c) =>
+            (c.title || "").toLowerCase().includes(ql) ||
+            (c.summary || "").toLowerCase().includes(ql) ||
+            (Array.isArray(c.benefits)
+              ? c.benefits.join(" ").toLowerCase()
+              : ""
+            ).includes(ql)
+        )
+      : courses;
 
-    const boxP = document.getElementById('searchPosts');
-    boxP.innerHTML = pFiltered.length ? pFiltered.map(p=>{
-      const mp = {...p};
-      mp.title = highlight(p.title||'', kw);
-      mp.body  = highlight(p.body||'', kw);
-      return postCardHTML(mp);
-    }).join('') : `<div class="card muted">No matching posts.</div>`;
+    const boxP = document.getElementById("searchPosts");
+    boxP.innerHTML = pFiltered.length
+      ? pFiltered
+          .map((p) => {
+            const mp = { ...p };
+            mp.title = highlight(p.title || "", kw);
+            mp.body = highlight(p.body || "", kw);
+            return postCardHTML(mp);
+          })
+          .join("")
+      : `<div class="card muted">No matching posts.</div>`;
 
-    const boxC = document.getElementById('searchCourses');
-    boxC.innerHTML = cFiltered.length ? cFiltered.map(courseCardHTML).join('')
-                                     : `<div class="card muted">No matching courses.</div>`;
+    const boxC = document.getElementById("searchCourses");
+    boxC.innerHTML = cFiltered.length
+      ? cFiltered.map(courseCardHTML).join("")
+      : `<div class="card muted">No matching courses.</div>`;
 
     // wire buttons in course cards
-    boxC.querySelectorAll("[data-action='details']").forEach(b =>
-      b.addEventListener("click", e => openCourse(e.currentTarget.dataset.id))
-    );
-    boxC.querySelectorAll("[data-action='enroll']").forEach(b =>
-      b.addEventListener("click", e => enrollCourse(e.currentTarget.dataset.id))
-    );
-
-  }catch(e){
-    console.error('[search]', e);
-    document.getElementById('searchPosts').innerHTML = `<div class="card error">Failed to search posts.</div>`;
-    document.getElementById('searchCourses').innerHTML = `<div class="card error">Failed to search courses.</div>`;
+    boxC
+      .querySelectorAll("[data-action='details']")
+      .forEach((b) =>
+        b.addEventListener("click", (e) =>
+          openCourse(e.currentTarget.dataset.id)
+        )
+      );
+    boxC
+      .querySelectorAll("[data-action='enroll']")
+      .forEach((b) =>
+        b.addEventListener("click", (e) =>
+          enrollCourse(e.currentTarget.dataset.id)
+        )
+      );
+  } catch (e) {
+    console.error("[search]", e);
+    document.getElementById(
+      "searchPosts"
+    ).innerHTML = `<div class="card error">Failed to search posts.</div>`;
+    document.getElementById(
+      "searchCourses"
+    ).innerHTML = `<div class="card error">Failed to search courses.</div>`;
   }
 }
 
@@ -3130,10 +3490,13 @@ async function renderProfile() {
               <option value="xl">XL</option>
             </select>
           </label>
-          <div class="spacer"></div>
-          <button class="btn" id="btnEditProfile">Edit</button>
         </div>
       </div>
+
+      <!-- ⬇️ Edit button moved to its own line -->
+        <div style="margin-top:.75rem; text-align:right">
+          <button class="btn" id="btnEditProfile">Edit</button>
+        </div>
 
       <!-- View / Edit container -->
       <div id="profileBody">
@@ -3392,105 +3755,89 @@ function renderNotFound() {
   app.innerHTML = `<section class="card"><h2>Not found</h2></section>`;
 }
 
-function normBenefits(b) {
-  // array / comma-separated / string → array
-  let arr = Array.isArray(b)
-    ? b
-    : String(b || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-  // show at least 3 lines (pad with em-dash)
-  while (arr.length < 3) arr.push("—");
-  return arr.slice(0, 3);
-}
-
-function priceLabel(c) {
+function priceBadgeHTML(c) {
   const p = Number(c.price ?? 0);
-  return p > 0 ? `$${p.toFixed(2)}` : "Free";
+  if (p > 0) return `<span class="chip paid">$${p.toFixed(2)}</span>`;
+  return `<span class="chip free">Free</span>`;
 }
 
 function levelLabel(c) {
-  // Home မှာ 0 လို့ပေါ်တာကို တား — number မဖြစ်ရင် မပြ
-  return typeof c.level === "number" && !Number.isNaN(c.level)
-    ? `Level: ${c.level}`
-    : "";
+  const L = Number(c.level ?? 0);
+  return (
+    ["Level: Beginner", "Level: Intermediate", "Level: Advanced", "Level: Pro"][
+      L
+    ] || `Level: ${L}`
+  );
+}
+
+function normBenefits(b) {
+  if (Array.isArray(b)) return b.filter(Boolean);
+  return String(b || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 function courseCardHTML(c) {
-  const src = c.img && String(c.img).trim() ? c.img : PLACEHOLDER_IMG;
-  const benefits = normBenefits(c.benefits);
-  const price = Number(c.price ?? 0);
-  const priceTxt = price > 0 ? `$${price.toFixed(2)}` : 'Free';
-  const ctaLabel = price > 0 ? 'Buy' : 'Enroll';
+  const FALLBACK = "/img/placeholder.png";
+  const lvl = typeof c.level === "number" ? c.level : Number(c.level || 0);
+  const levelMap = ["Beginner", "Intermediate", "Advanced", "Pro"];
+  const levelTxt = levelMap[lvl] ?? `Level ${lvl}`;
+  const price = Number(c.price || 0);
+  const priceStr = price > 0 ? `$${price.toFixed(2)}` : "Free";
 
   return `
-  <article class="course-card" data-cid="${c.id}" data-price="${price}">
-    <img class="cover"
-         alt="${(c.title || "Course").replace(/"/g, "&quot;")}"
-         src="${src}"
-         onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
+  <article class="course-card" data-cid="${c.id}">
+    <img class="cover" src="${
+      c.img || FALLBACK
+    }" onerror="this.onerror=null;this.src='${FALLBACK}'" alt="">
     <div class="body">
-      <h3>${c.title || "Untitled Course"}</h3>
-      <p class="desc">${c.summary || ""}</p>
-
+      <h3>${escapeHtml(c.title || "Untitled Course")}</h3>
+      <p class="desc">${escapeHtml(c.summary || "")}</p>
       <ul class="meta">
-        ${levelLabel(c) ? `<li>${levelLabel(c)}</li>` : ""}
+        <li>${levelTxt}</li>
         <li>Credits: ${c.credits ?? 0}</li>
       </ul>
-
-      <div class="benefits">
-        ${benefits.map((b) => `<div class="benefit">• ${b}</div>`).join("")}
-      </div>
-
       <div class="footer">
-        <span class="price">${priceTxt}</span>
+        <span class="price ${
+          price > 0 ? "price-paid" : "price-free"
+        }">${priceStr}</span>
         <div class="actions">
-          <button class="btn ghost"
-                  data-action="details"
-                  data-id="${c.id}">Details</button>
-          <button class="btn"
-                  data-action="enroll"
-                  data-id="${c.id}"
-                  data-price="${price}">${ctaLabel}</button>
+          <button class="btn ghost btn-details" data-act="details" data-cid="${
+            c.id
+          }">Details</button>
+          ${
+            price > 0
+              ? `<button class="btn btn-buy" data-act="buy" data-cid="${c.id}">Buy</button>`
+              : `<button class="btn btn-enroll" data-act="enroll" data-cid="${c.id}">Enroll</button>`
+          }
         </div>
       </div>
     </div>
-  </article>`;
+  </article>
+  `;
 }
 
-function wireCourseCardEvents(rootSel = "#app") {
-  const root = typeof rootSel === "string" ? document.querySelector(rootSel) : rootSel;
-  if (!root) return;
-  if (root.__cardWired) return;      // prevent double binding
-  root.__cardWired = true;
+function wireCourseCardEvents(scope = "#courseGrid") {
+  const host = document.querySelector(scope);
+  if (!host || host.__wired) return;
+  host.__wired = true;
 
-  root.addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-action]");
-    if (!btn) return;
+  host.addEventListener("click", (e) => {
+    const d = e.target.closest("button[data-act],a[data-act]");
+    if (!d) return;
+    const act = d.dataset.act;
+    const cid = d.dataset.cid;
+    if (!cid) return;
 
-    const act   = btn.dataset.action;
-    const id    = btn.dataset.id || btn.closest("[data-cid]")?.dataset.cid;
-    const price = parseFloat(btn.dataset.price || btn.closest("[data-price]")?.dataset.price || "0");
-
-    if (!id) return;
-
-    switch (act) {
-      case "details":
-        openCourse?.(id);                   // course detail page
-        break;
-
-      case "enroll":
-        if (price > 0) {
-          openBuyDialog?.(id, price);       // paid → PayPal
-        } else {
-          enrollCourse?.(id);               // free → enroll direct
-        }
-        break;
-
-      case "open":
-        location.hash = `#/courses/${id}`;  // dashboard cards → open reader
-        break;
+    if (act === "details") {
+      openCourseDetails?.(cid);
+    } else if (act === "enroll") {
+      enrollCourse?.(cid);
+    } else if (act === "buy") {
+      openBuyDialog?.(cid);
+    } else if (act === "open") {
+      location.hash = `#/courses/${cid}`;
     }
   });
 }

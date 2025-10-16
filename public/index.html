@@ -79,7 +79,7 @@
       <a class="nav-link auth-only" href="#/dashboard">Dashboard</a>
       <a class="nav-link auth-only" href="#/certs">Certificates</a>
       <a class="nav-link auth-only" href="#/transcripts">Transcripts</a>
-      <a class="nav-link auth-only" href="#/settings">Settings</a>
+      <!-- <a class="nav-link auth-only" href="#/settings">Settings</a> -->
       <a class="nav-link" href="#/profile">Profile</a>
 
       <a class="nav-link admin-only" href="#/admin">Admin</a>
@@ -89,137 +89,7 @@
     </nav>
 
     <!-- ===== App content ===== -->
-    <main id="app" class="container">
-      <!-- Admin Console -->
-      <!-- <section id="adminCourses">
-        <h2>Manage Courses</h2>
-        <div class="toolbar">
-          <button class="btn" data-act="new">New Course</button>
-        </div>
-        <div id="adminCourseList" class="course-grid">
-        </div>
-      </section> -->
-
-      <!-- <section id="tab-import" class="hidden">
-        <h3>Import Course JSON</h3>
-        <textarea
-          id="importJson"
-          rows="10"
-          placeholder="Paste catalog/chapters/lesson json here"
-        ></textarea>
-        <div class="row" style="gap: 0.5rem">
-          <button id="btnImportCourse" class="btn">Import</button>
-          <button
-            id="btnImportFolder"
-            class="btn ghost"
-            title="Sequential: catalog → chapters → lessons"
-          >
-            Quick Import
-          </button>
-        </div>
-        <p class="muted">
-          Tip: Start with catalog.json, then chapters.json, then each lesson
-          json.
-        </p>
-      </section> -->
-      <!-- <section
-        class="card maxw"
-        id="adminConsole"
-        style="max-width: 980px; margin-inline: auto"
-      >
-        <h2>Admin Console</h2>
-
-        <details open class="blk">
-          <summary class="h3">Add Course</summary>
-          <form id="formCourse" class="grid-2">
-            <label>Title <input name="title" required /></label>
-            <label
-              >Level
-              <select name="level">
-                <option value="0">Beginner</option>
-                <option value="1">Intermediate</option>
-                <option value="2">Advanced</option>
-                <option value="3">Pro</option>
-              </select>
-            </label>
-            <label
-              >Credits <input type="number" name="credits" value="3"
-            /></label>
-            <label>Summary <textarea name="summary" rows="3"></textarea></label>
-            <button class="btn" type="submit">Save Course</button>
-          </form>
-        </details>
-
-        <details class="blk">
-          <summary class="h3">Add Lesson</summary>
-          <form id="formLesson" class="grid-2">
-            <label
-              >Course ID
-              <input name="courseId" required placeholder="e.g. pali-beg-1"
-            /></label>
-            <label
-              >Order <input type="number" name="order" min="1" required
-            /></label>
-            <label>Title <input name="title" required /></label>
-            <label
-              >Reading PDF URL
-              <input name="readingUrl" placeholder="https://...pdf"
-            /></label>
-            <label>Pages <input type="number" name="pages" value="22" /></label>
-            <label
-              >Videos (comma)
-              <input name="videos" placeholder="https://v1, https://v2"
-            /></label>
-            <button class="btn" type="submit">Save Lesson</button>
-          </form>
-        </details>
-
-        <details class="blk">
-          <summary class="h3">Add Quiz</summary>
-          <form id="formQuiz" class="grid-2">
-            <label>Course ID <input name="courseId" required /></label>
-            <label>Lesson ID <input name="lessonId" required /></label>
-            <label
-              >Type
-              <select name="type">
-                <option value="mcq">Single choice</option>
-                <option value="msq">Multiple choice</option>
-                <option value="short">Short answer</option>
-              </select>
-            </label>
-            <label
-              >Question <textarea name="text" rows="3" required></textarea>
-            </label>
-            <label
-              >Options (comma) <input name="options" placeholder="A, B, C, D"
-            /></label>
-            <button class="btn" type="submit">Save Quiz</button>
-          </form>
-        </details>
-
-        <p class="muted">
-          Tips: Save လုပ်ပြီးတာနဲ့ Home/Courses/Dashboard ထဲမှာ
-          ချက်ချင်းပေါ်သွားပါမယ်။
-        </p>
-      </section> -->
-
-      <!-- <section
-        class="card maxw"
-        id="studentDash"
-        style="max-width: 980px; margin-inline: auto"
-      >
-        <h2>Student Dashboard</h2>
-
-        <div id="myCourses" class="list"></div>
-
-        <h3>Certificates</h3>
-        <div id="myCerts" class="list"></div>
-      </section> -->
-    </main>
-
-    <!-- <main class="container">
-      <div id="app"></div>
-    </main> -->
+    <main id="app" class="container"></main>
 
     <footer class="footer">&copy; <span id="year"></span> Pāli Lessons</footer>
 
@@ -286,19 +156,43 @@
       </form>
     </dialog>
 
-    <!-- Reusable PayPal Modal -->
-    <!-- <dialog id="buyDlg" class="card" style="max-width: 520px; width: 95%">
-      <h3 id="buyTitle" style="margin-top: 0">Purchase course</h3>
-      <div id="paypal-buttons" style="margin-top: 1rem"></div>
-      <div class="row" style="justify-content: flex-end; margin-top: 1rem">
-        <button
-          class="btn ghost"
-          onclick="document.getElementById('buyDlg').close()"
-        >
-          Close
-        </button>
-      </div>
-    </dialog> -->
+    <dialog id="courseDlg" class="modal">
+      <form method="dialog" class="sheet">
+        <div class="sheet-head">
+          <h3 id="cdTitle" style="margin: 0">Course</h3>
+          <button
+            class="close"
+            aria-label="Close"
+            onclick="document.getElementById('courseDlg').close()"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="sheet-main">
+          <div class="media">
+            <img id="cdImg" alt="" />
+          </div>
+
+          <div class="body">
+            <p id="cdDesc" class="desc muted"></p>
+
+            <ul class="meta" style="margin: 0.75rem 0">
+              <li id="cdLevel"></li>
+              <li id="cdCredits"></li>
+              <li id="cdBenefits"></li>
+              <li id="cdPrice"></li>
+            </ul>
+          </div>
+        </div>
+
+        <menu>
+          <button class="btn ghost" value="cancel">Close</button>
+          <button id="cdEnrollBtn" class="btn">Enroll / Buy</button>
+        </menu>
+      </form>
+    </dialog>
+
     <!-- Buy dialog -->
     <dialog id="buyDlg" class="modal">
       <form method="dialog" class="card">
