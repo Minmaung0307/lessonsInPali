@@ -1556,7 +1556,7 @@ dialog#courseDetails {
   border: 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   background: var(--surface, #fff);
 }
 
@@ -1587,23 +1587,29 @@ dialog#courseDetails {
   border-color: #d7dadd;
 }
 
-.btn-details:hover { filter: brightness(0.98); }
+.btn-details:hover {
+  filter: brightness(0.98);
+}
 
 .btn-enroll {
-  background: #16a34a;      /* green */
+  background: #16a34a; /* green */
   border-color: #148c40;
   color: #fff;
 }
 
-.btn-enroll:hover { filter: brightness(0.95); }
+.btn-enroll:hover {
+  filter: brightness(0.95);
+}
 
 .btn-buy {
-  background: #1f4fd6;      /* indigo/blue */
+  background: #1f4fd6; /* indigo/blue */
   border-color: #1a43b6;
   color: #fff;
 }
 
-.btn-buy:hover { filter: brightness(0.95); }
+.btn-buy:hover {
+  filter: brightness(0.95);
+}
 
 #courseDetails .dlg-head {
   display: flex;
@@ -1627,14 +1633,14 @@ dialog#courseDetails {
 #courseDetails .dlg-cover {
   width: 100%;
   height: 220px;
-  object-fit: contain;        /* ပုံမပြတ်အောင် */
+  object-fit: contain; /* ပုံမပြတ်အောင် */
   background: #f6f6f6;
   border-radius: 12px;
 }
 #courseDetails .dlg-scroll {
-  max-height: 62vh;           /* content သာ scroll ပေါ် */
+  max-height: 62vh; /* content သာ scroll ပေါ် */
   overflow: auto;
-  padding-right: .25rem;      /* scrollbar space */
+  padding-right: 0.25rem; /* scrollbar space */
 }
 
 /* Course/Post cards – show full image without cropping */
@@ -1814,7 +1820,9 @@ section.card.max,
 }
 
 /* Dialog backdrop */
-dialog.modal::backdrop { background: rgba(0,0,0,.6); }
+dialog.modal::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
 
 /* The dialog "card" */
 dialog.modal .sheet {
@@ -1823,7 +1831,7 @@ dialog.modal .sheet {
   padding: 0;
   border: none;
   border-radius: 16px;
-  overflow: hidden;               /* contain internal scrolling */
+  overflow: hidden; /* contain internal scrolling */
   display: grid;
   grid-template-rows: auto 1fr auto; /* header | body (scroll) | footer */
   background: var(--cardBg, #fff);
@@ -1831,10 +1839,18 @@ dialog.modal .sheet {
 
 /* header */
 .sheet .sheet-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1rem; border-bottom: 1px solid rgba(0,0,0,.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
-.sheet .close { background: transparent; border: 0; font-size: 1.25rem; cursor: pointer; }
+.sheet .close {
+  background: transparent;
+  border: 0;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
 
 /* 2-column content that scrolls as a whole */
 .sheet .sheet-main {
@@ -1842,38 +1858,52 @@ dialog.modal .sheet {
   grid-template-columns: 1fr 1.2fr;
   gap: 1rem;
   padding: 1rem;
-  overflow: auto;                  /* <— long descriptions scroll here */
+  overflow: auto; /* <— long descriptions scroll here */
 }
 
 /* image pane: keep full image visible (no cropping) */
 .sheet .media {
-  background: #000;                /* letterbox bars look neat */
+  background: #000; /* letterbox bars look neat */
   border-radius: 12px;
-  display: grid; place-items: center;
+  display: grid;
+  place-items: center;
   min-height: 220px;
 }
 .sheet .media img {
   width: 100%;
   height: 100%;
-  object-fit: contain;             /* <— NO CROPPING */
-  aspect-ratio: 16 / 9;            /* keeps a nice box on wide screens */
+  object-fit: contain; /* <— NO CROPPING */
+  aspect-ratio: 16 / 9; /* keeps a nice box on wide screens */
   border-radius: 12px;
 }
 
 /* text pane */
-.sheet .body { overflow: auto; padding-right: .25rem; }
-.sheet .body .desc { white-space: pre-wrap; line-height: 1.5; }
+.sheet .body {
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+.sheet .body .desc {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
 
 /* footer */
 .sheet menu {
-  display: flex; justify-content: flex-end; gap: .5rem;
-  padding: .75rem 1rem; border-top: 1px solid rgba(0,0,0,.06);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* Mobile: stack */
 @media (max-width: 720px) {
-  .sheet .sheet-main { grid-template-columns: 1fr; }
-  .sheet .media img { aspect-ratio: 16/9; }
+  .sheet .sheet-main {
+    grid-template-columns: 1fr;
+  }
+  .sheet .media img {
+    aspect-ratio: 16/9;
+  }
   .row-2 {
     grid-template-columns: 1fr;
   }
@@ -1903,7 +1933,7 @@ dialog.modal .sheet {
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
   transition: 0.2s ease;
-  box-shadow: 0 2px 4px rgba(30,58,138,0.3);
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.3);
 }
 .btn-open:hover {
   background: #2d4fc4;
@@ -1919,7 +1949,7 @@ dialog.modal .sheet {
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
   transition: 0.2s ease;
-  box-shadow: 0 2px 4px rgba(153,27,27,0.3);
+  box-shadow: 0 2px 4px rgba(153, 27, 27, 0.3);
 }
 .btn-unenroll:hover {
   background: #b91c1c;
@@ -1941,3 +1971,44 @@ dialog.modal .sheet {
   font-weight: 600;
   transition: background 0.2s ease, transform 0.1s ease;
 }
+
+.post-body {
+  line-height: 1.6;
+  margin: 0.5rem 0;
+  word-wrap: break-word;
+}
+.post-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 0.5rem 0;
+}
+.post-body ul,
+.post-body ol {
+  margin-left: 1.25rem;
+}
+.post-body pre {
+  white-space: pre-wrap;
+  background: #f7f7f7;
+  padding: 0.5rem;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.post-body h1,
+.post-body h2,
+.post-body h3 {
+  margin: 0.6rem 0 0.3rem;
+}
+.post .post-media {
+  margin: .5rem 0;
+}
+.post .post-media img,
+.post .post-media video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+.post .post-body p { margin: .35rem 0; }

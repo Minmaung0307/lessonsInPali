@@ -172,18 +172,49 @@ const PLACEHOLDER_IMG =
 const short = (s = "", n = 140) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ---------- Utils ----------
-function escapeHtml(s = "") {
-  return s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      }[c])
-  );
+function escapeHtml(s='') {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Parse a plain-text post body with simple media markers into HTML
+function parseBodyToHTML(body='') {
+  const lines = body.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const parts = [];
+
+  for (const line of lines) {
+    // [img] https://...
+    let m = line.match(/^\[img\]\s+(https?:\/\/\S+)$/i);
+    if (m) {
+      parts.push(
+        `<div class="post-media"><img src="${m[1]}" alt="" /></div>`
+      );
+      continue;
+    }
+    // [video] https://...
+    m = line.match(/^\[video\]\s+(https?:\/\/\S+)$/i);
+    if (m) {
+      parts.push(
+        `<div class="post-media"><video controls preload="metadata" playsinline><source src="${m[1]}"></video></div>`
+      );
+      continue;
+    }
+    // [audio] https://...
+    m = line.match(/^\[audio\]\s+(https?:\/\/\S+)$/i);
+    if (m) {
+      parts.push(
+        `<div class="post-media"><audio controls preload="metadata"><source src="${m[1]}"></audio></div>`
+      );
+      continue;
+    }
+
+    // Otherwise a normal paragraph (escaped)
+    parts.push(`<p>${escapeHtml(line)}</p>`);
+  }
+
+  return parts.join('\n');
 }
 
 const applyTheme = (v) =>
@@ -584,37 +615,44 @@ document
 // helpers
 const PLACEHOLDER_MEDIA = "/img/placeholder.png"; // already configured
 
-function postCardHTML(p) {
-  const t = p.type || "text";
-  const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
-  const title = p.title || "";
-  const body = p.body || "";
-  const media = p.mediaUrl || "";
+function canRenderTrustedHtml() {
+  return (window.currentRole === 'admin' || window.currentRole === 'ta');
+}
 
+function postCardHTML(p) {
+  const ts    = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
+  const title = p.title || "";
+  const body  = p.body  || "";
+  const type  = (p.type || 'text').toLowerCase();
+
+  // Optional top media (from mediaUrl/mediaType)
   let mediaBlock = "";
-  if (t === "image" && media) {
-    mediaBlock = `<img class="cover" src="${media}" alt="">`;
-  } else if (t === "video" && media) {
-    mediaBlock = `
-      <video class="cover" controls playsinline preload="metadata">
-        <source src="${media}" type="${p.mediaType || "video/mp4"}" />
-        Your browser does not support the video tag.
+  if (p.mediaUrl) {
+    const mt = (p.mediaType || '').toLowerCase();
+    if (mt.startsWith('image/')) {
+      mediaBlock = `<img class="cover" src="${p.mediaUrl}" alt="">`;
+    } else if (mt.startsWith('video/')) {
+      mediaBlock = `<video class="cover" controls preload="metadata" playsinline>
+        <source src="${p.mediaUrl}" type="${mt || 'video/mp4'}" />
       </video>`;
-  } else if (t === "audio" && media) {
-    mediaBlock = `
-      <audio controls preload="metadata" style="width:100%">
-        <source src="${media}" type="${p.mediaType || "audio/mpeg"}" />
-        Your browser does not support the audio element.
+    } else if (mt.startsWith('audio/')) {
+      mediaBlock = `<audio controls preload="metadata" style="width:100%">
+        <source src="${p.mediaUrl}" type="${mt || 'audio/mpeg'}" />
       </audio>`;
+    }
   }
 
+  // Body parsed with markers → HTML
+  const bodyHTML = body ? `<div class="post-body">${parseBodyToHTML(body)}</div>` : "";
+
   return `
-  <article class="card post" data-id="${p.id}">
-    ${title ? `<h3>${escapeHtml(title)}</h3>` : ""}
-    ${mediaBlock}
-    ${body ? `<p class="desc">${escapeHtml(body)}</p>` : ""}
-    <div class="muted" style="margin-top:.25rem">${ts}</div>
-  </article>`;
+    <article class="card post" data-id="${p.id}">
+      ${title ? `<h3>${escapeHtml(title)}</h3>` : ""}
+      ${mediaBlock}
+      ${bodyHTML}
+      <div class="muted" style="margin-top:.25rem">${ts}</div>
+    </article>
+  `;
 }
 
 async function renderHome() {
@@ -2514,25 +2552,72 @@ async function renderAdmin() {
       await loadAdminMsgs();
     });
 
+  async function autoDeleteOldMessages(days = 7) {
+    try {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const qOld = query(
+        collection(db, "messages"),
+        where("ts", "<", cutoff) // ⬅️ Timestamp.fromDate(cutoff) မလို
+      );
+
+      const snap = await getDocs(qOld);
+      if (snap.empty) return;
+
+      // writeBatch မ.import ထားရင် ဒီ loop ပဲ အသုံးပြု
+      const deletions = [];
+      snap.forEach((docSnap) => deletions.push(deleteDoc(docSnap.ref)));
+      await Promise.all(deletions);
+
+      // console.log(`[cleanup] deleted ${snap.size} old message(s)`);
+    } catch (err) {
+      console.error("[cleanup messages]", err);
+    }
+  }
+
   async function loadAdminMsgs() {
     const box = document.getElementById("adminMsgs");
+    if (!box) return;
     box.innerHTML = "Loading…";
+
     const snap = await getDocs(
       query(collection(db, "messages"), orderBy("ts", "desc"))
     );
     const rows = [];
-    snap.forEach((d) => rows.push(d.data()));
-    box.innerHTML = rows
-      .map(
-        (m) => `
-        <div class="card">
-          <div><strong>To:</strong> ${m.to}</div>
-          <p>${m.text}</p>
-        </div>
-      `
-      )
-      .join("");
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+
+    if (!rows.length) {
+      box.innerHTML = `<div class="card muted">No messages.</div>`;
+      return;
+    }
+
+    box.innerHTML = rows.map(m => {
+      const when = m.ts?.toDate ? m.ts.toDate().toLocaleString() : "";
+      return `
+        <div class="card" data-id="${m.id}">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <div>
+              <div><strong>To:</strong> ${m.to}</div>
+              <p class="muted" style="margin:.25rem 0">${when}</p>
+              <p>${escapeHtml(m.text || "")}</p>
+            </div>
+            <div>
+              <button class="btn small danger" data-del="${m.id}">Delete</button>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+
+    // delegate delete
+    box.querySelectorAll("[data-del]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.del;
+        if (!confirm("Delete this message?")) return;
+        await deleteDoc(doc(db, "messages", id));
+        await loadAdminMsgs();
+      });
+    });
   }
+  await autoDeleteOldMessages(7);
   await loadAdminMsgs();
 }
 
