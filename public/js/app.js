@@ -1143,67 +1143,84 @@ function ensureCourseDetailsDialog() {
   });
 }
 
+// ⬇️ REPLACE your existing openCourseDetails() with this
 async function openCourseDetails(courseId) {
   ensureCourseDetailsDialog();
-  const dlg = document.getElementById("courseDetails");
-  const title = dlg.querySelector("#cdTitle");
-  const cover = dlg.querySelector("#cdCover");
-  const body = dlg.querySelector("#cdBody");
-  const chips = dlg.querySelector("#cdMetaChips");
-  const btnOpen = dlg.querySelector("#cdOpenPage");
+  const dlg    = document.getElementById("courseDetails");
+  const title  = dlg.querySelector("#cdTitle");
+  const cover  = dlg.querySelector("#cdCover");
+  const body   = dlg.querySelector("#cdBody");
+  const chips  = dlg.querySelector("#cdMetaChips");
+  const btnOpen= dlg.querySelector("#cdOpenPage");
   const btnEnr = dlg.querySelector("#cdEnroll");
 
-  // fetch
-  const s = await getDoc(doc(db, "courses", courseId));
-  if (!s.exists()) {
-    title.textContent = "Course not found";
-    body.innerHTML = `<p class="error">This course no longer exists.</p>`;
+  // fetch course
+  let c = null;
+  try {
+    const s = await getDoc(doc(db, "courses", courseId));
+    if (!s.exists()) {
+      title.textContent = "Course not found";
+      body.innerHTML = `<p class="error">This course no longer exists.</p>`;
+      btnEnr.disabled = true;
+      return dlg.showModal();
+    }
+    c = { id: s.id, ...s.data() };
+  } catch (e) {
+    console.error("[course details]", e);
+    title.textContent = "Error";
+    body.innerHTML = `<p class="error">Failed to load course.</p>`;
     btnEnr.disabled = true;
     return dlg.showModal();
   }
-  const c = { id: s.id, ...s.data() };
 
-  // fill
+  // header
   title.textContent = c.title || "Course";
+
+  // cover (fallback-safe)
   const FALLBACK = "/img/placeholder.png";
   cover.src = (c.img || "").trim() || FALLBACK;
-  cover.onerror = () => {
-    cover.onerror = null;
-    cover.src = FALLBACK;
-  };
+  cover.onerror = () => { cover.onerror = null; cover.src = FALLBACK; };
 
+  // normalize benefits (array or comma-separated string)
   const benefits = Array.isArray(c.benefits)
-    ? c.benefits
+    ? c.benefits.filter(Boolean).map(String)
     : String(c.benefits || "")
         .split(",")
-        .map((x) => x.trim())
+        .map(x => x.trim())
         .filter(Boolean);
 
+  // description + full benefits list
+  const summaryHtml = c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : "";
+  const longDescHtml = c.description ? `<p>${escapeHtml(c.description)}</p>` : "";
+
+  const benefitsHtml = benefits.length
+    ? `
+      <h4 style="margin:.75rem 0 .25rem">Benefits</h4>
+      <ul class="benefits">
+        ${benefits.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
+      </ul>`
+    : "";
+
+  // write into modal body (scrollable container wrapper for long text)
   body.innerHTML = `
-    ${c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : ""}
-    ${c.description ? `<p>${escapeHtml(c.description)}</p>` : ""}
-    ${
-      benefits.length
-        ? `<h4>Benefits</h4><ul class="list">${benefits
-            .map((b) => `<li>${escapeHtml(b)}</li>`)
-            .join("")}</ul>`
-        : ""
-    }
+    <div class="cd-scroll">
+      ${summaryHtml}
+      ${longDescHtml}
+      ${benefitsHtml}
+    </div>
   `;
 
+  // meta chips
   const lvlIdx = Number(c.level ?? 0);
-  const lvlTxt =
-    ["Beginner", "Intermediate", "Advanced", "Pro"][lvlIdx] ??
-    `Level ${lvlIdx}`;
+  const lvlTxt = (["Beginner", "Intermediate", "Advanced", "Pro"][lvlIdx] ?? `Level ${lvlIdx}`);
   const priceN = Number(c.price || 0);
-  const priceStr = priceN > 0 ? `$${priceN.toFixed(2)}` : "Free";
+  const isFree = !priceN || priceN <= 0;
+  const priceStr = isFree ? "Free" : `$${priceN.toFixed(2)}`;
 
   chips.innerHTML = `
     <span class="badge">${lvlTxt}</span>
     <span class="badge">Credits: ${c.credits ?? 0}</span>
-    <span class="badge ${
-      priceN > 0 ? "price-paid" : "price-free"
-    }">${priceStr}</span>
+    <span class="badge ${isFree ? "price-free" : "price-paid"}">${priceStr}</span>
   `;
 
   // actions
@@ -1211,9 +1228,7 @@ async function openCourseDetails(courseId) {
     location.hash = `#/courses/${c.id}`;
     dlg.close();
   };
-  btnEnr.onclick = () => {
-    enrollCourse?.(c.id);
-  };
+  btnEnr.onclick = () => enrollCourse?.(c.id);
 
   dlg.showModal();
 }
@@ -4261,42 +4276,48 @@ function normBenefits(b) {
 }
 
 function courseCardHTML(c) {
-  const FALLBACK = "/img/placeholder.png";
-  const lvl = typeof c.level === "number" ? c.level : Number(c.level || 0);
-  const levelMap = ["Beginner", "Intermediate", "Advanced", "Pro"];
-  const levelTxt = levelMap[lvl] ?? `Level ${lvl}`;
-  const price = Number(c.price || 0);
-  const priceStr = price > 0 ? `$${price.toFixed(2)}` : "Free";
+  const price = Number(c.price ?? 0);
+  const isPaid = price > 0;
+  const priceLabel = isPaid ? `$${price.toFixed(2)}` : 'Free';
+
+  const benefits = Array.isArray(c.benefits)
+    ? c.benefits
+    : String(c.benefits || '').split(',').map(s=>s.trim()).filter(Boolean);
+
+  const FALLBACK = '/img/placeholder.png';
 
   return `
-  <article class="course-card" data-cid="${c.id}">
-    <img class="cover" src="${
-      c.img || FALLBACK
-    }" onerror="this.onerror=null;this.src='${FALLBACK}'" alt="">
-    <div class="body">
-      <h3>${escapeHtml(c.title || "Untitled Course")}</h3>
-      <p class="desc">${escapeHtml(c.summary || "")}</p>
-      <ul class="meta">
-        <li>${levelTxt}</li>
-        <li>Credits: ${c.credits ?? 0}</li>
-      </ul>
-      <div class="footer">
-        <span class="price ${
-          price > 0 ? "price-paid" : "price-free"
-        }">${priceStr}</span>
-        <div class="actions">
-          <button class="btn ghost btn-details" data-act="details" data-cid="${
-            c.id
-          }">Details</button>
-          ${
-            price > 0
-              ? `<button class="btn btn-buy" data-act="buy" data-cid="${c.id}">Buy</button>`
-              : `<button class="btn btn-enroll" data-act="enroll" data-cid="${c.id}">Enroll</button>`
-          }
+    <article class="course-card" data-cid="${c.id}">
+      <img class="cover"
+           src="${(c.img||'').trim() || FALLBACK}"
+           onerror="this.onerror=null; this.src='${FALLBACK}'" />
+      <div class="body">
+        <h3>${c.title || 'Untitled Course'}</h3>
+
+        ${c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : ''}
+
+        ${benefits.length ? `
+          <ul class="meta">
+            ${benefits.slice(0,3).map(b => `<li>${escapeHtml(b)}</li>`).join('')}
+          </ul>` : ''}
+
+        <ul class="meta">
+          <li>${levelLabel(c) || 'Level 0'}</li>
+          <li>Credits: ${c.credits ?? 0}</li>
+        </ul>
+
+        <div class="footer">
+          <span class="badge ${isPaid ? 'price-paid' : 'price-free'}">${priceLabel}</span>
+          <div class="actions">
+            <button class="btn btn-details" data-act="details" data-cid="${c.id}">Details</button>
+            <button class="btn ${isPaid ? 'btn-buy' : 'btn-enroll'}"
+                    data-act="enroll" data-cid="${c.id}">
+              ${isPaid ? 'Buy' : 'Enroll'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </article>
+    </article>
   `;
 }
 
