@@ -1887,6 +1887,24 @@ window.renderTranscript = async function () {
   }
 };
 
+// --- PDF helpers ---
+function genCertNo(uid, courseId) {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const last4 = (uid || 'user').slice(-4).replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  const c4    = (courseId || 'COURSE').slice(0,4).replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  return `${ymd}-${c4}-${last4}`;
+}
+
+
+// Same-origin images are easiest (no CORS). If you must load cross-origin,
+// keep the server CORS-allow or serve from your domain.
+async function imgToDataURL(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  const b = await r.blob();
+  return await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+}
+
 // ---------- Dashboard ----------
 async function renderDashboard() {
   if (!auth.currentUser) {
@@ -2204,16 +2222,17 @@ async function renderAdmin() {
         <h3>Certificates / Transcript (Admin preview)</h3>
         <form id="certForm" class="form grid-2" onsubmit="return false;">
           <label>User UID
-            <input id="certUid" placeholder="user uid (leave blank = current admin)" />
+            <input id="certUid" placeholder="user uid (blank = current admin)" />
           </label>
           <label>Course
             <select id="certCourse"></select>
           </label>
-          <div style="grid-column:1/-1; display:flex; gap:.5rem">
-            <button class="btn" id="btnViewCert">View Certificate (PDF)</button>
-            <button class="btn ghost" id="btnViewTranscript">View Transcript (PDF)</button>
+          <div style="grid-column:1/-1; display:flex; gap:.5rem; flex-wrap:wrap">
+            <button class="btn"          id="btnViewCert"       type="button">View Certificate</button>
+            <button class="btn ghost"    id="btnDlCert"         type="button">Download Certificate</button>
+            <button class="btn"          id="btnViewTranscript" type="button">View Transcript</button>
+            <button class="btn ghost"    id="btnDlTranscript"   type="button">Download Transcript</button>
           </div>
-          <p class="muted">Tip: Course list loads from Firestore “courses”. If blank UID, current admin uid will be used just for preview.</p>
         </form>
       </div>
     </section>
@@ -2241,6 +2260,45 @@ async function renderAdmin() {
 
   // initial
   showTab("courses");
+
+  // load course list
+  {
+    const sel = document.getElementById('certCourse');
+    if (sel) {
+      sel.innerHTML = `<option value="">Loading…</option>`;
+      const cs = await getDocs(query(collection(db,'courses'), orderBy('title','asc')));
+      const opts = [];
+      cs.forEach(d => {
+        const c = { id:d.id, ...d.data() };
+        opts.push(`<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`);
+      });
+      sel.innerHTML = opts.join('') || `<option value="">(no courses)</option>`;
+    }
+
+    const pickUid = () => (document.getElementById('certUid')?.value || auth.currentUser?.uid || '').trim();
+    const pickCid = () => (document.getElementById('certCourse')?.value || '').trim();
+
+    document.getElementById('btnViewCert')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return;
+      const uid = pickUid(); const cid = pickCid();
+      if (!cid) return alert('Choose a course');
+      await renderCertificate(cid, uid, 'view');
+    });
+    document.getElementById('btnDlCert')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return;
+      const uid = pickUid(); const cid = pickCid();
+      if (!cid) return alert('Choose a course');
+      await renderCertificate(cid, uid, 'download');
+    });
+    document.getElementById('btnViewTranscript')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return;
+      await renderTranscript(pickUid(), 'view');
+    });
+    document.getElementById('btnDlTranscript')?.addEventListener('click', async ()=>{
+      if (!requireStaff()) return;
+      await renderTranscript(pickUid(), 'download');
+    });
+  }
 
   /* ---------- CERTS tab (admin preview) ---------- */
   try {
@@ -3498,136 +3556,162 @@ async function openCourseEditor(id) {
 }
 
 // Certificate Template (with PDF export)
-async function renderCertificate(courseId) {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Please sign in first.");
-    return;
+async function renderCertificate(courseId, uidOpt, mode = 'view') {
+  const cid = (courseId || '').trim();
+  if (!cid) return alert('Choose a course first.');
+  const uid = (uidOpt || auth.currentUser?.uid || '').trim();
+  if (!uid) return alert('No UID (login first).');
+
+  // read course + user
+  const cSnap = await getDoc(doc(db, 'courses', cid));
+  const course = cSnap.exists() ? { id: cSnap.id, ...cSnap.data() } : { id: cid, title: cid };
+  let displayName = uid;
+  try {
+    const uSnap = await getDoc(doc(db, 'users', uid));
+    if (uSnap.exists()) displayName = uSnap.data().name || uSnap.data().displayName || uid;
+  } catch {}
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l', 'pt', 'a4'); // landscape
+  const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
+  const M = 40;
+
+  // left-top logo
+  try {
+    const logo = await imgToDataURL('/icons/icon-192.png');
+    pdf.addImage(logo, 'PNG', M, M, 64, 64);
+  } catch {}
+
+  // right-top certificate no
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+  pdf.text(`Certificate No: ${genCertNo(uid, course.id)}`, W - M, M + 12, { align: 'right' });
+
+  // title + body
+  pdf.setFont('times','bold');   pdf.setFontSize(42);
+  pdf.text('Certificate of Completion', W/2, H/2 - 60, { align: 'center' });
+  pdf.setFont('times','normal'); pdf.setFontSize(18);
+  pdf.text('This certifies that', W/2, H/2 - 20, { align: 'center' });
+  pdf.setFont('times','bold');   pdf.setFontSize(28);
+  pdf.text(displayName, W/2, H/2 + 10, { align: 'center' });
+  pdf.setFont('times','normal'); pdf.setFontSize(18);
+  pdf.text('has successfully completed the course', W/2, H/2 + 40, { align: 'center' });
+  pdf.setFont('times','bold');   pdf.setFontSize(24);
+  pdf.text(course.title || course.id, W/2, H/2 + 75, { align: 'center' });
+
+  const today = new Date().toLocaleDateString();
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(12);
+  pdf.text(`Date: ${today}`, M, H - M);
+  pdf.line(W - 220, H - M - 10, W - M, H - M - 10);
+  pdf.text('Authorized Signature', W - 110, H - M + 5, { align: 'center' });
+
+  if (mode === 'download') {
+    pdf.save(`certificate-${course.id}.pdf`);
+  } else {
+    pdf.output('dataurlnewwindow'); // view only
   }
+}
 
-  const uid = user.uid;
-  const userSnap = await getDoc(doc(db, "users", uid));
-  const userData = userSnap.exists() ? userSnap.data() : { name: user.displayName };
+// convenience wrappers
+const viewCertificate = (cid, uid) => renderCertificate(cid, uid, 'view');
+const downloadCertificate = (cid, uid) => renderCertificate(cid, uid, 'download');
 
-  // course info
-  const courseSnap = await getDoc(doc(db, "courses", courseId));
-  if (!courseSnap.exists()) {
-    alert("Course not found.");
-    return;
-  }
-  const course = { id: courseSnap.id, ...courseSnap.data() };
-
-  const app = document.getElementById("app");
-  app.innerHTML = `
-    <section class="certificate" id="certCard">
-      <h1>Certificate of Completion</h1>
-      <p>This certifies that</p>
-      <h2>${userData.displayName || userData.name || "Student"}</h2>
-      <p>has successfully completed the course</p>
-      <h3>${course.title}</h3>
-      <p>on ${new Date().toLocaleDateString()}</p>
-
-      <div class="signatures">
-        <div>
-          <hr />
-          <p>Instructor</p>
-        </div>
-        <div>
-          <hr />
-          <p>Director</p>
-        </div>
-      </div>
-
-      <button class="btn" id="btnCertPdf" style="margin-top:1rem">Download PDF</button>
-    </section>
-  `;
-
-  document.getElementById("btnCertPdf").addEventListener("click", async () => {
-    const el = document.getElementById("certCard");
-    const canvas = await html2canvas(el, { scale: 2 });
-    const pdf = new jspdf.jsPDF("p", "pt", "a4");
-    const imgData = canvas.toDataURL("image/png");
-    const imgWidth = 595;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-    pdf.save(`${course.title}_certificate.pdf`);
-  });
+async function getCourseStatus(uid, courseId) {
+  // enrollment.completed?
+  try {
+    const en = await getDoc(doc(db, 'users', uid, 'enrollments', courseId));
+    if (en.exists() && en.data().completed) return 'Completed';
+  } catch {}
+  // completions/{courseId} exists?
+  try {
+    const comp = await getDoc(doc(db, 'users', uid, 'completions', courseId));
+    if (comp.exists()) return 'Completed';
+  } catch {}
+  return 'In Progress';
 }
 
 // Transcript Template (with PDF export)
-async function renderTranscript() {
-  const user = auth.currentUser;
-  if (!user) {
-    alert("Please sign in first.");
-    return;
+async function renderTranscript(uidOpt, mode = 'view') {
+  const uid = (uidOpt || auth.currentUser?.uid || '').trim();
+  if (!uid) return alert('No UID (login first).');
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l','pt','a4'); // landscape
+  const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
+  const M = 48;
+
+  // right-top logo
+  try {
+    const logo = await imgToDataURL('/icons/icon-192.png');
+    pdf.addImage(logo, 'PNG', W - M - 56, M, 56, 56);
+  } catch {}
+
+  pdf.setFont('times','bold'); pdf.setFontSize(28);
+  pdf.text('Academic Transcript', M, M + 24);
+
+  // student block
+  let name = uid;
+  try {
+    const uSnap = await getDoc(doc(db,'users', uid));
+    if (uSnap.exists()) name = uSnap.data().name || uSnap.data().displayName || uid;
+  } catch {}
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(12);
+  pdf.text(`Name: ${name}`, M, M + 60);
+  pdf.text(`UID: ${uid}`,   M, M + 76);
+  pdf.text(`Generated: ${new Date().toLocaleString()}`, M, M + 92);
+
+  // table head
+  let y = M + 130;
+  pdf.setFont('helvetica','bold');
+  pdf.text('Course',  M,        y);
+  pdf.text('Level',   M + 360,  y);
+  pdf.text('Credits', M + 430,  y);
+  pdf.text('Status',  M + 510,  y);
+  pdf.setLineWidth(0.5); pdf.line(M, y+6, W - M, y+6);
+  y += 26; pdf.setFont('helvetica','normal');
+
+  // read enrollments
+  const es = await getDocs(query(collection(db,'users', uid, 'enrollments'), orderBy('ts','desc')));
+  if (es.empty) {
+    pdf.text('(No enrollments)', M, y);
+  } else {
+    for (const d of es.docs) {
+      const e = d.data();
+      let title = e.courseTitle || e.courseId;
+      let level = '-';
+      let credits = (typeof e.credits === 'number') ? e.credits : '-';
+      try {
+        const cs = await getDoc(doc(db, 'courses', e.courseId));
+        if (cs.exists()) {
+          const c = cs.data();
+          title   = c.title || title;
+          level   = (typeof c.level === 'number') ? String(c.level) : (c.level || '-');
+          credits = (typeof c.credits === 'number') ? c.credits : credits;
+        }
+      } catch {}
+      const status = await getCourseStatus(uid, e.courseId);
+
+      pdf.text(String(title),   M,        y);
+      pdf.text(String(level),   M + 360,  y);
+      pdf.text(String(credits), M + 430,  y);
+      pdf.text(String(status),  M + 510,  y);
+
+      y += 22;
+      if (y > H - M - 40) { pdf.addPage(); y = M + 20; }
+    }
   }
 
-  const uid = user.uid;
-  const userSnap = await getDoc(doc(db, "users", uid));
-  const userData = userSnap.exists() ? userSnap.data() : { name: user.displayName };
-
-  const app = document.getElementById("app");
-  app.innerHTML = `<section class="transcript" id="transCard"><h1>Loading transcript...</h1></section>`;
-  const transCard = document.getElementById("transCard");
-
-  const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
-  const snap = await getDocs(eq);
-  if (snap.empty) {
-    transCard.innerHTML = `<div class="card muted">No completed courses found.</div>`;
-    return;
+  if (mode === 'download') {
+    pdf.save('transcript.pdf');
+  } else {
+    pdf.output('dataurlnewwindow'); // view only
   }
-
-  const records = [];
-  for (const d of snap.docs) {
-    const e = d.data();
-    const cRef = doc(db, "courses", e.courseId);
-    const cSnap = await getDoc(cRef);
-    const c = cSnap.exists() ? cSnap.data() : {};
-    records.push({
-      title: c.title || e.courseTitle,
-      credits: c.credits ?? 3,
-      grade: e.grade ?? "A",
-      completedAt: e.completedAt?.toDate?.() || e.ts?.toDate?.() || new Date(),
-    });
-  }
-
-  transCard.innerHTML = `
-    <h1>Academic Transcript</h1>
-    <p><strong>Name:</strong> ${userData.displayName || userData.name || "Student"}</p>
-    <p><strong>Student ID:</strong> ${uid}</p>
-    <p><strong>Program:</strong> Pāli Language Studies</p>
-
-    <table>
-      <thead>
-        <tr><th>Course</th><th>Credits</th><th>Grade</th><th>Completed</th></tr>
-      </thead>
-      <tbody>
-        ${records.map(r => `
-          <tr>
-            <td>${r.title}</td>
-            <td>${r.credits}</td>
-            <td>${r.grade}</td>
-            <td>${r.completedAt.toLocaleDateString()}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-
-    <button class="btn" id="btnTransPdf" style="margin-top:1rem">Download PDF</button>
-  `;
-
-  // PDF Export
-  document.getElementById("btnTransPdf").addEventListener("click", async () => {
-    const el = document.getElementById("transCard");
-    const canvas = await html2canvas(el, { scale: 2 });
-    const pdf = new jspdf.jsPDF("p", "pt", "a4");
-    const imgData = canvas.toDataURL("image/png");
-    const imgWidth = 595;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-    pdf.save(`${userData.displayName}_transcript.pdf`);
-  });
 }
+
+// wrappers
+const viewTranscript = (uid) => renderTranscript(uid, 'view');
+const downloadTranscript = (uid) => renderTranscript(uid, 'download');
 
 // Certificate Example
 const user = auth.currentUser;
