@@ -1,0 +1,28 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+
+  "lesson": { "id": "l1", "order": 1, "title": "Vowels & Consonants" },
+
+  "reading": "Long text (use \\n for new lines). Or keep short and put big blocks into contents.",
+
+  "contents": [
+    { "type": "video",   "url": "https://.../file.mp4", "caption": "…", "order": 1 },
+    { "type": "audio",   "url": "https://.../file.mp3", "caption": "…", "order": 2 },
+    { "type": "image",   "url": "https://.../file.png", "caption": "…", "order": 3 },
+    { "type": "text",    "url": "https://example.com",  "caption": "…", "order": 4 },
+
+    { "type": "youtube", "url": "https://youtu.be/XXXX", "caption": "Intro", "order": 5 }
+  ],
+
+  "quiz": {
+    "title": "Lesson Quiz",
+    "passPct": 70,
+    "shuffle": true,
+    "questions": [
+      { "type": "sc", "text": "Single choice?", "choices": ["A","B","C"], "answerIndex": 1, "points": 1 },
+      { "type": "mc", "text": "Multiple choice?", "choices": ["A","B","C"], "answers": [0,2], "points": 2 },
+      { "type": "short", "text": "Short answer?", "answerText": "your expected keyword(s)", "points": 2 }
+    ]
+  }
+}

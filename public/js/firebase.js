@@ -1,8 +1,7 @@
-// /js/firebase.js
 // firebase.js
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
 import { getAuth }      from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+import { getFirestore, initializeFirestore } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { getStorage }   from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
 const firebaseConfig = {
@@ -15,22 +14,20 @@ const firebaseConfig = {
   measurementId: "G-3PZ5YXVFWG",
 };
 
-firebase.initializeApp(firebaseConfig);
+// ✅ initialize app (no firebase.initializeApp)
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const app  = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// ✅ initialize Firestore with better network stability (avoid Listen/channel errors)
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false,
+});
+
+// ✅ Auth and Storage
 export const auth = getAuth(app);
-export const db   = getFirestore(app);
 export const storage = getStorage(app);
 
-// (optional) make them visible to inline onclicks
+// (optional) expose globally
 window.auth = auth;
 window.db = db;
 window.storage = storage;
-
-// Auth helpers exposed for app.js
-// export const providers = {
-//   github: new GithubAuthProvider()
-// };
-// export const authApi = {
-//   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, signInWithPopup
-// };

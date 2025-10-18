@@ -1,0 +1,26 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+
+  "lesson": { "id": "l3", "order": 3, "title": "ပထမခန်း [ကိံ နာမော] (ကျက်မှတ်ရန်)" },
+
+  "reading": "နာမ-မည်၏။\nကိံ နာမော - အဘယ် အမည်ရှိသနည်း။\nကိံ နာမာ - အဘယ် အမည် ရှိကုန်သနည်း။\n... (ကျက်မှတ်ဖတ်စာများ ဆက်တင်) ...",
+
+  "contents": [
+    { "type": "text", "url": "https://example.com/reading", "caption": "ဆက်ဖတ်ရန်", "order": 1 }
+  ],
+
+  "quiz": {
+    "title": "Lesson 3 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      {
+        "type": "short",
+        "text": "“ကိံ နာမော” ကို မြန်မာစကားပြေ အတိုင်း ပြန်ဆိုပါ",
+        "answerText": "အဘယ် အမည် ရှိသနည်း",
+        "points": 2
+      }
+    ]
+  }
+}

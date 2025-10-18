@@ -1,0 +1,71 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+  "lesson": {
+    "id": "l1",
+    "order": 1,
+    "title": "Vowels & Consonants"
+  },
+
+  "reading": "Start by skimming the handout; focus on long vs. short vowels and how gemination affects rhythm.\n\n01: သရဏဂုံ ၃ပါး (အရကျက်)\n၁) ဗုဒ္ဓံ သရဏံ ဂစ္ဆာမိ ...\n(ဤနေရာတွင် သင့်စာအုပ်မှ မှတ်သားစရာမှတ်ချက်များ ထည့်နိုင်သည်)\n",
+
+  "contents": [
+    {
+      "type": "video",
+      "url": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj",
+      "caption": "Short intro: vowels vs consonants",
+      "order": 1
+    },
+    {
+      "type": "audio",
+      "url": "https://samplelib.com/lib/preview/mp3/sample-6s.mp3",
+      "caption": "Pronunciation drill: repeat after the teacher",
+      "order": 2
+    },
+    {
+      "type": "image",
+      "url": "https://i.imgur.com/4ZQZ4GZ.png",
+      "caption": "Alphabet chart (print-friendly)",
+      "order": 3
+    },
+    {
+      "type": "text",
+      "url": "https://example.com/pali-alphabet-notes",
+      "caption": "External reference: vowels and length",
+      "order": 4
+    }
+  ],
+
+  "quiz": {
+    "title": "Lesson 1 Quiz",
+    "passPct": 70,
+    "shuffle": true,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "mcq",
+        "text": "Which is a vowel?",
+        "choices": ["ka", "a", "ta", "ma"],
+        "answerIndex": 1,
+        "points": 1
+      },
+      {
+        "id": "q2",
+        "type": "mcq",
+        "multiple": true,
+        "text": "Select all vowels:",
+        "choices": ["a", "i", "k", "u", "ā"],
+        "answerIndexes": [0, 1, 3, 4],
+        "points": 2
+      },
+      {
+        "id": "q3",
+        "type": "short",
+        "text": "Write one example of a long vowel in Pāli.",
+        "acceptedAnswers": ["ā", "ī", "ū", "e", "o"],
+        "caseInsensitive": true,
+        "points": 2
+      }
+    ]
+  }
+}

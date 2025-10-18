@@ -1,0 +1,39 @@
+{
+  "course": { "id": "pali-beg-1" },
+  "chapters": [
+    {
+      "id": "ch1",
+      "order": 1,
+      "title": "Alphabet & Sounds",
+      "summary": "Vowels, consonants and basic sound rules",
+      "lessons": [
+        {
+          "id": "l1",
+          "order": 1,
+          "title": "Vowels & Consonants",
+          "lessonsUrl": "data/courses/pali-beg-1/lessons/l1.json"
+        },
+        {
+          "id": "l2",
+          "order": 2,
+          "title": "Pronunciation Drills",
+          "lessonsUrl": "data/courses/pali-beg-1/lessons/l2.json"
+        }
+      ]
+    },
+    {
+      "id": "ch2",
+      "order": 2,
+      "title": "Basic Nouns",
+      "summary": "Gender, number, and very common nouns",
+      "lessons": [
+        {
+          "id": "l1",
+          "order": 1,
+          "title": "Gender & Number",
+          "lessonsUrl": "data/courses/pali-beg-1/lessons/ch2-l1.json"
+        }
+      ]
+    }
+  ]
+}

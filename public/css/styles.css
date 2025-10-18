@@ -1459,17 +1459,18 @@ textarea::placeholder {
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+/*
 .chip.free {
   background: #10b98122;
   color: #065f46;
   border: 1px solid #10b98155;
-} /* green-ish */
+}
 .chip.paid {
   background: #f59e0b22;
   color: #92400e;
   border: 1px solid #f59e0b55;
-} /* amber-ish */
-
+} 
+*/
 /* details modal */
 #courseDlg::backdrop {
   background: rgba(0, 0, 0, 0.4);
@@ -1554,8 +1555,8 @@ textarea::placeholder {
 #courseDetails .benefits li { list-style: disc; line-height: 1.25rem; }
 
 /* Price chip colors (already used elsewhere) */
-.badge.price-free  { background: #e8f7ed; color: #1a7f42; }
-.badge.price-paid  { background: #fff4e5; color: #a45500; }
+/* .badge.price-free  { background: #e8f7ed; color: #1a7f42; }
+.badge.price-paid  { background: #fff4e5; color: #a45500; } */
 
 /* Fallback (non-webkit) – keeps about 3 lines height */
 .clamp-3-fallback {
@@ -1605,7 +1606,7 @@ dialog#courseDetails {
   line-height: 1;
   border: 1px solid transparent;
 }
-.price-free {
+/* .price-free {
   background: #e8f7ee;
   color: #0b6b2b;
   border-color: #c7ebd5;
@@ -1615,7 +1616,7 @@ dialog#courseDetails {
   background: #efe9ff;
   color: #3a1c7a;
   border-color: #d9ccff;
-}
+} */
 
 .btn-details {
   background: #f6f7f8;
@@ -2141,3 +2142,106 @@ dialog.modal .sheet {
 .course-card .actions{
   display:flex; gap:.5rem; flex-wrap:wrap;
 }
+
+/* =========================
+   QUIZ UI (clean + unified)
+   ========================= */
+
+/* Wrapper */
+#quizHost .quiz-q { 
+  padding: .75rem 0; 
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+#quizHost .quiz-q:first-child { border-top: 0; }
+#quizHost .quiz-qtext { 
+  font-weight: 600; 
+  margin-bottom: .35rem; 
+}
+#quizHost .q-num { color: #6b7280; margin-right: .25rem; }
+
+/* Choices layout */
+#quizHost .quiz-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: .5rem;
+}
+@media (min-width: 720px) {
+  #quizHost .quiz-choices {
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+  }
+}
+
+/* Choice chip */
+#quizHost .quiz-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .5rem .6rem;
+  border: 1px solid #e7e1d6;
+  border-radius: .6rem;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1.2;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+#quizHost .quiz-choice:hover { 
+  background: #f9f9f9; 
+}
+
+/* Make inputs clickable & show native controls properly */
+#quizHost input[type="radio"],
+#quizHost input[type="checkbox"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  pointer-events: auto;
+  accent-color: #17803d;        /* brand color */
+}
+
+/* Shape distinction (radio = circle, checkbox = square) */
+#quizHost input[type="radio"]    { border-radius: 50%; }
+#quizHost input[type="checkbox"] { border-radius: 4px;  }
+
+/* Feedback */
+#quizHost .quiz-feedback { 
+  margin-top: .25rem; 
+  font-size: .95rem; 
+  font-weight: 600; 
+}
+#quizHost .quiz-feedback.good{ color:#17803d; }
+#quizHost .quiz-feedback.bad { color:#b41e1e; }
+#quizHost #btnSubmitQuiz, #quizHost #btnResetQuiz { margin-top:.25rem; }
+
+/* Correct / Wrong state colors */
+#quizHost .quiz-choice.is-correct { 
+  background: #eaf7ef; 
+  border-color: #28a745; 
+  box-shadow: 0 0 0 2px #28a74533;
+}
+#quizHost .quiz-choice.is-wrong { 
+  background: #fdecec; 
+  border-color: #dc3545; 
+  box-shadow: 0 0 0 2px #dc354533;
+}
+
+/* Short answer */
+#quizHost .quiz-textarea {
+  width: 100%;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: .5rem;
+  font: inherit;
+  resize: vertical;
+}
+
+/* Progress bar (course-wide) */
+.progress-wrap { display: flex; flex-direction: column; gap: .25rem; }
+.progress-bar  { background: #eee; border-radius: 999px; overflow: hidden; height: 10px; }
+.progress-bar > span { display: block; height: 100%; background: #4caf50; transition: width .3s; }
+.progress-text  { font-size: .9rem; }
+
+/* Small polish */
+#quizHost .quiz-choice .quiz-choice-text { display: inline-block; }

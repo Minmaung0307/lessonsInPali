@@ -1,0 +1,71 @@
+{
+  "courseId": "pali-int-1",
+  "chapterId": "ch1",
+  "lesson": {
+    "id": "l1",
+    "order": 1,
+    "title": "Quick Review + Sandhi Basics"
+  },
+
+  "reading": "Rapid review of beginner topics. Then: vowel sandhi overview with examples.\nရိုးရိုးနိဿယပုံစံနှင့် sandhi နမူနာများကို သေချာကြည့်ပါ။",
+
+  "contents": [
+    {
+      "type": "video",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "caption": "Demo video (YouTube): sample lecture",
+      "order": 1
+    },
+    {
+      "type": "audio",
+      "url": "https://samplelib.com/lib/preview/mp3/sample-9s.mp3",
+      "caption": "Sandhi listening drill",
+      "order": 2
+    },
+    {
+      "type": "image",
+      "url": "https://i.imgur.com/e6rQwvw.png",
+      "caption": "Vowel sandhi summary",
+      "order": 3
+    },
+    {
+      "type": "text",
+      "url": "https://example.com/pali-sandhi",
+      "caption": "Reference: vowel sandhi rules",
+      "order": 4
+    }
+  ],
+
+  "quiz": {
+    "title": "Sandhi Basics Check",
+    "passPct": 70,
+    "shuffle": true,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "mcq",
+        "text": "Vowel sandhi applies to…",
+        "choices": ["Only vowels", "Only consonants", "Both", "Neither"],
+        "answerIndex": 2,
+        "points": 1
+      },
+      {
+        "id": "q2",
+        "type": "mcq",
+        "multiple": true,
+        "text": "Which result from a+i sandhi in Pāli? (select all that apply)",
+        "choices": ["e", "o", "ai", "āi"],
+        "answerIndexes": [0],
+        "points": 2
+      },
+      {
+        "id": "q3",
+        "type": "short",
+        "text": "Write one example pair that undergoes vowel sandhi.",
+        "acceptedAnswers": ["a+i=e", "a+u=o", "ā+i=ai (traditional)", "ā+u=au (traditional)"],
+        "caseInsensitive": true,
+        "points": 2
+      }
+    ]
+  }
+}

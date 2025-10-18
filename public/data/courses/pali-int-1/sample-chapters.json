@@ -1,0 +1,33 @@
+{
+  "course": { "id": "pali-int-1" },
+  "chapters": [
+    {
+      "id": "ch1",
+      "order": 1,
+      "title": "Review & Sandhi",
+      "summary": "Short review and vowel-sandhi essentials",
+      "lessons": [
+        {
+          "id": "l1",
+          "order": 1,
+          "title": "Quick Review + Sandhi Basics",
+          "lessonsUrl": "data/courses/pali-int-1/lessons/l1.json"
+        }
+      ]
+    },
+    {
+      "id": "ch2",
+      "order": 2,
+      "title": "Compounds I",
+      "summary": "Tatpurusa, Karmadhāraya, and Bahuvrīhi",
+      "lessons": [
+        {
+          "id": "l1",
+          "order": 1,
+          "title": "Tatpurusa & Friends",
+          "lessonsUrl": "data/courses/pali-int-1/lessons/ch2-l1.json"
+        }
+      ]
+    }
+  ]
+}
