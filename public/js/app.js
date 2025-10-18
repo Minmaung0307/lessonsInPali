@@ -3762,7 +3762,7 @@ function showCongratsModal() {
   const html = `
     <div class="modal-overlay" id="congratsModal">
       <div class="modal-card">
-        <img src="assets/congrats.png" alt="Congrats" onerror="this.style.display='none'">
+        <img src="/img/congrats.png" alt="Congrats" onerror="this.style.display='none'">
         <h3 style="margin:.25rem 0 .5rem">ဂုဏ်ယူပါတယ်! 🎉</h3>
         <p class="muted">သင့်ရဲ့ ကြိုးစားမှုအတွက် ဂုဏ်ယူပါတယ်၊ ပျော်ရွင်ပါစေ</p>
         <div class="row" style="margin-top:.75rem">
