@@ -1060,11 +1060,16 @@ label.pw .eye {
   margin-top: 0.25rem;
 }
 .btn.primary {
-  /* background: #e0b15c;
-  color: #111; */
-  background: #0b5ed7;
+  background: #2563eb;
   color: #fff;
-  border-color: #dba948;
+  border-color: #2563eb;
+}
+.btn[disabled] {
+  background: #e5e7eb !important;
+  border-color: #e5e7eb !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
 }
 .btn.primary:hover {
   filter: brightness(0.98);
@@ -1526,17 +1531,17 @@ textarea::placeholder {
 
 .course-card .benefits {
   margin: 0.5rem 0 0.75rem;
-  padding-left: 1.1rem;      /* bullet indent */
+  padding-left: 1.1rem; /* bullet indent */
 }
 .course-card .benefits li {
   list-style: disc;
-  line-height: 1.25rem;      /* for max-height fallback */
+  line-height: 1.25rem; /* for max-height fallback */
 }
 /* 3-line clamp (modern) */
 .clamp-3 {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;     /* show up to 3 lines */
+  -webkit-line-clamp: 3; /* show up to 3 lines */
   overflow: hidden;
 }
 
@@ -1544,15 +1549,18 @@ textarea::placeholder {
 #courseDetails .cd-scroll {
   max-height: min(56vh, 520px);
   overflow: auto;
-  padding-right: .25rem;
+  padding-right: 0.25rem;
 }
 
 /* Benefits list bullets */
 #courseDetails .benefits {
-  margin: .25rem 0 0;
+  margin: 0.25rem 0 0;
   padding-left: 1.1rem;
 }
-#courseDetails .benefits li { list-style: disc; line-height: 1.25rem; }
+#courseDetails .benefits li {
+  list-style: disc;
+  line-height: 1.25rem;
+}
 
 /* Price chip colors (already used elsewhere) */
 /* .badge.price-free  { background: #e8f7ed; color: #1a7f42; }
@@ -2039,7 +2047,7 @@ dialog.modal .sheet {
   margin: 0.6rem 0 0.3rem;
 }
 .post .post-media {
-  margin: .5rem 0;
+  margin: 0.5rem 0;
 }
 .post .post-media img,
 .post .post-media video {
@@ -2048,7 +2056,9 @@ dialog.modal .sheet {
   height: auto;
   border-radius: 12px;
 }
-.post .post-body p { margin: .35rem 0; }
+.post .post-body p {
+  margin: 0.35rem 0;
+}
 
 /* certificate & transcript */
 .certificate {
@@ -2059,7 +2069,7 @@ dialog.modal .sheet {
   background: #fffef7;
   max-width: 700px;
   margin: 2rem auto;
-  box-shadow: 0 0 20px rgba(0,0,0,0.2);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 }
 .certificate h1 {
   font-size: 2em;
@@ -2091,7 +2101,8 @@ dialog.modal .sheet {
   width: 100%;
   border-collapse: collapse;
 }
-.transcript th, .transcript td {
+.transcript th,
+.transcript td {
   border: 1px solid #aaa;
   padding: 10px;
   text-align: center;
@@ -2101,46 +2112,57 @@ dialog.modal .sheet {
 }
 
 /* ===== Course card badges & CTA colors ===== */
-.badge.price-free{
+.badge.price-free {
   background: #e8f8ee;
-  color:#0a7a3c;
-  border:1px solid #b6e8c8;
+  color: #0a7a3c;
+  border: 1px solid #b6e8c8;
 }
-.badge.price-paid{
-  background:#fff4e5;
-  color:#a14b00;
-  border:1px solid #ffd6a6;
+.badge.price-paid {
+  background: #fff4e5;
+  color: #a14b00;
+  border: 1px solid #ffd6a6;
 }
 
 /* CTA buttons */
-.btn.btn-details{
-  background:#eef2ff;
-  color:#3730a3;
-  border:1px solid #dbe2ff;
+.btn.btn-details {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #dbe2ff;
 }
-.btn.btn-details:hover{ filter:brightness(0.96); }
+.btn.btn-details:hover {
+  filter: brightness(0.96);
+}
 
-.btn.btn-enroll{
-  background:#e6fffa;
-  color:#0f766e;
-  border:1px solid #b5f5ee;
+.btn.btn-enroll {
+  background: #e6fffa;
+  color: #0f766e;
+  border: 1px solid #b5f5ee;
 }
-.btn.btn-enroll:hover{ filter:brightness(0.96); }
+.btn.btn-enroll:hover {
+  filter: brightness(0.96);
+}
 
-.btn.btn-buy{
-  background:#fff1f2;
-  color:#be123c;
-  border:1px solid #ffc8cf;
+.btn.btn-buy {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #ffc8cf;
 }
-.btn.btn-buy:hover{ filter:brightness(0.96); }
+.btn.btn-buy:hover {
+  filter: brightness(0.96);
+}
 
 /* Footer layout spacing (keeps buttons tidy) */
-.course-card .footer{
-  display:flex; justify-content:space-between; align-items:center;
-  gap:.5rem; margin-top:.5rem;
+.course-card .footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
-.course-card .actions{
-  display:flex; gap:.5rem; flex-wrap:wrap;
+.course-card .actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 /* =========================
@@ -2148,22 +2170,27 @@ dialog.modal .sheet {
    ========================= */
 
 /* Wrapper */
-#quizHost .quiz-q { 
-  padding: .75rem 0; 
+#quizHost .quiz-q {
+  padding: 0.75rem 0;
   border-top: 1px solid var(--border, #e5e7eb);
 }
-#quizHost .quiz-q:first-child { border-top: 0; }
-#quizHost .quiz-qtext { 
-  font-weight: 600; 
-  margin-bottom: .35rem; 
+#quizHost .quiz-q:first-child {
+  border-top: 0;
 }
-#quizHost .q-num { color: #6b7280; margin-right: .25rem; }
+#quizHost .quiz-qtext {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+#quizHost .q-num {
+  color: #6b7280;
+  margin-right: 0.25rem;
+}
 
 /* Choices layout */
 #quizHost .quiz-choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(160px, 1fr));
-  gap: .5rem;
+  gap: 0.5rem;
 }
 @media (min-width: 720px) {
   #quizHost .quiz-choices {
@@ -2175,18 +2202,18 @@ dialog.modal .sheet {
 #quizHost .quiz-choice {
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  padding: .5rem .6rem;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid #e7e1d6;
-  border-radius: .6rem;
+  border-radius: 0.6rem;
   background: #fff;
   cursor: pointer;
   user-select: none;
   line-height: 1.2;
-  transition: background .15s, border-color .15s, box-shadow .15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-#quizHost .quiz-choice:hover { 
-  background: #f9f9f9; 
+#quizHost .quiz-choice:hover {
+  background: #f9f9f9;
 }
 
 /* Make inputs clickable & show native controls properly */
@@ -2198,32 +2225,43 @@ dialog.modal .sheet {
   height: 18px;
   margin: 0;
   pointer-events: auto;
-  accent-color: #17803d;        /* brand color */
+  accent-color: #17803d; /* brand color */
 }
 
 /* Shape distinction (radio = circle, checkbox = square) */
-#quizHost input[type="radio"]    { border-radius: 50%; }
-#quizHost input[type="checkbox"] { border-radius: 4px;  }
+#quizHost input[type="radio"] {
+  border-radius: 50%;
+}
+#quizHost input[type="checkbox"] {
+  border-radius: 4px;
+}
 
 /* Feedback */
-#quizHost .quiz-feedback { 
-  margin-top: .25rem; 
-  font-size: .95rem; 
-  font-weight: 600; 
+#quizHost .quiz-feedback {
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
-#quizHost .quiz-feedback.good{ color:#17803d; }
-#quizHost .quiz-feedback.bad { color:#b41e1e; }
-#quizHost #btnSubmitQuiz, #quizHost #btnResetQuiz { margin-top:.25rem; }
+#quizHost .quiz-feedback.good {
+  color: #17803d;
+}
+#quizHost .quiz-feedback.bad {
+  color: #b41e1e;
+}
+#quizHost #btnSubmitQuiz,
+#quizHost #btnResetQuiz {
+  margin-top: 0.25rem;
+}
 
 /* Correct / Wrong state colors */
-#quizHost .quiz-choice.is-correct { 
-  background: #eaf7ef; 
-  border-color: #28a745; 
+#quizHost .quiz-choice.is-correct {
+  background: #eaf7ef;
+  border-color: #28a745;
   box-shadow: 0 0 0 2px #28a74533;
 }
-#quizHost .quiz-choice.is-wrong { 
-  background: #fdecec; 
-  border-color: #dc3545; 
+#quizHost .quiz-choice.is-wrong {
+  background: #fdecec;
+  border-color: #dc3545;
   box-shadow: 0 0 0 2px #dc354533;
 }
 
@@ -2232,18 +2270,65 @@ dialog.modal .sheet {
   width: 100%;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 8px;
-  padding: .5rem;
+  padding: 0.5rem;
   font: inherit;
   resize: vertical;
 }
 
 /* Progress bar (course-wide) */
-.progress-wrap { display: flex; flex-direction: column; gap: .25rem; }
-.progress-bar  { background: #eee; border-radius: 999px; overflow: hidden; height: 10px; }
-.progress-bar > span { display: block; height: 100%; background: #4caf50; transition: width .3s; }
-.progress-text  { font-size: .9rem; }
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.progress-bar {
+  background: #eee;
+  border-radius: 999px;
+  overflow: hidden;
+  height: 10px;
+}
+.progress-bar > span {
+  display: block;
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.3s;
+}
+.progress-text {
+  font-size: 0.9rem;
+}
 
 /* Small polish */
-#quizHost .quiz-choice .quiz-choice-text { display: inline-block; }
+#quizHost .quiz-choice .quiz-choice-text {
+  display: inline-block;
+}
 
 /* ========= Course Reader 1 ========= */
+
+/* Congrats Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  width: min(520px, 92vw);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+.modal-card img {
+  max-width: 160px;
+  height: auto;
+  display: block;
+  margin: 0.5rem auto;
+}
+.modal-card .row {
+  gap: 0.5rem;
+  justify-content: center;
+}

@@ -172,25 +172,26 @@ const PLACEHOLDER_IMG =
 const short = (s = "", n = 140) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ---------- Utils Helper 1----------
-function escapeHtml(s='') {
+function escapeHtml(s = "") {
   return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 // Parse a plain-text post body with simple media markers into HTML
-function parseBodyToHTML(body='') {
-  const lines = body.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+function parseBodyToHTML(body = "") {
+  const lines = body
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const parts = [];
 
   for (const line of lines) {
     // [img] https://...
     let m = line.match(/^\[img\]\s+(https?:\/\/\S+)$/i);
     if (m) {
-      parts.push(
-        `<div class="post-media"><img src="${m[1]}" alt="" /></div>`
-      );
+      parts.push(`<div class="post-media"><img src="${m[1]}" alt="" /></div>`);
       continue;
     }
     // [video] https://...
@@ -214,7 +215,7 @@ function parseBodyToHTML(body='') {
     parts.push(`<p>${escapeHtml(line)}</p>`);
   }
 
-  return parts.join('\n');
+  return parts.join("\n");
 }
 
 const applyTheme = (v) =>
@@ -332,6 +333,20 @@ if (!window.__APP_ROUTER__) {
   window.addEventListener("hashchange", window.route);
   window.addEventListener("load", window.route);
 }
+
+function removeTopbarMenus() {
+  const sel = [
+    'a[href="#/certificates"]',
+    'a[data-nav="certs"]',
+    'a[href="#/transcripts"]',
+    'a[data-nav="transcripts"]',
+    'a[href="#/settings"]',
+    'a[data-nav="settings"]',
+  ];
+  document.querySelectorAll(sel.join(",")).forEach((el) => el.remove());
+}
+// app စတင်တဲ့နေရာ/route() ပြီးသွားတဲ့နေရာ တစ်ခုခုမှာ ခေါ်
+removeTopbarMenus();
 
 function defaultsProfile(d = {}) {
   return {
@@ -616,34 +631,36 @@ document
 const PLACEHOLDER_MEDIA = "/img/placeholder.png"; // already configured
 
 function canRenderTrustedHtml() {
-  return (window.currentRole === 'admin' || window.currentRole === 'ta');
+  return window.currentRole === "admin" || window.currentRole === "ta";
 }
 
 function postCardHTML(p) {
-  const ts    = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
+  const ts = p.ts?.toDate ? p.ts.toDate().toLocaleString() : "";
   const title = p.title || "";
-  const body  = p.body  || "";
-  const type  = (p.type || 'text').toLowerCase();
+  const body = p.body || "";
+  const type = (p.type || "text").toLowerCase();
 
   // Optional top media (from mediaUrl/mediaType)
   let mediaBlock = "";
   if (p.mediaUrl) {
-    const mt = (p.mediaType || '').toLowerCase();
-    if (mt.startsWith('image/')) {
+    const mt = (p.mediaType || "").toLowerCase();
+    if (mt.startsWith("image/")) {
       mediaBlock = `<img class="cover" src="${p.mediaUrl}" alt="">`;
-    } else if (mt.startsWith('video/')) {
+    } else if (mt.startsWith("video/")) {
       mediaBlock = `<video class="cover" controls preload="metadata" playsinline>
-        <source src="${p.mediaUrl}" type="${mt || 'video/mp4'}" />
+        <source src="${p.mediaUrl}" type="${mt || "video/mp4"}" />
       </video>`;
-    } else if (mt.startsWith('audio/')) {
+    } else if (mt.startsWith("audio/")) {
       mediaBlock = `<audio controls preload="metadata" style="width:100%">
-        <source src="${p.mediaUrl}" type="${mt || 'audio/mpeg'}" />
+        <source src="${p.mediaUrl}" type="${mt || "audio/mpeg"}" />
       </audio>`;
     }
   }
 
   // Body parsed with markers → HTML
-  const bodyHTML = body ? `<div class="post-body">${parseBodyToHTML(body)}</div>` : "";
+  const bodyHTML = body
+    ? `<div class="post-body">${parseBodyToHTML(body)}</div>`
+    : "";
 
   return `
     <article class="card post" data-id="${p.id}">
@@ -1146,12 +1163,12 @@ function ensureCourseDetailsDialog() {
 // ⬇️ REPLACE your existing openCourseDetails() with this
 async function openCourseDetails(courseId) {
   ensureCourseDetailsDialog();
-  const dlg    = document.getElementById("courseDetails");
-  const title  = dlg.querySelector("#cdTitle");
-  const cover  = dlg.querySelector("#cdCover");
-  const body   = dlg.querySelector("#cdBody");
-  const chips  = dlg.querySelector("#cdMetaChips");
-  const btnOpen= dlg.querySelector("#cdOpenPage");
+  const dlg = document.getElementById("courseDetails");
+  const title = dlg.querySelector("#cdTitle");
+  const cover = dlg.querySelector("#cdCover");
+  const body = dlg.querySelector("#cdBody");
+  const chips = dlg.querySelector("#cdMetaChips");
+  const btnOpen = dlg.querySelector("#cdOpenPage");
   const btnEnr = dlg.querySelector("#cdEnroll");
 
   // fetch course
@@ -1179,25 +1196,32 @@ async function openCourseDetails(courseId) {
   // cover (fallback-safe)
   const FALLBACK = "/img/placeholder.png";
   cover.src = (c.img || "").trim() || FALLBACK;
-  cover.onerror = () => { cover.onerror = null; cover.src = FALLBACK; };
+  cover.onerror = () => {
+    cover.onerror = null;
+    cover.src = FALLBACK;
+  };
 
   // normalize benefits (array or comma-separated string)
   const benefits = Array.isArray(c.benefits)
     ? c.benefits.filter(Boolean).map(String)
     : String(c.benefits || "")
         .split(",")
-        .map(x => x.trim())
+        .map((x) => x.trim())
         .filter(Boolean);
 
   // description + full benefits list
-  const summaryHtml = c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : "";
-  const longDescHtml = c.description ? `<p>${escapeHtml(c.description)}</p>` : "";
+  const summaryHtml = c.summary
+    ? `<p class="desc">${escapeHtml(c.summary)}</p>`
+    : "";
+  const longDescHtml = c.description
+    ? `<p>${escapeHtml(c.description)}</p>`
+    : "";
 
   const benefitsHtml = benefits.length
     ? `
       <h4 style="margin:.75rem 0 .25rem">Benefits</h4>
       <ul class="benefits">
-        ${benefits.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
+        ${benefits.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}
       </ul>`
     : "";
 
@@ -1212,7 +1236,9 @@ async function openCourseDetails(courseId) {
 
   // meta chips
   const lvlIdx = Number(c.level ?? 0);
-  const lvlTxt = (["Beginner", "Intermediate", "Advanced", "Pro"][lvlIdx] ?? `Level ${lvlIdx}`);
+  const lvlTxt =
+    ["Beginner", "Intermediate", "Advanced", "Pro"][lvlIdx] ??
+    `Level ${lvlIdx}`;
   const priceN = Number(c.price || 0);
   const isFree = !priceN || priceN <= 0;
   const priceStr = isFree ? "Free" : `$${priceN.toFixed(2)}`;
@@ -1220,7 +1246,9 @@ async function openCourseDetails(courseId) {
   chips.innerHTML = `
     <span class="badge">${lvlTxt}</span>
     <span class="badge">Credits: ${c.credits ?? 0}</span>
-    <span class="badge ${isFree ? "price-free" : "price-paid"}">${priceStr}</span>
+    <span class="badge ${
+      isFree ? "price-free" : "price-paid"
+    }">${priceStr}</span>
   `;
 
   // actions
@@ -1777,13 +1805,16 @@ async function cleanupOrphanEnrollments(uid) {
 // Make them global because your buttons use inline onclick=""
 window.renderCertificate = async function (courseId) {
   try {
-    if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+    if (!auth.currentUser) {
+      authDlg?.showModal?.();
+      return;
+    }
     const uid = auth.currentUser.uid;
 
     // user display name
     let student = auth.currentUser.email || uid;
     try {
-      const us = await getDoc(doc(db, 'users', uid));
+      const us = await getDoc(doc(db, "users", uid));
       if (us.exists()) {
         const u = us.data();
         student = u.displayName || u.name || student;
@@ -1792,23 +1823,26 @@ window.renderCertificate = async function (courseId) {
 
     // course info
     let courseTitle = courseId;
-    let credits = '';
+    let credits = "";
     try {
-      const cs = await getDoc(doc(db, 'courses', courseId));
+      const cs = await getDoc(doc(db, "courses", courseId));
       if (cs.exists()) {
         const c = cs.data();
         courseTitle = c.title || courseTitle;
-        credits = (c.credits ?? '') ? ` · ${c.credits} credits` : '';
+        credits = c.credits ?? "" ? ` · ${c.credits} credits` : "";
       }
     } catch (_) {}
 
     // jsPDF
     const { jsPDF } = window.jspdf || {};
-    if (!jsPDF) { alert('PDF library not loaded'); return; }
+    if (!jsPDF) {
+      alert("PDF library not loaded");
+      return;
+    }
 
-    const pdf = new jsPDF('l','pt','a4');
+    const pdf = new jsPDF("l", "pt", "a4");
     pdf.setFontSize(28);
-    pdf.text('Certificate of Completion', 60, 90);
+    pdf.text("Certificate of Completion", 60, 90);
     pdf.setFontSize(18);
     pdf.text(`This certifies that`, 60, 140);
     pdf.setFontSize(26);
@@ -1824,100 +1858,124 @@ window.renderCertificate = async function (courseId) {
 
     pdf.save(`certificate-${courseId}.pdf`);
   } catch (e) {
-    console.error('[renderCertificate]', e);
-    alert('Failed to generate certificate.');
+    console.error("[renderCertificate]", e);
+    alert("Failed to generate certificate.");
   }
 };
 
 window.renderTranscript = async function () {
   try {
-    if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+    if (!auth.currentUser) {
+      authDlg?.showModal?.();
+      return;
+    }
     const uid = auth.currentUser.uid;
 
     // fetch enrollments
-    const snap = await getDocs(collection(db, 'users', uid, 'enrollments'));
+    const snap = await getDocs(collection(db, "users", uid, "enrollments"));
     const rows = [];
     for (const d of snap.docs) {
       const e = d.data();
       let title = e.courseTitle || e.courseId;
-      let credits = e.credits ?? '';
+      let credits = e.credits ?? "";
       // try fill from course doc (title/credits)
       try {
-        const cs = await getDoc(doc(db, 'courses', e.courseId));
+        const cs = await getDoc(doc(db, "courses", e.courseId));
         if (cs.exists()) {
           const c = cs.data();
           title = c.title || title;
-          if (credits === '' && c.credits != null) credits = c.credits;
+          if (credits === "" && c.credits != null) credits = c.credits;
         }
       } catch (_) {}
       rows.push({
         title,
         courseId: e.courseId,
         credits,
-        grade: e.grade ?? '',
-        status: e.status ?? '',
-        ts: e.ts?.toDate ? e.ts.toDate().toLocaleDateString() : ''
+        grade: e.grade ?? "",
+        status: e.status ?? "",
+        ts: e.ts?.toDate ? e.ts.toDate().toLocaleDateString() : "",
       });
     }
 
     const { jsPDF } = window.jspdf || {};
-    if (!jsPDF) { alert('PDF library not loaded'); return; }
+    if (!jsPDF) {
+      alert("PDF library not loaded");
+      return;
+    }
 
-    const pdf = new jsPDF('p','pt','a4');
+    const pdf = new jsPDF("p", "pt", "a4");
     let y = 70;
     pdf.setFontSize(22);
-    pdf.text('Transcript', 60, y); y += 30;
+    pdf.text("Transcript", 60, y);
+    y += 30;
 
     pdf.setFontSize(12);
-    pdf.text(`Student: ${auth.currentUser.email || uid}`, 60, y); y += 20;
-    pdf.text(`Generated: ${new Date().toLocaleString()}`, 60, y); y += 30;
+    pdf.text(`Student: ${auth.currentUser.email || uid}`, 60, y);
+    y += 20;
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, 60, y);
+    y += 30;
 
     // table header
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Course', 60, y);
-    pdf.text('ID', 300, y);
-    pdf.text('Credits', 420, y);
-    pdf.text('Grade', 490, y);
-    pdf.text('Status', 550, y);
-    pdf.text('Date', 610, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(undefined, "bold");
+    pdf.text("Course", 60, y);
+    pdf.text("ID", 300, y);
+    pdf.text("Credits", 420, y);
+    pdf.text("Grade", 490, y);
+    pdf.text("Status", 550, y);
+    pdf.text("Date", 610, y);
+    pdf.setFont(undefined, "normal");
     y += 16;
 
     for (const r of rows) {
-      pdf.text(String(r.title || ''), 60, y, { maxWidth: 220 });
-      pdf.text(String(r.courseId || ''), 300, y, { maxWidth: 100 });
-      pdf.text(String(r.credits || ''), 420, y);
-      pdf.text(String(r.grade || ''), 490, y);
-      pdf.text(String(r.status || ''), 550, y);
-      pdf.text(String(r.ts || ''), 610, y);
+      pdf.text(String(r.title || ""), 60, y, { maxWidth: 220 });
+      pdf.text(String(r.courseId || ""), 300, y, { maxWidth: 100 });
+      pdf.text(String(r.credits || ""), 420, y);
+      pdf.text(String(r.grade || ""), 490, y);
+      pdf.text(String(r.status || ""), 550, y);
+      pdf.text(String(r.ts || ""), 610, y);
 
       y += 18;
-      if (y > 780) { pdf.addPage(); y = 60; }
+      if (y > 780) {
+        pdf.addPage();
+        y = 60;
+      }
     }
 
-    pdf.save('transcript.pdf');
+    pdf.save("transcript.pdf");
   } catch (e) {
-    console.error('[renderTranscript]', e);
-    alert('Failed to generate transcript.');
+    console.error("[renderTranscript]", e);
+    alert("Failed to generate transcript.");
   }
 };
 
 // --- PDF helpers ---
 function genCertNo(uid, courseId) {
   const d = new Date();
-  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  const last4 = (uid || 'user').slice(-4).replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
-  const c4    = (courseId || 'COURSE').slice(0,4).replace(/[^a-zA-Z0-9]/g,'').toUpperCase();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}${String(d.getDate()).padStart(2, "0")}`;
+  const last4 = (uid || "user")
+    .slice(-4)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+  const c4 = (courseId || "COURSE")
+    .slice(0, 4)
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
   return `${ymd}-${c4}-${last4}`;
 }
-
 
 // Same-origin images are easiest (no CORS). If you must load cross-origin,
 // keep the server CORS-allow or serve from your domain.
 async function imgToDataURL(url) {
-  const r = await fetch(url, { cache: 'no-store' });
+  const r = await fetch(url, { cache: "no-store" });
   const b = await r.blob();
-  return await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+  return await new Promise((res) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.readAsDataURL(b);
+  });
 }
 
 // ---------- Dashboard ----------
@@ -1957,6 +2015,34 @@ async function renderDashboard() {
     </section>
   `;
 
+  // Dashboard main HTML ပြီးသွားတဲ့နောက်တန်းမှာ ထည့်
+  const achHtml = `
+    <section class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0">Achievements</h3>
+        <span class="muted">View your documents anytime</span>
+      </div>
+      <div class="row" style="gap:.5rem;margin-top:.5rem">
+        <button class="btn" id="btnDashCert">Certificate</button>
+        <button class="btn ghost" id="btnDashTranscript">Transcript</button>
+      </div>
+    </section>
+  `;
+  document.getElementById("app")?.insertAdjacentHTML("beforeend", achHtml);
+
+  document.getElementById("btnDashCert")?.addEventListener("click", () => {
+    // per-course သို့မဟုတ် latest course id ကိုသုံး – သင်က course picker ရှိပြီးသားဆို အဲဒါသုံးပါ
+    const cid =
+      /* pick current courseId here */ window.lastViewedCourseId ||
+      "pali-beg-1";
+    renderCertificate(cid);
+  });
+  document
+    .getElementById("btnDashTranscript")
+    ?.addEventListener("click", () => {
+      renderTranscript(auth.currentUser?.uid);
+    });
+
   /* ---------- My Courses ---------- */
   const uid = auth.currentUser.uid;
   try {
@@ -1965,7 +2051,10 @@ async function renderDashboard() {
     const my = document.getElementById("myCourses");
     if (my) my.innerHTML = `<div class="muted">Loading…</div>`;
 
-    const eq = query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"));
+    const eq = query(
+      collection(db, "users", uid, "enrollments"),
+      orderBy("ts", "desc")
+    );
     onSnapshot(eq, async (snap) => {
       if (snap.metadata.fromCache && navigator.onLine) return;
       if (!my) return;
@@ -1980,9 +2069,13 @@ async function renderDashboard() {
         const e = d.data();
         const cRef = doc(db, "courses", e.courseId);
         const cs = await getDoc(cRef);
-        const c  = cs.exists() ? { id: cs.id, ...cs.data() } : { id: e.courseId, title: e.courseTitle };
+        const c = cs.exists()
+          ? { id: cs.id, ...cs.data() }
+          : { id: e.courseId, title: e.courseTitle };
 
-        my.insertAdjacentHTML("beforeend", `
+        my.insertAdjacentHTML(
+          "beforeend",
+          `
           <article class="course-card" data-cid="${c.id}">
             <img class="cover" src="${c.img || PLACEHOLDER_IMG}"
                  onerror="this.onerror=null; this.src='${PLACEHOLDER_IMG}'" />
@@ -1994,12 +2087,17 @@ async function renderDashboard() {
                 <li>Credits: ${c.credits ?? 0}</li>
               </ul>
               <div class="footer two-btn-footer">
-                <button class="btn btn-open"     data-action="open"     data-id="${c.id}">Open</button>
-                <button class="btn btn-unenroll" data-action="unenroll" data-id="${c.id}">Unenroll</button>
+                <button class="btn btn-open"     data-action="open"     data-id="${
+                  c.id
+                }">Open</button>
+                <button class="btn btn-unenroll" data-action="unenroll" data-id="${
+                  c.id
+                }">Unenroll</button>
               </div>
             </div>
           </article>
-        `);
+        `
+        );
       }
 
       if (!my.__wired) {
@@ -2014,7 +2112,9 @@ async function renderDashboard() {
           } else if (act === "unenroll") {
             const ok = confirm("Remove this course from your dashboard?");
             if (!ok) return;
-            try { await deleteDoc(doc(db, "users", uid, "enrollments", cid)); } catch(_) {}
+            try {
+              await deleteDoc(doc(db, "users", uid, "enrollments", cid));
+            } catch (_) {}
             const base = collection(db, "users", uid, "enrollments");
             const qs = await getDocs(query(base, where("courseId", "==", cid)));
             qs.forEach((d) => deleteDoc(d.ref));
@@ -2028,7 +2128,9 @@ async function renderDashboard() {
 
   /* ---------- Announcements (public) ---------- */
   try {
-    const as = await getDocs(query(collection(db, "announcements"), orderBy("ts", "desc")));
+    const as = await getDocs(
+      query(collection(db, "announcements"), orderBy("ts", "desc"))
+    );
     const annBox = document.getElementById("annList");
     if (annBox) {
       if (as.empty) {
@@ -2052,14 +2154,18 @@ async function renderDashboard() {
   } catch (e) {
     console.error("[dashboard] announcements:", e);
     const el = document.getElementById("annList");
-    if (el) el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
+    if (el)
+      el.innerHTML = `<div class="card error">Announcements unavailable.</div>`;
   }
 
   /* ---------- Messages (to me + broadcast '*') ---------- */
   try {
     const mineQ = query(collection(db, "messages"), where("to", "==", uid));
-    const allQ  = query(collection(db, "messages"), where("to", "==", "*"));
-    const [mineSnap, broadSnap] = await Promise.all([ getDocs(mineQ), getDocs(allQ) ]);
+    const allQ = query(collection(db, "messages"), where("to", "==", "*"));
+    const [mineSnap, broadSnap] = await Promise.all([
+      getDocs(mineQ),
+      getDocs(allQ),
+    ]);
 
     const items = [];
     mineSnap.forEach((d) => items.push({ id: d.id, ...d.data() }));
@@ -2073,20 +2179,25 @@ async function renderDashboard() {
     const msgBox = document.getElementById("msgList");
     if (msgBox) {
       msgBox.innerHTML = items.length
-        ? items.map((m) => `
+        ? items
+            .map(
+              (m) => `
             <article class="card">
               <p class="muted" style="margin:0 0 .25rem">
                 ${m.ts?.toDate ? m.ts.toDate().toLocaleString() : ""}
               </p>
               <p>${escapeHtml(m.text || "")}</p>
             </article>
-          `).join("")
+          `
+            )
+            .join("")
         : `<div class="card muted">No messages.</div>`;
     }
   } catch (e) {
     console.error("[dashboard] messages:", e);
     const box = document.getElementById("msgList");
-    if (box) box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
+    if (box)
+      box.innerHTML = `<div class="card error">Messages unavailable.</div>`;
   }
 }
 
@@ -2258,7 +2369,7 @@ async function renderAdmin() {
 
   // Tabs (null-safe)
   const tabBtns = app.querySelectorAll(".tab");
-  const paneKeys = ["courses", "posts", "ann", "msg", "import",'certs'];
+  const paneKeys = ["courses", "posts", "ann", "msg", "import", "certs"];
 
   function showTab(k) {
     // buttons
@@ -2281,84 +2392,118 @@ async function renderAdmin() {
 
   // load course list
   {
-    const sel = document.getElementById('certCourse');
+    const sel = document.getElementById("certCourse");
     if (sel) {
       sel.innerHTML = `<option value="">Loading…</option>`;
-      const cs = await getDocs(query(collection(db,'courses'), orderBy('title','asc')));
+      const cs = await getDocs(
+        query(collection(db, "courses"), orderBy("title", "asc"))
+      );
       const opts = [];
-      cs.forEach(d => {
-        const c = { id:d.id, ...d.data() };
-        opts.push(`<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`);
+      cs.forEach((d) => {
+        const c = { id: d.id, ...d.data() };
+        opts.push(
+          `<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`
+        );
       });
-      sel.innerHTML = opts.join('') || `<option value="">(no courses)</option>`;
+      sel.innerHTML = opts.join("") || `<option value="">(no courses)</option>`;
     }
 
-    const pickUid = () => (document.getElementById('certUid')?.value || auth.currentUser?.uid || '').trim();
-    const pickCid = () => (document.getElementById('certCourse')?.value || '').trim();
+    const pickUid = () =>
+      (
+        document.getElementById("certUid")?.value ||
+        auth.currentUser?.uid ||
+        ""
+      ).trim();
+    const pickCid = () =>
+      (document.getElementById("certCourse")?.value || "").trim();
 
-    document.getElementById('btnViewCert')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return;
-      const uid = pickUid(); const cid = pickCid();
-      if (!cid) return alert('Choose a course');
-      await renderCertificate(cid, uid, 'view');
-    });
-    document.getElementById('btnDlCert')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return;
-      const uid = pickUid(); const cid = pickCid();
-      if (!cid) return alert('Choose a course');
-      await renderCertificate(cid, uid, 'download');
-    });
-    document.getElementById('btnViewTranscript')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return;
-      await renderTranscript(pickUid(), 'view');
-    });
-    document.getElementById('btnDlTranscript')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return;
-      await renderTranscript(pickUid(), 'download');
-    });
+    document
+      .getElementById("btnViewCert")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return;
+        const uid = pickUid();
+        const cid = pickCid();
+        if (!cid) return alert("Choose a course");
+        await renderCertificate(cid, uid, "view");
+      });
+    document
+      .getElementById("btnDlCert")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return;
+        const uid = pickUid();
+        const cid = pickCid();
+        if (!cid) return alert("Choose a course");
+        await renderCertificate(cid, uid, "download");
+      });
+    document
+      .getElementById("btnViewTranscript")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return;
+        await renderTranscript(pickUid(), "view");
+      });
+    document
+      .getElementById("btnDlTranscript")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return;
+        await renderTranscript(pickUid(), "download");
+      });
   }
 
   /* ---------- CERTS tab (admin preview) ---------- */
   try {
     // populate course list
-    const sel = document.getElementById('certCourse');
+    const sel = document.getElementById("certCourse");
     if (sel) {
       sel.innerHTML = `<option value="">Loading…</option>`;
-      const cs = await getDocs(query(collection(db,'courses'), orderBy('title','asc')));
+      const cs = await getDocs(
+        query(collection(db, "courses"), orderBy("title", "asc"))
+      );
       const opts = [];
-      cs.forEach(d => {
-        const c = { id:d.id, ...d.data() };
-        opts.push(`<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`);
+      cs.forEach((d) => {
+        const c = { id: d.id, ...d.data() };
+        opts.push(
+          `<option value="${c.id}">${escapeHtml(c.title || c.id)}</option>`
+        );
       });
-      sel.innerHTML = opts.join('') || `<option value="">(no courses)</option>`;
+      sel.innerHTML = opts.join("") || `<option value="">(no courses)</option>`;
     }
 
     // wire buttons
-    document.getElementById('btnViewCert')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return; // guard
-      const uid = (document.getElementById('certUid')?.value || '').trim() || auth.currentUser?.uid || '';
-      const cid = document.getElementById('certCourse')?.value || '';
-      if (!cid) return alert('Choose a course');
-      try {
-        await renderCertificate?.(cid, uid); // global function
-      } catch (e) {
-        console.error('[cert-preview]', e);
-        alert('Failed to render certificate.');
-      }
-    });
+    document
+      .getElementById("btnViewCert")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return; // guard
+        const uid =
+          (document.getElementById("certUid")?.value || "").trim() ||
+          auth.currentUser?.uid ||
+          "";
+        const cid = document.getElementById("certCourse")?.value || "";
+        if (!cid) return alert("Choose a course");
+        try {
+          await renderCertificate?.(cid, uid); // global function
+        } catch (e) {
+          console.error("[cert-preview]", e);
+          alert("Failed to render certificate.");
+        }
+      });
 
-    document.getElementById('btnViewTranscript')?.addEventListener('click', async ()=>{
-      if (!requireStaff()) return; // guard
-      const uid = (document.getElementById('certUid')?.value || '').trim() || auth.currentUser?.uid || '';
-      try {
-        await renderTranscript?.(uid); // global function
-      } catch (e) {
-        console.error('[transcript-preview]', e);
-        alert('Failed to render transcript.');
-      }
-    });
-  } catch(e) {
-    console.warn('[admin certs]', e);
+    document
+      .getElementById("btnViewTranscript")
+      ?.addEventListener("click", async () => {
+        if (!requireStaff()) return; // guard
+        const uid =
+          (document.getElementById("certUid")?.value || "").trim() ||
+          auth.currentUser?.uid ||
+          "";
+        try {
+          await renderTranscript?.(uid); // global function
+        } catch (e) {
+          console.error("[transcript-preview]", e);
+          alert("Failed to render transcript.");
+        }
+      });
+  } catch (e) {
+    console.warn("[admin certs]", e);
   }
 
   // Inside renderAdmin(), after HTML is set:
@@ -2497,8 +2642,9 @@ async function renderAdmin() {
       : c.benefits || "";
 
     // ✅ NEW: final exam settings
-    formCourse.passPct.value    = (typeof c.passPct === "number" ? c.passPct : 65);
-    formCourse.finalLimit.value = (typeof c.finalLimit === "number" ? c.finalLimit : 12);
+    formCourse.passPct.value = typeof c.passPct === "number" ? c.passPct : 65;
+    formCourse.finalLimit.value =
+      typeof c.finalLimit === "number" ? c.finalLimit : 12;
   }
 
   document
@@ -2511,16 +2657,16 @@ async function renderAdmin() {
     const id = f.id.value || crypto.randomUUID();
 
     const data = {
-      title:   f.title.value.trim(),
-      level:   Number(f.level.value || 0),
+      title: f.title.value.trim(),
+      level: Number(f.level.value || 0),
       credits: Number(f.credits.value || 0),
       summary: f.summary.value.trim(),
-      price:   Number(f.price.value || 0),
-      img:     f.img.value.trim(),
+      price: Number(f.price.value || 0),
+      img: f.img.value.trim(),
       benefits: normBenefits(f.benefits.value),
 
       // ✅ NEW: final exam settings
-      passPct:    Number(f.passPct.value || 65),
+      passPct: Number(f.passPct.value || 65),
       finalLimit: Number(f.finalLimit.value || 12),
 
       ts: serverTimestamp(),
@@ -2841,16 +2987,17 @@ async function renderAdmin() {
       query(collection(db, "messages"), orderBy("ts", "desc"))
     );
     const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
 
     if (!rows.length) {
       box.innerHTML = `<div class="card muted">No messages.</div>`;
       return;
     }
 
-    box.innerHTML = rows.map(m => {
-      const when = m.ts?.toDate ? m.ts.toDate().toLocaleString() : "";
-      return `
+    box.innerHTML = rows
+      .map((m) => {
+        const when = m.ts?.toDate ? m.ts.toDate().toLocaleString() : "";
+        return `
         <div class="card" data-id="${m.id}">
           <div class="row" style="justify-content:space-between;align-items:center">
             <div>
@@ -2859,14 +3006,17 @@ async function renderAdmin() {
               <p>${escapeHtml(m.text || "")}</p>
             </div>
             <div>
-              <button class="btn small danger" data-del="${m.id}">Delete</button>
+              <button class="btn small danger" data-del="${
+                m.id
+              }">Delete</button>
             </div>
           </div>
         </div>`;
-    }).join("");
+      })
+      .join("");
 
     // delegate delete
-    box.querySelectorAll("[data-del]").forEach(btn => {
+    box.querySelectorAll("[data-del]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.del;
         if (!confirm("Delete this message?")) return;
@@ -2880,14 +3030,14 @@ async function renderAdmin() {
 }
 
 /* ========= YouTube helper ========= */
-function getYouTubeId(url='') {
+function getYouTubeId(url = "") {
   try {
     const u = new URL(url);
-    if (u.hostname.includes('youtu.be')) {
+    if (u.hostname.includes("youtu.be")) {
       return u.pathname.slice(1);
     }
-    if (u.hostname.includes('youtube.com')) {
-      if (u.searchParams.get('v')) return u.searchParams.get('v');
+    if (u.hostname.includes("youtube.com")) {
+      if (u.searchParams.get("v")) return u.searchParams.get("v");
       // /embed/{id}
       const m = u.pathname.match(/\/embed\/([A-Za-z0-9_-]{6,})/);
       if (m) return m[1];
@@ -2896,61 +3046,69 @@ function getYouTubeId(url='') {
   return null;
 }
 
-/* Helper 3*/
-function ensureFinalInjected(chapters){
-      if (!Array.isArray(chapters) || !chapters.length) return;
-      const last = chapters[chapters.length - 1];
-      last.lessons ||= [];
-      if (!last.lessons.some(l => l.id === "__final__")) {
-        last.lessons.push({ id:"__final__", order:9999, title:"Final Exam", isFinal:true });
-      }
-    }
-
-    /* Helper 4*/
-    function renderSidebarAndFlatList(courseId, chapters, activeLessonId){
-      const sb = document.getElementById("crsSidebar");
-      const flat = [];
-      sb.innerHTML = chapters.map(ch => {
-        const items = (ch.lessons || []).map(ls => {
-          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || '' });
-          const active = (activeLessonId && ls.id === activeLessonId) ? ' class="active"' : '';
-          return `<li${active}><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a></li>`;
-        }).join("");
-        return `
+/* Helper 4*/
+function renderSidebarAndFlatList(courseId, chapters, activeLessonId) {
+  const sb = document.getElementById("crsSidebar");
+  const flat = [];
+  sb.innerHTML = chapters
+    .map((ch) => {
+      const items = (ch.lessons || [])
+        .map((ls) => {
+          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
+          const active =
+            activeLessonId && ls.id === activeLessonId ? ' class="active"' : "";
+          return `<li${active}><a href="#/courses/${courseId}/lesson/${
+            ls.id
+          }">${ls.title || "Lesson"}</a></li>`;
+        })
+        .join("");
+      return `
           <details open class="blk">
-            <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
-            <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
+            <summary><strong>${ch.order ?? ""} ${
+        ch.title || ""
+      }</strong></summary>
+            <ol class="list clean">${
+              items || '<li class="muted">No lessons</li>'
+            }</ol>
           </details>
         `;
-      }).join("");
-      return flat;
-    }
+    })
+    .join("");
+  return flat;
+}
 
-  // ===== Helper 5: show Certificate & Transcript buttons =====
+// ===== Helper 5: show Certificate & Transcript buttons =====
 async function showCertButtonsIfEligible(courseId, enrRef) {
-  if (!enrRef) return;
-
   try {
-    const es = await getDoc(enrRef);
-    const ok = es.exists() && !!es.data().finalPassed;
-    const box = document.getElementById('certBtns');
+    if (!enrRef) return;
+    const snap = await getDoc(enrRef);
+    const e = snap.exists() ? snap.data() : {};
+    const prog = e.progress || {};
+    const total = Object.keys(prog).length;
+    const done = Object.values(prog).filter(Boolean).length;
+    const ok = total > 0 && done >= total;
+
+    const box = document.getElementById("certBtns");
     if (!box) return;
 
-    box.innerHTML = ok
-      ? `<button class="btn" id="btnViewCert">Certificate</button>
-         <button class="btn ghost" id="btnViewTranscript">Transcript</button>`
-      : ``;
-
     if (ok) {
-      document.getElementById('btnViewCert')?.addEventListener('click', () => {
-        renderCertificate(courseId, auth.currentUser?.uid, 'view');
-      });
-      document.getElementById('btnViewTranscript')?.addEventListener('click', () => {
-        renderTranscript(auth.currentUser?.uid, 'view');
-      });
+      box.innerHTML = `
+        <button class="btn small" id="btnViewCert">Certificate</button>
+        <button class="btn small ghost" id="btnViewTranscript">Transcript</button>
+      `;
+      document
+        .getElementById("btnViewCert")
+        ?.addEventListener("click", () => renderCertificate(courseId));
+      document
+        .getElementById("btnViewTranscript")
+        ?.addEventListener("click", () =>
+          renderTranscript(auth.currentUser?.uid)
+        );
+    } else {
+      box.innerHTML = "";
     }
-  } catch (err) {
-    console.warn('[showCertButtonsIfEligible]', err);
+  } catch (e) {
+    console.warn("[certBtns]", e);
   }
 }
 
@@ -2974,7 +3132,9 @@ async function renderCourseDetail(courseId, lessonId = null) {
   // --- Course title ---
   try {
     const s = await getDoc(doc(db, "courses", courseId));
-    if (s.exists()) document.getElementById("crsTitle").textContent = s.data().title || "Course";
+    if (s.exists())
+      document.getElementById("crsTitle").textContent =
+        s.data().title || "Course";
   } catch {}
 
   // --- Load tree first (NEEDED for counts) ---
@@ -2995,45 +3155,56 @@ async function renderCourseDetail(courseId, lessonId = null) {
   try {
     if (enrRef) {
       const es = await getDoc(enrRef);
-      progress = es.exists() ? (es.data().progress || {}) : {};
+      progress = es.exists() ? es.data().progress || {} : {};
     }
   } catch {}
 
   // --- compute counts for progress bar ---
-  const allLessons = chapters.flatMap(ch => (ch.lessons || []).filter(ls => ls.id !== "__final__"));
+  const allLessons = chapters.flatMap((ch) =>
+    (ch.lessons || []).filter((ls) => ls.id !== "__final__")
+  );
   const totalCount = allLessons.length;
-  const doneCount  = Object.values(progress).filter(Boolean).length;
-
-  // ✅ completed all normal lessons? -> inject Final
-    if (totalCount > 0 && doneCount >= totalCount) {
-      ensureFinalInjected(chapters);
-    }
+  const doneCount = Object.values(progress).filter(Boolean).length;
 
   // --- Final Exam only when completed all normal lessons ---
   const canShowFinal = totalCount > 0 && doneCount >= totalCount;
   if (canShowFinal && chapters.length) {
     const last = chapters[chapters.length - 1];
-    if (!(last.lessons || []).some(l => l.id === "__final__")) {
-      (last.lessons ||= []).push({ id: "__final__", order: 9999, title: "Final Exam", isFinal: true });
+    if (!(last.lessons || []).some((l) => l.id === "__final__")) {
+      (last.lessons ||= []).push({
+        id: "__final__",
+        order: 9999,
+        title: "Final Exam",
+        isFinal: true,
+      });
     }
   }
 
   // --- Sidebar render ---
   // const flat = [];
   const flat = renderSidebarAndFlatList(courseId, chapters, lessonId);
-  sb.innerHTML = chapters.map(ch => {
-    const items = (ch.lessons || []).map(ls => {
-      flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
-      const active = (lessonId && ls.id === lessonId) ? ' class="active"' : '';
-      return `<li${active}><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a></li>`;
-    }).join("");
-    return `
+  sb.innerHTML = chapters
+    .map((ch) => {
+      const items = (ch.lessons || [])
+        .map((ls) => {
+          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
+          const active =
+            lessonId && ls.id === lessonId ? ' class="active"' : "";
+          return `<li${active}><a href="#/courses/${courseId}/lesson/${
+            ls.id
+          }">${ls.title || "Lesson"}</a></li>`;
+        })
+        .join("");
+      return `
       <details open class="blk">
-        <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
-        <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
+        <summary><strong>${ch.order ?? ""} ${ch.title || ""}</strong></summary>
+        <ol class="list clean">${
+          items || '<li class="muted">No lessons</li>'
+        }</ol>
       </details>
     `;
-  }).join("");
+    })
+    .join("");
 
   // default select first lesson
   if (!lessonId && flat.length) {
@@ -3042,69 +3213,121 @@ async function renderCourseDetail(courseId, lessonId = null) {
   }
 
   // idx + prev/next
-  const idx  = flat.findIndex(x => x.lsId === lessonId);
-  if (idx < 0) { main.innerHTML = `<div class="card error">Lesson not found.</div>`; return; }
+  const idx = flat.findIndex((x) => x.lsId === lessonId);
+  if (idx < 0) {
+    main.innerHTML = `<div class="card error">Lesson not found.</div>`;
+    return;
+  }
   const prev = idx > 0 ? flat[idx - 1] : null;
   const next = idx < flat.length - 1 ? flat[idx + 1] : null;
 
   if (!next) {
-    const existsFinal = chapters[chapters.length-1]?.lessons?.some(l => l.id === "__final__");
+    const existsFinal = chapters[chapters.length - 1]?.lessons?.some(
+      (l) => l.id === "__final__"
+    );
     if (existsFinal) next = { lsId: "__final__" };
-  }
-  
-  // --- Final Exam special branch ---
-  if (lessonId === "__final__") {
-    try {
-      const quiz = await buildFinalExam(courseId); // will read course config (finalLimit/passPct)
-      return renderFinalExamUI(courseId, quiz, { prev, next, progress, enrRef, totalCount });
-    } catch (e) {
-      console.error('[final-exam]', e);
-      main.innerHTML = `<div class="card error">Failed to build Final Exam.</div>`;
-      return;
-    }
   }
 
   // --- Normal lesson flow ---
   try {
     // load quiz (optional)
-    let quiz = null, questions = [];
+    let quiz = null,
+      questions = [];
     const chId = flat[idx].chId;
 
-    const lessonRef = doc(db, "courses", courseId, "chapters", chId, "lessons", lessonId);
+    const lessonRef = doc(
+      db,
+      "courses",
+      courseId,
+      "chapters",
+      chId,
+      "lessons",
+      lessonId
+    );
     const lsSnap = await getDoc(lessonRef);
-    if (!lsSnap.exists()) { main.innerHTML = `<div class="card error">Lesson not found.</div>`; return; }
+    if (!lsSnap.exists()) {
+      main.innerHTML = `<div class="card error">Lesson not found.</div>`;
+      return;
+    }
     const L = { id: lsSnap.id, ...lsSnap.data() };
 
     // prepare helpers
     const isUrl = (v) => /^https?:\/\//i.test(v || "");
     const isPdf = (v) => /\.pdf($|\?)/i.test(v || "");
-    const getYouTubeId = (u="")=> { try {
-      const m = u.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : "";
-    } catch { return ""; } };
+    const getYouTubeId = (u = "") => {
+      try {
+        const m = u.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
+        return m ? m[1] : "";
+      } catch {
+        return "";
+      }
+    };
 
     // load contents
     const contents = [];
-    const csnap = await getDocs(query(
-      collection(db, "courses", courseId, "chapters", chId, "lessons", lessonId, "contents"),
-      orderBy("order","asc")
-    ));
-    csnap.forEach(d => contents.push({ id:d.id, ...d.data() }));
-    const contentsResolved = await Promise.all(contents.map(async b => ({
-      ...b, url: await resolveMediaUrl(b.url || '')
-    })));
+    const csnap = await getDocs(
+      query(
+        collection(
+          db,
+          "courses",
+          courseId,
+          "chapters",
+          chId,
+          "lessons",
+          lessonId,
+          "contents"
+        ),
+        orderBy("order", "asc")
+      )
+    );
+    csnap.forEach((d) => contents.push({ id: d.id, ...d.data() }));
+    const contentsResolved = await Promise.all(
+      contents.map(async (b) => ({
+        ...b,
+        url: await resolveMediaUrl(b.url || ""),
+      }))
+    );
 
     // ✅ normalize quiz object (may be null)
     const quizObj = quiz
-      ? { title: quiz.title || 'Quiz',
+      ? {
+          title: quiz.title || "Quiz",
           shuffle: !!quiz.shuffle,
           passPct: Number(quiz.passPct ?? 70),
-          questions: questions || [] }
+          questions: questions || [],
+        }
       : null;
-    const qsnap = await getDocs(collection(db, "courses", courseId, "chapters", chId, "lessons", lessonId, "quizzes"));
-    qsnap.forEach(qd => { if (!quiz) quiz = { id: qd.id, ...qd.data() }; });
+    const qsnap = await getDocs(
+      collection(
+        db,
+        "courses",
+        courseId,
+        "chapters",
+        chId,
+        "lessons",
+        lessonId,
+        "quizzes"
+      )
+    );
+    qsnap.forEach((qd) => {
+      if (!quiz) quiz = { id: qd.id, ...qd.data() };
+    });
     if (quiz) {
-      const qsn = await getDocs(collection(db, "courses", courseId, "chapters", chId, "lessons", lessonId, "quizzes", quiz.id, "questions"));
-      qsn.forEach(d => questions.push({ id:d.id, ...d.data() }));
+      const qsn = await getDocs(
+        collection(
+          db,
+          "courses",
+          courseId,
+          "chapters",
+          chId,
+          "lessons",
+          lessonId,
+          "quizzes",
+          quiz.id,
+          "questions"
+        )
+      );
+      qsn.forEach((d) => questions.push({ id: d.id, ...d.data() }));
       quiz.questions = questions;
     }
 
@@ -3126,13 +3349,18 @@ async function renderCourseDetail(courseId, lessonId = null) {
             <div class="progress-text muted"></div>
           </div>
 
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <h3 style="margin:0">${L.title || 'Lesson'}</h3>
-        <div class="row" style="gap:.5rem">
-          <button class="btn ghost" ${prev ? '' : 'disabled'} data-nav="prev">← Prev</button>
-          <button class="btn" ${next ? '' : 'disabled'} data-nav="next">Next →</button>
+        <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
+          <h3 style="margin:0">${L.title || "Lesson"}</h3>
+          <div class="row" style="gap:.5rem;align-items:center">
+            <div id="certBtns"></div>   <!-- 👈 certificate/transcript buttons will appear here -->
+            <button class="btn ghost" ${
+              prev ? "" : "disabled"
+            } data-nav="prev">← Prev</button>
+            <button class="btn" ${
+              next ? "" : "disabled"
+            } data-nav="next" id="btnNext">Next →</button>
+          </div>
         </div>
-      </div>
 
       ${readingHtml}
 
@@ -3159,69 +3387,129 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }
     `;
 
+    const btnNext = document.getElementById("btnNext");
+
+    // အခုသင်ကြည့်နေတဲ့ lesson ပြီးပြီလား?
+    const isDone = !!progress[lessonId];
+    if (btnNext) btnNext.disabled = !isDone; // ❗ Quiz မပတ်လဲ မဖြတ်လမ်းနိုင်အောင်
+
+    // nav buttons (ရှိပြီးသား code)
+    btnNext?.addEventListener(
+      "click",
+      () =>
+        next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
+    );
+
     // --- only after innerHTML is set, resolve nodes ---
-    const lessonBlocks = main.querySelector('#lessonBlocks');
+    const lessonBlocks = main.querySelector("#lessonBlocks");
     if (!lessonBlocks) {
-      console.warn('[reader] #lessonBlocks not found; aborting render to avoid null error');
+      console.warn(
+        "[reader] #lessonBlocks not found; aborting render to avoid null error"
+      );
       return;
     }
 
     // (optional) inline PDF preview
     if (isUrl(L.reading) && isPdf(L.reading)) {
-      main.insertAdjacentHTML('beforeend', `
+      main.insertAdjacentHTML(
+        "beforeend",
+        `
         <div class="card" style="margin-top:.5rem">
           <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
             <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
           </div>
         </div>
-      `);
+      `
+      );
     }
 
     // --- render contents (guard again) ---
     try {
-      lessonBlocks.innerHTML = contentsResolved.map(b => {
-        const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
-        const u = b.url || '';
-        const t = (b.type || '').toLowerCase();
-        const yid = getYouTubeId(u);
-        if (t === 'youtube' || yid) {
-          return `<div class="card">
+      lessonBlocks.innerHTML = contentsResolved
+        .map((b) => {
+          const cap = b.caption
+            ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
+                b.caption
+              )}</div>`
+            : "";
+          const u = b.url || "";
+          const t = (b.type || "").toLowerCase();
+          const yid = getYouTubeId(u);
+          if (t === "youtube" || yid) {
+            return `<div class="card">
             <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
               <iframe src="https://www.youtube.com/embed/${yid}" allowfullscreen
                 style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
             </div>${cap}
           </div>`;
-        }
-        switch (t) {
-          case 'video': return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-          case 'audio': return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-          case 'image': return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
-          case 'text':
-          default:      return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(u)}</a>${cap}</div>`;
-        }
-      }).join('');
+          }
+          switch (t) {
+            case "video":
+              return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+            case "audio":
+              return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+            case "image":
+              return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+            case "text":
+            default:
+              return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(
+                u
+              )}</a>${cap}</div>`;
+          }
+        })
+        .join("");
     } catch (e) {
-      console.error('[reader/blocks]', e);
+      console.error("[reader/blocks]", e);
     }
+
+    // helper: set Next button state (gray when disabled, blue when enabled)
+    function setNextState(passed, isLast) {
+      const btnNext = document.getElementById("btnNext");
+      if (!btnNext) return;
+
+      if (isLast) {
+        // နောက်ဆုံးအခန်း—ရောက်ချင်း disabled (မခွင့်ပြု)
+        btnNext.disabled = true;
+        btnNext.classList.remove("primary");
+        btnNext.title = "This is the last lesson";
+        return;
+      }
+
+      btnNext.disabled = !passed; // Quiz မဖြတ်မချင်း မခွင့်ပြု
+      btnNext.classList.toggle("primary", !!passed); // passed => ပြာရောင်
+      btnNext.title = passed ? "" : "Complete the quiz to proceed";
+    }
+
+    // … header DOM တင်ပြီးနောက် (prev/next တွေတွက်ပြီး) —
+    const isLastLesson = !next || !next.lsId;
+    setNextState(!!progress[lessonId], isLastLesson);
 
     // ✦ normalize: JSON / Firestore မတူရောရင်လည်း အလွယ်တကူသုံးဖို့
     function normalizeQuiz(raw) {
       if (!raw) return null;
       const q = {
-        id: raw.id || '',
-        title: raw.title || 'Quiz',
+        id: raw.id || "",
+        title: raw.title || "Quiz",
         shuffle: !!raw.shuffle,
         passPct: Number(raw.passPct ?? 70),
-        questions: Array.isArray(raw.questions) ? raw.questions.map((x) => ({
-          id: x.id || '',
-          type: (x.type || '').toLowerCase() || (Array.isArray(x.answerIndex) ? 'mcq' : 'scq'),
-          text: x.text || '',
-          choices: Array.isArray(x.choices) ? x.choices.slice() : [],
-          answerIndex: Array.isArray(x.answerIndex) ? x.answerIndex.slice() : (typeof x.answerIndex === 'number' ? x.answerIndex : null),
-          points: Number(x.points || 1),
-          feedback: x.feedback || null,
-          accept: Array.isArray(x.accept) ? x.accept.slice() : null,
-        })) : []
+        questions: Array.isArray(raw.questions)
+          ? raw.questions.map((x) => ({
+              id: x.id || "",
+              type:
+                (x.type || "").toLowerCase() ||
+                (Array.isArray(x.answerIndex) ? "mcq" : "scq"),
+              text: x.text || "",
+              choices: Array.isArray(x.choices) ? x.choices.slice() : [],
+              answerIndex: Array.isArray(x.answerIndex)
+                ? x.answerIndex.slice()
+                : typeof x.answerIndex === "number"
+                ? x.answerIndex
+                : null,
+              points: Number(x.points || 1),
+              feedback: x.feedback || null,
+              accept: Array.isArray(x.accept) ? x.accept.slice() : null,
+            }))
+          : [],
       };
       return q.questions.length ? q : null;
     }
@@ -3242,7 +3530,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
     async function getFallbackQuizFromUrl(url) {
       try {
         if (!url) return null;
-        const res = await fetch(url, { cache: 'no-cache' });
+        const res = await fetch(url, { cache: "no-cache" });
         if (!res.ok) return null;
         const j = await res.json();
         // support root { quiz: {...} } or quiz ကို root-level ထဲမှာတင်ရှိမှုနှစ်မျိုးလုံး
@@ -3255,7 +3543,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
 
     // --- after you set main.innerHTML (quizHost div already exists) ---
     const startBtn = document.getElementById("btnStartQuiz");
-    const qHost    = document.getElementById("quizHost");
+    const qHost = document.getElementById("quizHost");
 
     if (startBtn && qHost) {
       startBtn.onclick = async () => {
@@ -3287,18 +3575,41 @@ async function renderCourseDetail(courseId, lessonId = null) {
         }
 
         // header meta update
-        const ttl = document.getElementById('quizTitle');
-        const meta = document.getElementById('quizMeta');
-        if (ttl) ttl.textContent = quizObj.title || 'Quiz';
-        if (meta) meta.textContent = `${quizObj.questions.length} questions · Pass ${quizObj.passPct ?? 70}%`;
+        const ttl = document.getElementById("quizTitle");
+        const meta = document.getElementById("quizMeta");
+        if (ttl) ttl.textContent = quizObj.title || "Quiz";
+        if (meta)
+          meta.textContent = `${quizObj.questions.length} questions · Pass ${
+            quizObj.passPct ?? 70
+          }%`;
 
         // pass-on complete callback
         quizObj.onSubmit = async ({ passed }) => {
-          if (passed) {
-            progress[lessonId] = true;
-            if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
-            updateProgressUI(main, progress, totalCount);
-            await afterLessonCompleted();  // 👈 here
+          if (!passed) return;
+
+          // save progress
+          progress[lessonId] = true;
+          if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
+          updateProgressUI(main, progress, totalCount);
+
+          // Next button
+          const isLastLesson = !next || !next.lsId;
+          setNextState(true, isLastLesson);
+
+          // အားလုံးပြီးပြီလား?
+          const done = Object.values(progress).filter(Boolean).length;
+          const allDone = totalCount > 0 && done >= totalCount;
+
+          if (allDone) {
+            // Quiz UI lock
+            const qHost = document.getElementById("quizHost");
+            disableQuizUI(qHost);
+
+            // header cert buttons refresh
+            await showCertButtonsIfEligible(courseId, enrRef);
+
+            // modal ပြ
+            showCongratsModal();
           }
         };
 
@@ -3312,23 +3623,46 @@ async function renderCourseDetail(courseId, lessonId = null) {
 
     // === (B) Read lesson quiz+questions from Firestore ===
     async function loadLessonQuiz(courseId, chId, lessonId) {
-      const quizCol = collection(db, "courses", courseId, "chapters", chId, "lessons", lessonId, "quizzes");
+      const quizCol = collection(
+        db,
+        "courses",
+        courseId,
+        "chapters",
+        chId,
+        "lessons",
+        lessonId,
+        "quizzes"
+      );
       const qsnap = await getDocs(quizCol);
       if (qsnap.empty) return null;
 
       const qdoc = qsnap.docs[0];
       const qdata = qdoc.data() || {};
 
-      const qsnCol  = collection(db, "courses", courseId, "chapters", chId, "lessons", lessonId, "quizzes", qdoc.id, "questions");
+      const qsnCol = collection(
+        db,
+        "courses",
+        courseId,
+        "chapters",
+        chId,
+        "lessons",
+        lessonId,
+        "quizzes",
+        qdoc.id,
+        "questions"
+      );
       const qsnSnap = await getDocs(qsnCol);
-      const questions = qsnSnap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+      const questions = qsnSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() || {}),
+      }));
 
       return {
         id: qdoc.id,
         title: qdata.title || "Quiz",
         shuffle: !!qdata.shuffle,
         passPct: Number(qdata.passPct ?? 70),
-        questions
+        questions,
       };
     }
 
@@ -3343,8 +3677,8 @@ async function renderCourseDetail(courseId, lessonId = null) {
 
         // if user is currently at the last normal lesson and there was no "next" before,
         // navigate to Final Exam directly
-        const i = flat2.findIndex(x => x.lsId === lessonId);
-        const next = i >= 0 ? flat2[i+1] : null;
+        const i = flat2.findIndex((x) => x.lsId === lessonId);
+        const next = i >= 0 ? flat2[i + 1] : null;
         if (next && next.lsId === "__final__") {
           location.hash = `#/courses/${courseId}/lesson/__final__`;
         }
@@ -3353,63 +3687,130 @@ async function renderCourseDetail(courseId, lessonId = null) {
 
     // contents render (ensure host exists NOW)
     const host = document.getElementById("lessonBlocks");
-    host.innerHTML = contentsResolved.map(b => {
-      const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
-      const u = b.url || '';
-      const t = (b.type || '').toLowerCase();
-      const yid = getYouTubeId(u);
-      if (t === 'youtube' || yid) {
-        const id = yid;
-        if (id) {
-          return `<div class="card">
+    host.innerHTML = contentsResolved
+      .map((b) => {
+        const cap = b.caption
+          ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
+              b.caption
+            )}</div>`
+          : "";
+        const u = b.url || "";
+        const t = (b.type || "").toLowerCase();
+        const yid = getYouTubeId(u);
+        if (t === "youtube" || yid) {
+          const id = yid;
+          if (id) {
+            return `<div class="card">
             <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
               <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
                 style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
             </div>${cap}
           </div>`;
+          }
         }
-      }
-      switch (t) {
-        case 'video': return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-        case 'audio': return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-        case 'image': return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
-        case 'text':
-        default:      return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(u)}</a>${cap}</div>`;
-      }
-    }).join("");
+        switch (t) {
+          case "video":
+            return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+          case "audio":
+            return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+          case "image":
+            return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+          case "text":
+          default:
+            return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(
+              u
+            )}</a>${cap}</div>`;
+        }
+      })
+      .join("");
 
     // nav buttons
-    main.querySelector('[data-nav="prev"]')?.addEventListener('click', () => prev && (location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`));
-    main.querySelector('[data-nav="next"]')?.addEventListener('click', () => next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`));
+    main
+      .querySelector('[data-nav="prev"]')
+      ?.addEventListener(
+        "click",
+        () =>
+          prev && (location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`)
+      );
+    main
+      .querySelector('[data-nav="next"]')
+      ?.addEventListener(
+        "click",
+        () =>
+          next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
+      );
 
     // mark manual complete
-        document.getElementById('btnMarkDone')?.addEventListener('click', async ()=>{
-      progress[lessonId] = true;
-      if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
-      updateProgressUI(main, progress, totalCount);
-      await afterLessonCompleted();    // 👈 here
-    });
+    document
+      .getElementById("btnMarkDone")
+      ?.addEventListener("click", async () => {
+        progress[lessonId] = true;
+        if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
+        updateProgressUI(main, progress, totalCount);
+        await afterLessonCompleted(); // 👈 here
+      });
 
     // initial progress render
     updateProgressUI(main, progress, totalCount);
-
   } catch (e) {
-    console.error('[reader]', e);
+    console.error("[reader]", e);
     main.innerHTML = `<div class="card error">Failed to load lesson.</div>`;
   }
 }
 
-function updateProgressUI(main, progress = {}, totalCount = 0) {
-  const done = Object.values(progress).filter(Boolean).length;
-  const pct  = totalCount ? Math.round((done / totalCount) * 100) : 0;
-  const bar  = main.querySelector('#courseProgress .progress-bar > span');
-  const txt  = main.querySelector('#courseProgress .progress-text');
-  if (bar) bar.style.width = `${pct}%`;
-  if (txt) txt.textContent = `Progress: ${done}/${totalCount} lessons (${pct}%)`;
+function showCongratsModal() {
+  const html = `
+    <div class="modal-overlay" id="congratsModal">
+      <div class="modal-card">
+        <img src="assets/congrats.png" alt="Congrats" onerror="this.style.display='none'">
+        <h3 style="margin:.25rem 0 .5rem">ဂုဏ်ယူပါတယ်! 🎉</h3>
+        <p class="muted">သင့်ရဲ့ ကြိုးစားမှုအတွက် ဂုဏ်ယူပါတယ်၊ ပျော်ရွင်ပါစေ</p>
+        <div class="row" style="margin-top:.75rem">
+          <button class="btn" id="btnOpenCert">Certificate</button>
+          <button class="btn ghost" id="btnOpenTranscript">Transcript</button>
+          <button class="btn ghost" id="btnCloseModal">Close</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  document.getElementById("btnCloseModal")?.addEventListener("click", () => {
+    document.getElementById("congratsModal")?.remove();
+  });
+  document.getElementById("btnOpenCert")?.addEventListener("click", () => {
+    const cid = document.querySelector("#courseReader")?.dataset?.cid;
+    if (cid) renderCertificate(cid);
+  });
+  document
+    .getElementById("btnOpenTranscript")
+    ?.addEventListener("click", () => {
+      renderTranscript(auth.currentUser?.uid);
+    });
 }
 
-function shuffle(arr){ return arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); }
+function disableQuizUI(scopeEl) {
+  if (!scopeEl) return;
+  scopeEl
+    .querySelectorAll("input, textarea, button")
+    .forEach((el) => (el.disabled = true));
+}
 
+function updateProgressUI(main, progress = {}, totalCount = 0) {
+  const done = Object.values(progress).filter(Boolean).length;
+  const pct = totalCount ? Math.round((done / totalCount) * 100) : 0;
+  const bar = main.querySelector("#courseProgress .progress-bar > span");
+  const txt = main.querySelector("#courseProgress .progress-text");
+  if (bar) bar.style.width = `${pct}%`;
+  if (txt)
+    txt.textContent = `Progress: ${done}/${totalCount} lessons (${pct}%)`;
+}
+
+function shuffle(arr) {
+  return arr
+    .map((v) => [Math.random(), v])
+    .sort((a, b) => a[0] - b[0])
+    .map((x) => x[1]);
+}
 
 // === (A) QUIZ RENDERER: radio / checkbox / textarea ===
 function renderQuizUI(hostEl, quiz) {
@@ -3419,35 +3820,46 @@ function renderQuizUI(hostEl, quiz) {
     return;
   }
 
-  const qs = quiz.shuffle ? [...quiz.questions].sort(() => Math.random() - 0.5) : [...quiz.questions];
+  const qs = quiz.shuffle
+    ? [...quiz.questions].sort(() => Math.random() - 0.5)
+    : [...quiz.questions];
 
-  const html = qs.map((q, qi) => {
-    const name = `q_${qi}`;
-    const rawType = String(q.type || '').toLowerCase();
-    const isMCQ = rawType === 'mcq' || Array.isArray(q.answerIndex);
-    const type = isMCQ ? 'mcq' : (rawType || 'scq');
+  const html = qs
+    .map((q, qi) => {
+      const name = `q_${qi}`;
+      const rawType = String(q.type || "").toLowerCase();
+      const isMCQ = rawType === "mcq" || Array.isArray(q.answerIndex);
+      const type = isMCQ ? "mcq" : rawType || "scq";
 
-    const choiceHtml = Array.isArray(q.choices)
-      ? q.choices.map((c, ci) => {
-          const input = isMCQ
-            ? `<input type="checkbox" name="${name}" value="${ci}">`
-            : `<input type="radio" name="${name}" value="${ci}">`;
-          return `<label class="quiz-choice">${input}<span class="quiz-choice-text">${escapeHtml(String(c))}</span></label>`;
-        }).join("")
-      : "";
+      const choiceHtml = Array.isArray(q.choices)
+        ? q.choices
+            .map((c, ci) => {
+              const input = isMCQ
+                ? `<input type="checkbox" name="${name}" value="${ci}">`
+                : `<input type="radio" name="${name}" value="${ci}">`;
+              return `<label class="quiz-choice">${input}<span class="quiz-choice-text">${escapeHtml(
+                String(c)
+              )}</span></label>`;
+            })
+            .join("")
+        : "";
 
-    const saHtml = (rawType === 'sa')
-      ? `<textarea name="${name}" rows="3" class="quiz-textarea" placeholder="Type your answer…"></textarea>`
-      : "";
+      const saHtml =
+        rawType === "sa"
+          ? `<textarea name="${name}" rows="3" class="quiz-textarea" placeholder="Type your answer…"></textarea>`
+          : "";
 
-    return `
+      return `
       <div class="quiz-q" data-type="${type}">
-        <div class="quiz-qtext"><span class="q-num">${qi + 1}.</span> ${escapeHtml(q.text || "")}</div>
+        <div class="quiz-qtext"><span class="q-num">${
+          qi + 1
+        }.</span> ${escapeHtml(q.text || "")}</div>
         <div class="quiz-choices">${choiceHtml || saHtml}</div>
         <div class="quiz-feedback" style="display:none"></div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 
   hostEl.innerHTML = `
     <div class="quiz-wrap">
@@ -3460,38 +3872,45 @@ function renderQuizUI(hostEl, quiz) {
     </div>
   `;
 
-  const submitBtn = hostEl.querySelector('#btnSubmitQuiz');
-  const resetBtn = hostEl.querySelector('#btnResetQuiz');
+  const submitBtn = hostEl.querySelector("#btnSubmitQuiz");
+  const resetBtn = hostEl.querySelector("#btnResetQuiz");
 
-  submitBtn?.addEventListener('click', () => {
-    let got = 0, total = 0;
+  submitBtn?.addEventListener("click", () => {
+    let got = 0,
+      total = 0;
     let firstWrong = null;
 
-    hostEl.querySelectorAll('.quiz-q').forEach((wrap, i) => {
+    hostEl.querySelectorAll(".quiz-q").forEach((wrap, i) => {
       const q = qs[i] || {};
-      const rawType = String(q.type || '').toLowerCase();
-      const isMCQ = rawType === 'mcq' || Array.isArray(q.answerIndex);
-      const type = isMCQ ? 'mcq' : (rawType || 'scq');
+      const rawType = String(q.type || "").toLowerCase();
+      const isMCQ = rawType === "mcq" || Array.isArray(q.answerIndex);
+      const type = isMCQ ? "mcq" : rawType || "scq";
 
-      const fb = wrap.querySelector('.quiz-feedback');
+      const fb = wrap.querySelector(".quiz-feedback");
       const pts = Number(q.points || 1);
       total += pts;
 
       let ok = false;
       let sel = [];
 
-      if (type === 'mcq') {
-        sel = [...wrap.querySelectorAll('input[type="checkbox"]:checked')].map(x => Number(x.value)).sort();
-        const ans = (Array.isArray(q.answerIndex) ? q.answerIndex : []).map(Number).sort();
+      if (type === "mcq") {
+        sel = [...wrap.querySelectorAll('input[type="checkbox"]:checked')]
+          .map((x) => Number(x.value))
+          .sort();
+        const ans = (Array.isArray(q.answerIndex) ? q.answerIndex : [])
+          .map(Number)
+          .sort();
         ok = JSON.stringify(sel) === JSON.stringify(ans);
-      } else if (type === 'scq') {
+      } else if (type === "scq") {
         const r = wrap.querySelector('input[type="radio"]:checked');
         sel = r ? [Number(r.value)] : [];
         ok = r && Number(r.value) === Number(q.answerIndex);
-      } else if (rawType === 'sa') {
-        const v = (wrap.querySelector('textarea')?.value || '').trim();
+      } else if (rawType === "sa") {
+        const v = (wrap.querySelector("textarea")?.value || "").trim();
         if (Array.isArray(q.accept)) {
-          ok = q.accept.some(a => String(a).toLowerCase().trim() === v.toLowerCase());
+          ok = q.accept.some(
+            (a) => String(a).toLowerCase().trim() === v.toLowerCase()
+          );
         } else {
           ok = !!v;
         }
@@ -3502,62 +3921,72 @@ function renderQuizUI(hostEl, quiz) {
 
       // ===== feedback handling =====
       let msg = ok ? q.feedback?.correct?.text : q.feedback?.incorrect?.text;
-      let color = ok ? q.feedback?.correct?.color : q.feedback?.incorrect?.color;
+      let color = ok
+        ? q.feedback?.correct?.color
+        : q.feedback?.incorrect?.color;
 
       // fallback if none found
       if (!msg && Array.isArray(q.feedback?.byChoice) && sel.length) {
         msg = q.feedback.byChoice[sel[0]];
       }
 
-      fb.style.display = 'block';
+      fb.style.display = "block";
       fb.textContent = msg || (ok ? "မှန်ကန်ပါတယ် ✅" : "ထပ်ကြိုးစားပါ ❌");
-      fb.classList.toggle('good', !!ok);
-      fb.classList.toggle('bad', !ok);
-      fb.style.color = color || '';
+      fb.classList.toggle("good", !!ok);
+      fb.classList.toggle("bad", !ok);
+      fb.style.color = color || "";
 
-      wrap.querySelectorAll('.quiz-choice').forEach(lbl => {
-        const inp = lbl.querySelector('input');
+      wrap.querySelectorAll(".quiz-choice").forEach((lbl) => {
+        const inp = lbl.querySelector("input");
         if (!inp) return;
-        lbl.classList.remove('is-correct', 'is-wrong');
-        if (inp.checked) lbl.classList.add(ok ? 'is-correct' : 'is-wrong');
+        lbl.classList.remove("is-correct", "is-wrong");
+        if (inp.checked) lbl.classList.add(ok ? "is-correct" : "is-wrong");
       });
 
-      if (!ok && (type === 'mcq' || type === 'scq')) {
-        const ansIdxs = Array.isArray(q.answerIndex) ? q.answerIndex.map(Number) : [Number(q.answerIndex)];
-        wrap.querySelectorAll('.quiz-choice').forEach((lbl, ci) => {
-          lbl.style.outline = ansIdxs.includes(ci) ? '2px dashed #28a74555' : '';
+      if (!ok && (type === "mcq" || type === "scq")) {
+        const ansIdxs = Array.isArray(q.answerIndex)
+          ? q.answerIndex.map(Number)
+          : [Number(q.answerIndex)];
+        wrap.querySelectorAll(".quiz-choice").forEach((lbl, ci) => {
+          lbl.style.outline = ansIdxs.includes(ci)
+            ? "2px dashed #28a74555"
+            : "";
         });
       } else {
-        wrap.querySelectorAll('.quiz-choice').forEach(lbl => lbl.style.outline = '');
+        wrap
+          .querySelectorAll(".quiz-choice")
+          .forEach((lbl) => (lbl.style.outline = ""));
       }
     });
 
     const pct = total ? Math.round((got / total) * 100) : 0;
     const need = Number(quiz.passPct ?? 70);
-    const _scoreEl = hostEl.querySelector('#quizScore');
+    const _scoreEl = hostEl.querySelector("#quizScore");
     if (_scoreEl) _scoreEl.textContent = `Score: ${got}/${total} (${pct}%)`;
 
-    if (typeof quiz.onSubmit === 'function') {
+    if (typeof quiz.onSubmit === "function") {
       quiz.onSubmit({ got, total, pct, passed: pct >= need });
     }
 
-    firstWrong?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    firstWrong?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
-  resetBtn?.addEventListener('click', () => {
-    hostEl.querySelectorAll('input[type="radio"],input[type="checkbox"]').forEach(i => i.checked = false);
-    hostEl.querySelectorAll('textarea').forEach(t => t.value = '');
-    hostEl.querySelectorAll('.quiz-feedback').forEach(f => {
-      f.style.display = 'none';
-      f.textContent = '';
-      f.style.color = '';
-      f.classList.remove('good', 'bad');
+  resetBtn?.addEventListener("click", () => {
+    hostEl
+      .querySelectorAll('input[type="radio"],input[type="checkbox"]')
+      .forEach((i) => (i.checked = false));
+    hostEl.querySelectorAll("textarea").forEach((t) => (t.value = ""));
+    hostEl.querySelectorAll(".quiz-feedback").forEach((f) => {
+      f.style.display = "none";
+      f.textContent = "";
+      f.style.color = "";
+      f.classList.remove("good", "bad");
     });
-    const _scoreEl2 = hostEl.querySelector('#quizScore');
-    if (_scoreEl2) _scoreEl2.textContent = '';
-    hostEl.querySelectorAll('.quiz-choice').forEach(l => {
-      l.classList.remove('is-correct', 'is-wrong');
-      l.style.outline = '';
+    const _scoreEl2 = hostEl.querySelector("#quizScore");
+    if (_scoreEl2) _scoreEl2.textContent = "";
+    hostEl.querySelectorAll(".quiz-choice").forEach((l) => {
+      l.classList.remove("is-correct", "is-wrong");
+      l.style.outline = "";
     });
   });
 }
@@ -3566,10 +3995,10 @@ function renderQuizUI(hostEl, quiz) {
 
 function gradeFromPct(pct) {
   if (pct >= 100) return "A+";
-  if (pct >= 95)  return "A";
-  if (pct >= 85)  return "B";
-  if (pct >= 75)  return "C";
-  if (pct >= 65)  return "D";
+  if (pct >= 95) return "A";
+  if (pct >= 85) return "B";
+  if (pct >= 75) return "C";
+  if (pct >= 65) return "D";
   return "F";
 }
 
@@ -3587,8 +4016,8 @@ async function getCourseExamSettings(courseId) {
   const s = await getDoc(doc(db, "courses", courseId));
   const c = s.exists() ? s.data() : {};
   return {
-    passPct:   typeof c.passPct === "number" ? c.passPct : 65,  // default 65
-    finalLimit: typeof c.finalLimit === "number" ? c.finalLimit : 12 // default 12
+    passPct: typeof c.passPct === "number" ? c.passPct : 65, // default 65
+    finalLimit: typeof c.finalLimit === "number" ? c.finalLimit : 12, // default 12
   };
 }
 
@@ -3602,17 +4031,43 @@ async function getAllLessonQuestions(courseId) {
     const chId = chDoc.id;
 
     // lessons
-    const lsSnap = await getDocs(collection(db, "courses", courseId, "chapters", chId, "lessons"));
+    const lsSnap = await getDocs(
+      collection(db, "courses", courseId, "chapters", chId, "lessons")
+    );
     for (const lsDoc of lsSnap.docs) {
       const lsId = lsDoc.id;
 
       // quizzes (သင်တန်းတစ်ခန်းမှာ quiz တစ်ခုထက်ပိုလို့ရ)
-      const qzSnap = await getDocs(collection(db, "courses", courseId, "chapters", chId, "lessons", lsId, "quizzes"));
+      const qzSnap = await getDocs(
+        collection(
+          db,
+          "courses",
+          courseId,
+          "chapters",
+          chId,
+          "lessons",
+          lsId,
+          "quizzes"
+        )
+      );
       for (const qDoc of qzSnap.docs) {
         // questions
-        const qsSnap = await getDocs(collection(db, "courses", courseId, "chapters", chId, "lessons", lsId, "quizzes", qDoc.id, "questions"));
+        const qsSnap = await getDocs(
+          collection(
+            db,
+            "courses",
+            courseId,
+            "chapters",
+            chId,
+            "lessons",
+            lsId,
+            "quizzes",
+            qDoc.id,
+            "questions"
+          )
+        );
         for (const q of qsSnap.docs) {
-          const raw = { id: q.id, ...(q.data()), _lesson: lsId, _chapter: chId };
+          const raw = { id: q.id, ...q.data(), _lesson: lsId, _chapter: chId };
           let type = (raw.type || "").toLowerCase();
           let choices = raw.choices || [];
           let correct = null;
@@ -3630,7 +4085,7 @@ async function getAllLessonQuestions(courseId) {
           } else if (type === "short") {
             correct = raw.answerText || raw.accept || raw.answers || ""; // allow array
           } else {
-            correct = (typeof raw.answerIndex === "number") ? raw.answerIndex : 0;
+            correct = typeof raw.answerIndex === "number" ? raw.answerIndex : 0;
           }
 
           pool.push({
@@ -3638,7 +4093,7 @@ async function getAllLessonQuestions(courseId) {
             text: raw.text || "",
             type,
             choices,
-            correct
+            correct,
           });
         }
       }
@@ -3663,7 +4118,7 @@ async function buildFinalExam(courseId, opts = {}) {
   return {
     title: "Final Exam",
     passPct,
-    questions: picked
+    questions: picked,
   };
 }
 
@@ -3682,39 +4137,49 @@ async function renderFinalExamUI(courseId, quiz) {
   }
 
   // Render questions
-  const qHtml = quiz.questions.map((q, i) => {
-    const n = i + 1;
-    if (q.type === "short") {
-      return `
+  const qHtml = quiz.questions
+    .map((q, i) => {
+      const n = i + 1;
+      if (q.type === "short") {
+        return `
         <div class="card">
           <div><strong>${n}. ${escapeHtml(q.text)}</strong></div>
           <input class="input" name="q_${i}" placeholder="Your answer">
         </div>`;
-    } else if (q.type === "multi") {
-      const opts = (q.choices || []).map((c, idx) => `
+      } else if (q.type === "multi") {
+        const opts = (q.choices || [])
+          .map(
+            (c, idx) => `
         <label class="row" style="gap:.5rem">
           <input type="checkbox" name="q_${i}" value="${idx}">
           <span>${escapeHtml(c)}</span>
-        </label>`).join("");
-      return `
+        </label>`
+          )
+          .join("");
+        return `
         <div class="card">
           <div><strong>${n}. ${escapeHtml(q.text)}</strong></div>
           <div class="stack" style="margin-top:.5rem">${opts}</div>
         </div>`;
-    } else {
-      // single
-      const opts = (q.choices || []).map((c, idx) => `
+      } else {
+        // single
+        const opts = (q.choices || [])
+          .map(
+            (c, idx) => `
         <label class="row" style="gap:.5rem">
           <input type="radio" name="q_${i}" value="${idx}">
           <span>${escapeHtml(c)}</span>
-        </label>`).join("");
-      return `
+        </label>`
+          )
+          .join("");
+        return `
         <div class="card">
           <div><strong>${n}. ${escapeHtml(q.text)}</strong></div>
           <div class="stack" style="margin-top:.5rem">${opts}</div>
         </div>`;
-    }
-  }).join("");
+      }
+    })
+    .join("");
 
   main.innerHTML = `
     <div class="card">
@@ -3750,20 +4215,24 @@ async function renderFinalExamUI(courseId, quiz) {
 
     quiz.questions.forEach((q, i) => {
       if (q.type === "short") {
-        const val = (form.querySelector(`input[name="q_${i}"]`)?.value || "").trim();
+        const val = (
+          form.querySelector(`input[name="q_${i}"]`)?.value || ""
+        ).trim();
         if (!val) return;
         const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
         if (Array.isArray(q.correct)) {
-          if (q.correct.some(x => norm(x) === norm(val))) earned += 1;
+          if (q.correct.some((x) => norm(x) === norm(val))) earned += 1;
         } else {
           if (norm(q.correct || "") === norm(val)) earned += 1;
         }
       } else if (q.type === "multi") {
-        const boxes = Array.from(form.querySelectorAll(`input[name="q_${i}"]:checked`)).map(b => Number(b.value));
+        const boxes = Array.from(
+          form.querySelectorAll(`input[name="q_${i}"]:checked`)
+        ).map((b) => Number(b.value));
         const correct = Array.isArray(q.correct) ? q.correct : [];
         // strict compare: same set
         const sameLen = boxes.length === correct.length;
-        const allIn   = boxes.every(v => correct.includes(v));
+        const allIn = boxes.every((v) => correct.includes(v));
         if (sameLen && allIn) earned += 1;
       } else {
         // single
@@ -3780,10 +4249,10 @@ async function renderFinalExamUI(courseId, quiz) {
 
     const box = document.getElementById("finalResult");
     box.innerHTML = `
-      <div class="card ${passed ? 'success' : 'error'}">
+      <div class="card ${passed ? "success" : "error"}">
         <strong>Result:</strong>
         <p>${earned}/${total} correct → <strong>${pct}%</strong> (Grade <strong>${letter}</strong>)</p>
-        <p class="muted">${passed ? 'You passed ✅' : 'Not passed ❌'}</p>
+        <p class="muted">${passed ? "You passed ✅" : "Not passed ❌"}</p>
         <div class="row" style="gap:.5rem;justify-content:flex-end;margin-top:.5rem">
           <button class="btn ghost" id="btnBackCourse">Back to Course</button>
           <button class="btn" id="btnSaveAttempt">Save Result</button>
@@ -3791,28 +4260,32 @@ async function renderFinalExamUI(courseId, quiz) {
       </div>`;
 
     // wire actions
-    document.getElementById("btnBackCourse")?.addEventListener("click", (ev)=>{
-      ev.preventDefault();
-      location.hash = `#/courses/${courseId}`;
-    });
+    document
+      .getElementById("btnBackCourse")
+      ?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        location.hash = `#/courses/${courseId}`;
+      });
 
-    document.getElementById("btnSaveAttempt")?.addEventListener("click", async (ev)=>{
-      ev.preventDefault();
-      if (!auth.currentUser) {
-        alert("Please sign in.");
-        return;
-      }
-      try {
-        await addDoc(
-          collection(db, "users", auth.currentUser.uid, "attempts"),
-          { courseId, pct, letter, passed, ts: serverTimestamp() }
-        );
-        alert("Saved ✔");
-      } catch (err) {
-        console.error("[attempt save]", err);
-        alert("Failed to save.");
-      }
-    });
+    document
+      .getElementById("btnSaveAttempt")
+      ?.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        if (!auth.currentUser) {
+          alert("Please sign in.");
+          return;
+        }
+        try {
+          await addDoc(
+            collection(db, "users", auth.currentUser.uid, "attempts"),
+            { courseId, pct, letter, passed, ts: serverTimestamp() }
+          );
+          alert("Saved ✔");
+        } catch (err) {
+          console.error("[attempt save]", err);
+          alert("Failed to save.");
+        }
+      });
   });
 }
 
@@ -4249,162 +4722,211 @@ async function openCourseEditor(id) {
 }
 
 // Certificate Template (with PDF export)
-async function renderCertificate(courseId, uidOpt, mode = 'view') {
-  const cid = (courseId || '').trim();
-  if (!cid) return alert('Choose a course first.');
-  const uid = (uidOpt || auth.currentUser?.uid || '').trim();
-  if (!uid) return alert('No UID (login first).');
+async function renderCertificate(courseId, uidOpt, mode = "view") {
+  const cid = (courseId || "").trim();
+  if (!cid) return alert("Choose a course first.");
+  const uid = (uidOpt || auth.currentUser?.uid || "").trim();
+  if (!uid) return alert("No UID (login first).");
 
   // read course + user
-  const cSnap = await getDoc(doc(db, 'courses', cid));
-  const course = cSnap.exists() ? { id: cSnap.id, ...cSnap.data() } : { id: cid, title: cid };
+  const cSnap = await getDoc(doc(db, "courses", cid));
+  const course = cSnap.exists()
+    ? { id: cSnap.id, ...cSnap.data() }
+    : { id: cid, title: cid };
   let displayName = uid;
   try {
-    const uSnap = await getDoc(doc(db, 'users', uid));
-    if (uSnap.exists()) displayName = uSnap.data().name || uSnap.data().displayName || uid;
+    const uSnap = await getDoc(doc(db, "users", uid));
+    if (uSnap.exists())
+      displayName = uSnap.data().name || uSnap.data().displayName || uid;
   } catch {}
 
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('l', 'pt', 'a4'); // landscape
+  const pdf = new jsPDF("l", "pt", "a4"); // landscape
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
   const M = 40;
 
   // left-top logo
   try {
-    const logo = await imgToDataURL('/icons/icon-192.png');
-    pdf.addImage(logo, 'PNG', M, M, 64, 64);
+    const logo = await imgToDataURL("/icons/icon-192.png");
+    pdf.addImage(logo, "PNG", M, M, 64, 64);
   } catch {}
 
   // right-top certificate no
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
-  pdf.text(`Certificate No: ${genCertNo(uid, course.id)}`, W - M, M + 12, { align: 'right' });
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(12);
+  pdf.text(`Certificate No: ${genCertNo(uid, course.id)}`, W - M, M + 12, {
+    align: "right",
+  });
 
   // title + body
-  pdf.setFont('times','bold');   pdf.setFontSize(42);
-  pdf.text('Certificate of Completion', W/2, H/2 - 60, { align: 'center' });
-  pdf.setFont('times','normal'); pdf.setFontSize(18);
-  pdf.text('This certifies that', W/2, H/2 - 20, { align: 'center' });
-  pdf.setFont('times','bold');   pdf.setFontSize(28);
-  pdf.text(displayName, W/2, H/2 + 10, { align: 'center' });
-  pdf.setFont('times','normal'); pdf.setFontSize(18);
-  pdf.text('has successfully completed the course', W/2, H/2 + 40, { align: 'center' });
-  pdf.setFont('times','bold');   pdf.setFontSize(24);
-  pdf.text(course.title || course.id, W/2, H/2 + 75, { align: 'center' });
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(42);
+  pdf.text("Certificate of Completion", W / 2, H / 2 - 60, { align: "center" });
+  pdf.setFont("times", "normal");
+  pdf.setFontSize(18);
+  pdf.text("This certifies that", W / 2, H / 2 - 20, { align: "center" });
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(28);
+  pdf.text(displayName, W / 2, H / 2 + 10, { align: "center" });
+  pdf.setFont("times", "normal");
+  pdf.setFontSize(18);
+  pdf.text("has successfully completed the course", W / 2, H / 2 + 40, {
+    align: "center",
+  });
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(24);
+  pdf.text(course.title || course.id, W / 2, H / 2 + 75, { align: "center" });
 
   const today = new Date().toLocaleDateString();
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(12);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(12);
   pdf.text(`Date: ${today}`, M, H - M);
   pdf.line(W - 220, H - M - 10, W - M, H - M - 10);
-  pdf.text('Authorized Signature', W - 110, H - M + 5, { align: 'center' });
+  pdf.text("Authorized Signature", W - 110, H - M + 5, { align: "center" });
 
-  if (mode === 'download') {
+  if (mode === "download") {
     pdf.save(`certificate-${course.id}.pdf`);
   } else {
-    pdf.output('dataurlnewwindow'); // view only
+    pdf.output("dataurlnewwindow"); // view only
   }
 }
 
 // convenience wrappers
-const viewCertificate = (cid, uid) => renderCertificate(cid, uid, 'view');
-const downloadCertificate = (cid, uid) => renderCertificate(cid, uid, 'download');
+const viewCertificate = (cid, uid) => renderCertificate(cid, uid, "view");
+const downloadCertificate = (cid, uid) =>
+  renderCertificate(cid, uid, "download");
 
 async function getCourseStatus(uid, courseId) {
-  // enrollment.completed?
   try {
-    const en = await getDoc(doc(db, 'users', uid, 'enrollments', courseId));
-    if (en.exists() && en.data().completed) return 'Completed';
-  } catch {}
-  // completions/{courseId} exists?
-  try {
-    const comp = await getDoc(doc(db, 'users', uid, 'completions', courseId));
-    if (comp.exists()) return 'Completed';
-  } catch {}
-  return 'In Progress';
+    const ref = doc(db, "users", uid, "enrollments", courseId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return "In progress";
+
+    const enrollment = snap.data() || {};
+
+    // enrollment data ပြန်ဖတ်ထားတဲ့နေရာမှာ ကိုယ်ရှိပြီးသား e/progress ထဲက သုံး
+    const isAllDone = (() => {
+      const prog = enrollment.progress || {};
+      const total = Object.keys(prog).length;
+      const done = Object.values(prog).filter(Boolean).length;
+      return total > 0 && done >= total;
+    })();
+
+    const passed = !!enrollment.finalPassed || isAllDone;
+
+    // before: const status = item.status || 'In progress';
+    const status = passed ? "Success" : "In progress";
+    return status;
+  } catch (err) {
+    console.warn("[getCourseStatus]", err);
+    return "In progress";
+  }
 }
 
 // Transcript Template (with PDF export)
-async function renderTranscript(uidOpt, mode = 'view') {
-  const uid = (uidOpt || auth.currentUser?.uid || '').trim();
-  if (!uid) return alert('No UID (login first).');
+// ===== helpers =====
+const LEVEL_NAMES = { 0: "Beginner", 1: "Intermediate", 2: "Advanced" };
+function toLevelName(v) {
+  if (typeof v === "string" && isNaN(Number(v))) return v; // already label
+  const n = Number(v);
+  return LEVEL_NAMES[n] || "Beginner";
+}
+
+async function renderTranscript(uidOpt, mode = "view") {
+  const uid = (uidOpt || auth.currentUser?.uid || "").trim();
+  if (!uid) return alert("No UID (login first).");
 
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('l','pt','a4'); // landscape
+  const pdf = new jsPDF("l", "pt", "a4"); // landscape
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
   const M = 48;
 
-  // right-top logo
+  // logo (optional)
   try {
-    const logo = await imgToDataURL('/icons/icon-192.png');
-    pdf.addImage(logo, 'PNG', W - M - 56, M, 56, 56);
+    const logo = await imgToDataURL("/icons/icon-192.png");
+    pdf.addImage(logo, "PNG", W - M - 56, M, 56, 56);
   } catch {}
 
-  pdf.setFont('times','bold'); pdf.setFontSize(28);
-  pdf.text('Academic Transcript', M, M + 24);
+  pdf.setFont("times", "bold");
+  pdf.setFontSize(28);
+  pdf.text("Academic Transcript", M, M + 24);
 
   // student block
   let name = uid;
   try {
-    const uSnap = await getDoc(doc(db,'users', uid));
-    if (uSnap.exists()) name = uSnap.data().name || uSnap.data().displayName || uid;
+    const uSnap = await getDoc(doc(db, "users", uid));
+    if (uSnap.exists())
+      name = uSnap.data().name || uSnap.data().displayName || uid;
   } catch {}
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(12);
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(12);
   pdf.text(`Name: ${name}`, M, M + 60);
-  pdf.text(`UID: ${uid}`,   M, M + 76);
+  pdf.text(`UID: ${uid}`, M, M + 76);
   pdf.text(`Generated: ${new Date().toLocaleString()}`, M, M + 92);
 
   // table head
   let y = M + 130;
-  pdf.setFont('helvetica','bold');
-  pdf.text('Course',  M,        y);
-  pdf.text('Level',   M + 360,  y);
-  pdf.text('Credits', M + 430,  y);
-  pdf.text('Status',  M + 510,  y);
-  pdf.setLineWidth(0.5); pdf.line(M, y+6, W - M, y+6);
-  y += 26; pdf.setFont('helvetica','normal');
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Course", M, y);
+  pdf.text("Level", M + 360, y);
+  pdf.text("Credits", M + 430, y);
+  pdf.text("Status", M + 510, y);
+  pdf.setLineWidth(0.5);
+  pdf.line(M, y + 6, W - M, y + 6);
+  y += 26;
+  pdf.setFont("helvetica", "normal");
 
-  // read enrollments
-  const es = await getDocs(query(collection(db,'users', uid, 'enrollments'), orderBy('ts','desc')));
+  // enrollments
+  const es = await getDocs(
+    query(collection(db, "users", uid, "enrollments"), orderBy("ts", "desc"))
+  );
   if (es.empty) {
-    pdf.text('(No enrollments)', M, y);
+    pdf.text("(No enrollments)", M, y);
   } else {
     for (const d of es.docs) {
       const e = d.data();
-      let title = e.courseTitle || e.courseId;
-      let level = '-';
-      let credits = (typeof e.credits === 'number') ? e.credits : '-';
+      const courseId = e.courseId;
+      let title = e.courseTitle || courseId;
+      let level = "-";
+      let credits = typeof e.credits === "number" ? e.credits : "-";
+
       try {
-        const cs = await getDoc(doc(db, 'courses', e.courseId));
+        const cs = await getDoc(doc(db, "courses", courseId));
         if (cs.exists()) {
           const c = cs.data();
-          title   = c.title || title;
-          level   = (typeof c.level === 'number') ? String(c.level) : (c.level || '-');
-          credits = (typeof c.credits === 'number') ? c.credits : credits;
+          title = c.title || title;
+          level = toLevelName(c.level); // ✅ map to label
+          credits = typeof c.credits === "number" ? c.credits : credits;
         }
       } catch {}
-      const status = await getCourseStatus(uid, e.courseId);
 
-      pdf.text(String(title),   M,        y);
-      pdf.text(String(level),   M + 360,  y);
-      pdf.text(String(credits), M + 430,  y);
-      pdf.text(String(status),  M + 510,  y);
+      const status = await getCourseStatus(uid, courseId); // ✅ Success / In progress
+
+      pdf.text(String(title), M, y);
+      pdf.text(String(level), M + 360, y);
+      pdf.text(String(credits), M + 430, y);
+      pdf.text(String(status), M + 510, y);
 
       y += 22;
-      if (y > H - M - 40) { pdf.addPage(); y = M + 20; }
+      if (y > H - M - 40) {
+        pdf.addPage();
+        y = M + 20;
+      }
     }
   }
 
-  if (mode === 'download') {
-    pdf.save('transcript.pdf');
+  if (mode === "download") {
+    pdf.save("transcript.pdf");
   } else {
-    pdf.output('dataurlnewwindow'); // view only
+    pdf.output("dataurlnewwindow"); // view
   }
 }
 
-// wrappers
-const viewTranscript = (uid) => renderTranscript(uid, 'view');
-const downloadTranscript = (uid) => renderTranscript(uid, 'download');
+// (optional) simple wrappers
+const viewTranscript = (uid) => renderTranscript(uid, "view");
+const downloadTranscript = (uid) => renderTranscript(uid, "download");
 
 // Certificate Example
 const user = auth.currentUser;
@@ -4413,8 +4935,18 @@ renderCertificate(user, course);
 
 // Transcript Example
 const records = [
-  { courseTitle: "Pāli Beginner I", credits: 3, grade: "A", completedAt: Date.now() },
-  { courseTitle: "Pāli Beginner II", credits: 3, grade: "A-", completedAt: Date.now() }
+  {
+    courseTitle: "Pāli Beginner I",
+    credits: 3,
+    grade: "A",
+    completedAt: Date.now(),
+  },
+  {
+    courseTitle: "Pāli Beginner II",
+    credits: 3,
+    grade: "A-",
+    completedAt: Date.now(),
+  },
 ];
 renderTranscript(user, records);
 
@@ -4956,41 +5488,55 @@ function normBenefits(b) {
 function courseCardHTML(c) {
   const price = Number(c.price ?? 0);
   const isPaid = price > 0;
-  const priceLabel = isPaid ? `$${price.toFixed(2)}` : 'Free';
+  const priceLabel = isPaid ? `$${price.toFixed(2)}` : "Free";
 
   const benefits = Array.isArray(c.benefits)
     ? c.benefits
-    : String(c.benefits || '').split(',').map(s=>s.trim()).filter(Boolean);
+    : String(c.benefits || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-  const FALLBACK = '/img/placeholder.png';
+  const FALLBACK = "/img/placeholder.png";
 
   return `
     <article class="course-card" data-cid="${c.id}">
       <img class="cover"
-           src="${(c.img||'').trim() || FALLBACK}"
+           src="${(c.img || "").trim() || FALLBACK}"
            onerror="this.onerror=null; this.src='${FALLBACK}'" />
       <div class="body">
-        <h3>${c.title || 'Untitled Course'}</h3>
+        <h3>${c.title || "Untitled Course"}</h3>
 
-        ${c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : ''}
+        ${c.summary ? `<p class="desc">${escapeHtml(c.summary)}</p>` : ""}
 
-        ${benefits.length ? `
+        ${
+          benefits.length
+            ? `
           <ul class="meta">
-            ${benefits.slice(0,3).map(b => `<li>${escapeHtml(b)}</li>`).join('')}
-          </ul>` : ''}
+            ${benefits
+              .slice(0, 3)
+              .map((b) => `<li>${escapeHtml(b)}</li>`)
+              .join("")}
+          </ul>`
+            : ""
+        }
 
         <ul class="meta">
-          <li>${levelLabel(c) || 'Level 0'}</li>
+          <li>${levelLabel(c) || "Level 0"}</li>
           <li>Credits: ${c.credits ?? 0}</li>
         </ul>
 
         <div class="footer">
-          <span class="badge ${isPaid ? 'price-paid' : 'price-free'}">${priceLabel}</span>
+          <span class="badge ${
+            isPaid ? "price-paid" : "price-free"
+          }">${priceLabel}</span>
           <div class="actions">
-            <button class="btn btn-details" data-act="details" data-cid="${c.id}">Details</button>
-            <button class="btn ${isPaid ? 'btn-buy' : 'btn-enroll'}"
+            <button class="btn btn-details" data-act="details" data-cid="${
+              c.id
+            }">Details</button>
+            <button class="btn ${isPaid ? "btn-buy" : "btn-enroll"}"
                     data-act="enroll" data-cid="${c.id}">
-              ${isPaid ? 'Buy' : 'Enroll'}
+              ${isPaid ? "Buy" : "Enroll"}
             </button>
           </div>
         </div>
@@ -5057,9 +5603,6 @@ window.addEventListener("load", () => {
     emailjs.init({ publicKey: "WT0GOYrL9HnDKvLUf" });
   }
 });
-
-// ---------- Profile page (route for now via dashboard) ----------
-// (You can add a dedicated #/profile similarly using the pattern above)
 
 // ✅ boot point
 window.addEventListener("load", () => {
