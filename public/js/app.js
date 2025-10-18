@@ -171,7 +171,7 @@ const PLACEHOLDER_IMG =
 
 const short = (s = "", n = 140) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
-// ---------- Utils ----------
+// ---------- Utils Helper 1----------
 function escapeHtml(s='') {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -2896,7 +2896,65 @@ function getYouTubeId(url='') {
   return null;
 }
 
-/* ========= Course Reader ========= */
+/* Helper 3*/
+function ensureFinalInjected(chapters){
+      if (!Array.isArray(chapters) || !chapters.length) return;
+      const last = chapters[chapters.length - 1];
+      last.lessons ||= [];
+      if (!last.lessons.some(l => l.id === "__final__")) {
+        last.lessons.push({ id:"__final__", order:9999, title:"Final Exam", isFinal:true });
+      }
+    }
+
+    /* Helper 4*/
+    function renderSidebarAndFlatList(courseId, chapters, activeLessonId){
+      const sb = document.getElementById("crsSidebar");
+      const flat = [];
+      sb.innerHTML = chapters.map(ch => {
+        const items = (ch.lessons || []).map(ls => {
+          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || '' });
+          const active = (activeLessonId && ls.id === activeLessonId) ? ' class="active"' : '';
+          return `<li${active}><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a></li>`;
+        }).join("");
+        return `
+          <details open class="blk">
+            <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
+            <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
+          </details>
+        `;
+      }).join("");
+      return flat;
+    }
+
+  // ===== Helper 5: show Certificate & Transcript buttons =====
+async function showCertButtonsIfEligible(courseId, enrRef) {
+  if (!enrRef) return;
+
+  try {
+    const es = await getDoc(enrRef);
+    const ok = es.exists() && !!es.data().finalPassed;
+    const box = document.getElementById('certBtns');
+    if (!box) return;
+
+    box.innerHTML = ok
+      ? `<button class="btn" id="btnViewCert">Certificate</button>
+         <button class="btn ghost" id="btnViewTranscript">Transcript</button>`
+      : ``;
+
+    if (ok) {
+      document.getElementById('btnViewCert')?.addEventListener('click', () => {
+        renderCertificate(courseId, auth.currentUser?.uid, 'view');
+      });
+      document.getElementById('btnViewTranscript')?.addEventListener('click', () => {
+        renderTranscript(auth.currentUser?.uid, 'view');
+      });
+    }
+  } catch (err) {
+    console.warn('[showCertButtonsIfEligible]', err);
+  }
+}
+
+/* ========= Course Reader 1 ========= */
 async function renderCourseDetail(courseId, lessonId = null) {
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -3274,34 +3332,6 @@ async function renderCourseDetail(courseId, lessonId = null) {
       };
     }
 
-    function ensureFinalInjected(chapters){
-      if (!Array.isArray(chapters) || !chapters.length) return;
-      const last = chapters[chapters.length - 1];
-      last.lessons ||= [];
-      if (!last.lessons.some(l => l.id === "__final__")) {
-        last.lessons.push({ id:"__final__", order:9999, title:"Final Exam", isFinal:true });
-      }
-    }
-
-    function renderSidebarAndFlatList(courseId, chapters, activeLessonId){
-      const sb = document.getElementById("crsSidebar");
-      const flat = [];
-      sb.innerHTML = chapters.map(ch => {
-        const items = (ch.lessons || []).map(ls => {
-          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || '' });
-          const active = (activeLessonId && ls.id === activeLessonId) ? ' class="active"' : '';
-          return `<li${active}><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || 'Lesson'}</a></li>`;
-        }).join("");
-        return `
-          <details open class="blk">
-            <summary><strong>${ch.order ?? ''} ${ch.title || ''}</strong></summary>
-            <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
-          </details>
-        `;
-      }).join("");
-      return flat;
-    }
-
     async function afterLessonCompleted() {
       // 1) save progress already done (you do this today)
       // 2) if now all done -> inject final + rerender sidebar + maybe auto-nav
@@ -3543,7 +3573,7 @@ function gradeFromPct(pct) {
   return "F";
 }
 
-// Fisher–Yates shuffle
+/* Fisher–Yates shuffle Helper 2 */
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -3637,6 +3667,7 @@ async function buildFinalExam(courseId, opts = {}) {
   };
 }
 
+/* ========= Course Reader 2 ========= */
 async function renderFinalExamUI(courseId, quiz) {
   const main = document.getElementById("crsMain");
   if (!main) return;
