@@ -2227,11 +2227,11 @@ async function renderAdmin() {
     <section class="card max" id="adminConsole">
       <h2>Admin Console</h2>
 
-      <div class="tabs">
+      <div class="tabs" id="adminTabs">
         <button class="tab is-active" data-tab="courses">Courses</button>
         <button class="tab" data-tab="posts">Posts</button>
-        <button class="tab" data-tab="ann">Announcements</button>
-        <button class="tab" data-tab="msg">Message Students</button>
+        <button class="tab" data-tab="ann">Announce</button>
+        <button class="tab" data-tab="msg">Message</button>
         <button class="tab" data-tab="import">Import</button>
         <button class="tab" data-tab="certs">Certificates</button>
       </div>
@@ -3028,6 +3028,89 @@ async function renderAdmin() {
   await autoDeleteOldMessages(7);
   await loadAdminMsgs();
 }
+
+// ===== Draggable horizontal scroll that still allows tapping =====
+function makeDraggableScroll(el) {
+  if (!el) return;
+  let isDown = false, startX = 0, startY = 0, scrollLeft = 0, pid = null;
+  let moved = false;
+
+  el.addEventListener('pointerdown', (e) => {
+    isDown = true; moved = false;
+    pid = e.pointerId; el.setPointerCapture(pid);
+    startX = e.clientX; startY = e.clientY;
+    scrollLeft = el.scrollLeft;
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (!isDown) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
+    // only scroll horizontally
+    el.scrollLeft = scrollLeft - dx;
+  });
+
+  function endPointer(e){
+    if (!isDown) return;
+    isDown = false; if (pid!=null) el.releasePointerCapture(pid); pid = null;
+
+    // treat as tap only if user didn't drag
+    if (!moved) {
+      const btn = e.target.closest('.tab'); // <-- your existing class
+      if (btn) btn.click();
+    }
+  }
+  el.addEventListener('pointerup', endPointer);
+  el.addEventListener('pointercancel', endPointer);
+  el.addEventListener('mouseleave', endPointer);
+
+  // prevent vertical scroll only when horizontal intent is clear
+  el.addEventListener('touchmove', (e) => {
+    if (!e.touches || !e.touches[0]) return;
+    const t = e.touches[0];
+    const dx = Math.abs(t.clientX - startX);
+    const dy = Math.abs(t.clientY - startY);
+    if (dx > dy) e.preventDefault();
+  }, { passive: false });
+}
+
+// Tabs (null-safe)
+const tabStrip = document.getElementById('adminTabs');
+makeDraggableScroll(tabStrip);
+
+const tabBtns = (tabStrip ? tabStrip.querySelectorAll('.tab') : document.querySelectorAll('.tab'));
+const paneKeys = ['courses','posts','ann','msg','import','certs'];
+
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    // active UI
+    tabBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+
+    // show pane by data-tab
+    const key = btn.dataset.tab;
+    paneKeys.forEach(k => {
+      const pane = document.getElementById(`tab-${k}`);
+      if (pane) pane.classList.toggle('hidden', k !== key);
+    });
+  }, { passive: true });
+});
+
+// Active tab helper (route ပြောင်းတိုင်း ခေါ်ပါ)
+function highlightAdminTab() {
+  const el = document.getElementById('adminTabs');
+  if (!el) return;
+  const hash = location.hash || '';
+  el.querySelectorAll('.admin-tab').forEach(a => {
+    const on = hash.startsWith(a.getAttribute('href'));
+    a.classList.toggle('active', !!on);
+    if (on) {
+      // active ကို အလယ်ဘက် သွားအောင်
+      a.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  });
+}
+window.addEventListener('hashchange', highlightAdminTab);
 
 /* ========= YouTube helper ========= */
 function getYouTubeId(url = "") {

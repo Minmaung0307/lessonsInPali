@@ -869,6 +869,12 @@ h3 {
   gap: 0.5rem;
   justify-content: center;
   margin-bottom: 1rem;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory; padding-bottom: .25rem;
+}
+.tabs .tab {
+  white-space: nowrap; scroll-snap-align: start;
+  user-select: none; -webkit-user-select: none;
 }
 .tab {
   border: none;
@@ -1795,6 +1801,7 @@ section.card.max,
     width: 100%;
     min-width: 0;
   }
+  body { overscroll-behavior-y: contain; }
   #topbar,
   header.topbar,
   main,
@@ -2331,4 +2338,42 @@ dialog.modal .sheet {
 .modal-card .row {
   gap: 0.5rem;
   justify-content: center;
+}
+
+/* ===== Admin tabs: mobile horizontal scroller ===== */
+.admin-tabs {
+  position: sticky;      /* menu ကို အပေါ်မှာ ထိန်း */
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: .5rem;
+  padding: .5rem .75rem;
+  background: var(--card,#fff);
+  border-bottom: 1px solid var(--border,#e5e7eb);
+
+  overflow-x: auto;                    /* 横 scroll */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;   /* iOS momentum */
+
+  scroll-snap-type: x proximity;       /* snap-to-tab */
+  touch-action: pan-x;                 /* ချိုင့်ချိုင့်ပေါက်: x ကိုပဲ allow */
+  overscroll-behavior-x: contain;      /* parent ကို မပို့ */
+}
+.admin-tabs::-webkit-scrollbar { display: none; }
+
+.admin-tab {
+  flex: 0 0 auto;                      /* shrink မသွား */
+  scroll-snap-align: center;
+  white-space: nowrap;
+  padding: .45rem .8rem;
+  border: 1px solid var(--border,#e5e7eb);
+  border-radius: .75rem;
+  background: #fff;
+  color: var(--text,#111);
+}
+.admin-tab.active {
+  background: #eef6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 600;
 }
