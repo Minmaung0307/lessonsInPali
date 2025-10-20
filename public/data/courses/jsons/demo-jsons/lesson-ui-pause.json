@@ -1,0 +1,16 @@
+{
+  "blocks": [
+    {
+      "type": "pauseBlock",
+      "title": "PAUSE",
+      "question": "What do you think `cd` stands for?",
+      "answer": "**change directory**",
+      "icon": "❓",
+      "underline": true,
+      "leftBadge": {
+        "icon": "❓",
+        "bg": "#2d6fb3"
+      }
+    }
+  ]
+}

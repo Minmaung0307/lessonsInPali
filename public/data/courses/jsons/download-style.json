@@ -1,0 +1,39 @@
+{
+  "id": "lesson1",
+  "chapterTitle": "1 Getting Ready for Class",
+  "chapterStyle": {
+    "backgroundColor": "#f0f8ff",
+    "borderLeft": "8px solid #2196f3",
+    "borderRadius": "50px 0 0 50px"
+  },
+  "contents": [
+    { "type": "heading", "level": 1, "text": "Virtual Class 1", "color": "#0077cc" },
+    { "type": "text", "text": "Please download the following activity files before class:" },
+    {
+      "type": "list",
+      "ordered": true,
+      "items": [
+        { "text": "01 - HTML",       "link": "https://example.com/activities/html.zip" },
+        { "text": "02 - Attributes", "link": "https://example.com/activities/attributes.zip" },
+        { "text": "03 - Git Guide",  "link": "https://example.com/activities/git-guide.zip" }
+      ]
+    },
+    { "type": "video", "title": "Watch the video", "url": "https://www.youtube.com/watch?v=abcdefghijk" },
+    { "type": "divider" },
+    { "type": "heading", "level": 2, "text": "Full-Stack Blog Posts", "color": "#009688" },
+    {
+      "type": "text",
+      "text": "Check out the Full-Stack Blog for additional resources, like walkthroughs, articles, and installation guides.",
+      "link": "https://coding-boot-camp.github.io/fullstack-blog/"
+    },
+    {
+      "type": "list",
+      "ordered": false,
+      "items": [
+        { "icon": "📖", "text": "Getting Started with Git",        "link": "https://coding-boot-camp.github.io/fullstack-blog/git-getting-started" },
+        { "icon": "📖", "text": "Professional README Guide",       "link": "https://coding-boot-camp.github.io/fullstack-blog/readme-guide" },
+        { "icon": "📖", "text": "Full-Stack Blog HTML Cheatsheet", "link": "https://coding-boot-camp.github.io/fullstack-blog/html-cheatsheet" }
+      ]
+    }
+  ]
+}

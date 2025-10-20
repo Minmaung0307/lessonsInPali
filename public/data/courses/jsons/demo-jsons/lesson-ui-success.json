@@ -1,0 +1,10 @@
+{
+  "blocks": [
+    {
+      "type": "successTip",
+      "title": "Nice!",
+      "icon": "✅",
+      "body": "Your changes have been saved successfully."
+    }
+  ]
+}

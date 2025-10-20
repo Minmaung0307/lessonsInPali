@@ -1,0 +1,5 @@
+<script>
+  fetch('/data/lesson-ui-hero.json')
+    .then(r=>r.json())
+    .then(d=> LessonUI.render('#lessonBlocks', d.blocks));
+</script>

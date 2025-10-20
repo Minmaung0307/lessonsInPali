@@ -1,0 +1,17 @@
+{
+  "type": "codeBlock",
+  "lang": "bash",
+  "theme": "light",
+  "code": [
+    { "text": "cd", "color": "#c7254e", "bold": true },
+    { "text": " projects\n", "color": "#000" },
+    { "text": "mkdir", "color": "#0000aa", "bold": true },
+    { "text": " run-buddy\n\n", "color": "#000" },
+    { "text": "cd", "color": "#c7254e", "bold": true },
+    { "text": " run-buddy\n\n", "color": "#000" },
+    { "text": "pwd", "color": "#9c27b0", "bold": true }
+  ],
+  "bgColor": "#faf8f6",
+  "borderColor": "#ddd",
+  "radius": "8px"
+}

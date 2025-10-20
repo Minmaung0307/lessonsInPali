@@ -1,0 +1,14 @@
+<!-- site တစ်ခုလုံးအတွက် shared lesson section -->
+<section id="lessonGlobal"></section>
+
+<script src="/js/lesson-ui-kit.js"></script>
+<script>
+  async function loadLessonUI() {
+    const res = await fetch('/data/lesson-ui-examples.json');
+    const json = await res.json();
+    LessonUI.render('#lessonGlobal', json.blocks);
+  }
+
+  // page တစ်ခု load လုပ်တိုင်း render လုပ်ပေးပါ
+  document.addEventListener('DOMContentLoaded', loadLessonUI);
+</script>

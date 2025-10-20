@@ -1,0 +1,11 @@
+{
+  "blocks": [
+    {
+      "type": "proTip",
+      "title": "SHOW PRO TIP",
+      "icon": "💎",
+      "content": "Press ↑ / ↓ in the terminal to cycle through command history. This saves a ton of time.",
+      "pill": true
+    }
+  ]
+}

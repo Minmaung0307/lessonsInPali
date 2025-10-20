@@ -1,0 +1,39 @@
+{
+  "blocks": [
+    {
+      "type": "codeBlock",
+      "lang": "bash",
+      "theme": "light",
+      "code": "cd projects\nmkdir run-buddy\n\ncd run-buddy\npwd\n",
+      "tokens": [
+        {
+          "match": "cd",
+          "color": "#b4007a"
+        },
+        {
+          "match": "pwd",
+          "color": "#b4007a"
+        },
+        {
+          "match": "run-buddy",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        },
+        {
+          "match": "ls",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        },
+        {
+          "match": "touch",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "If you were to run the `ls` command inside the `run-buddy` directory, nothing would happen, because currently there are no files to list.\n\nLet's go ahead and make a few files using the `touch` command."
+    }
+  ]
+}

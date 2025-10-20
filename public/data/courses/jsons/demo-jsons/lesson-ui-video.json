@@ -1,0 +1,9 @@
+{
+  "blocks": [
+    {
+      "type": "video",
+      "src": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "caption": "Watch the video"
+    }
+  ]
+}

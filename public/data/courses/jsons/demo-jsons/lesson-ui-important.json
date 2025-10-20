@@ -1,0 +1,12 @@
+{
+  "blocks": [
+    {
+      "type": "infoTip",
+      "variant": "important",
+      "title": "IMPORTANT",
+      "titleBorder": "#2d6fb3",
+      "body": "To succeed in this boot camp, type out every line of code instead of copying and pasting it. This will quickly build the muscle memory you need to become an expert coder.",
+      "bodyLeftBar": "#2d6fb3"
+    }
+  ]
+}

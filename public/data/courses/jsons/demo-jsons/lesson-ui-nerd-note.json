@@ -1,0 +1,12 @@
+{
+  "blocks": [
+    {
+      "type": "nerdNote",
+      "title": "NERD NOTE",
+      "icon": "🤓",
+      "body": "The graphical \"desktop\" you see when your computer starts is the **Desktop** folder in your user directory!",
+      "badgeWord": "Desktop",
+      "color": "#3b873e"
+    }
+  ]
+}

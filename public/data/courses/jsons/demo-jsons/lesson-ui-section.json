@@ -1,0 +1,68 @@
+{
+  "blocks": [
+    {
+      "type": "section",
+      "title": "Getting Ready for Class",
+      "style": {
+        "bg": "#f5f7fa",
+        "borderLeft": "6px solid #2d6fb3",
+        "radius": "16px"
+      }
+    },
+    {
+      "type": "h1",
+      "text": "Virtual Class 1",
+      "color": "#2d6fb3"
+    },
+    {
+      "type": "text",
+      "text": "Please download the following activity files before class:"
+    },
+    {
+      "type": "ol",
+      "items": [
+        {
+          "text": "01-HTML",
+          "href": "/assets/01-html.zip"
+        },
+        {
+          "text": "02-Attributes",
+          "href": "/assets/02-attributes.zip"
+        },
+        {
+          "text": "03-Git Guide",
+          "href": "/assets/03-git-guide.pdf"
+        }
+      ]
+    },
+    {
+      "type": "hr"
+    },
+    {
+      "type": "h2",
+      "text": "Full-Stack Blog Posts",
+      "color": "#2d6fb3"
+    },
+    {
+      "type": "text",
+      "text": "Check out the Full-Stack Blog for additional resources, like walkthroughs, articles, and installation guides."
+    },
+    {
+      "type": "ul",
+      "items": [
+        {
+          "text": "📖 Getting Started with Git",
+          "href": "https://example.com/git"
+        },
+        {
+          "text": "📖 Professional README Guide",
+          "href": "https://example.com/readme"
+        },
+        {
+          "text": "📖 Full-Stack Blog HTML Cheatsheet",
+          "href": "https://example.com/html-cheatsheet"
+        }
+      ]
+    }
+  ]
+}

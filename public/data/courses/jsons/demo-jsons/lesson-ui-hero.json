@@ -1,0 +1,36 @@
+{
+  "blocks": [
+    {
+      "type": "lessonHero",
+      "bgColor": "#345667",
+      "accentColor": "#5a94b6",
+      "footerColor": "#cfd3d6",
+      "icons": [
+        {
+          "emoji": "🧑‍💻"
+        },
+        {
+          "emoji": "✏️"
+        },
+        {
+          "emoji": "🌿"
+        },
+        {
+          "emoji": "🧑‍💻"
+        },
+        {
+          "emoji": "✏️"
+        },
+        {
+          "emoji": "🌿"
+        }
+      ],
+      "badge": {
+        "text": "1.1.3",
+        "color": "#2d6fb3"
+      },
+      "title": "Get Started with the Command Line",
+      "titleColor": "#1f5d93"
+    }
+  ]
+}

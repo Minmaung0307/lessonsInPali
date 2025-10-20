@@ -1,0 +1,11 @@
+{
+  "blocks": [
+    {
+      "type": "warningTip",
+      "title": "Heads up",
+      "icon": "⚠️",
+      "body": "You are about to delete a resource. This cannot be undone.",
+      "tone": "warning"
+    }
+  ]
+}

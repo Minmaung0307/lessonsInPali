@@ -1,0 +1,8 @@
+<div id="lessonBlocks"></div>
+<script src="/js/lesson-ui-kit.js"></script>
+<script>
+  // Example—local JSON (သို့) Firestore/remote JSON ကို လိုချင်သလို fetch ပါ
+  fetch('/data/lesson-ui-examples.json')
+    .then(r => r.json())
+    .then(data => LessonUI.render('#lessonBlocks', data.blocks));
+</script>

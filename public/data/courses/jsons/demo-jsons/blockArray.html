@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lesson UI Example</title>
+  <script src="lesson-ui-kit.js"></script>
+</head>
+<body>
+  <div id="lessonBlocks"></div>
+
+  <script>
+    // ==== 1️⃣ blocks array တည်ဆောက်ခြင်း ====
+    const blocks = [
+      {
+        type: "hero",
+        number: "1.1.3",
+        title: "Get Started with the Command Line",
+        icons: [
+          { html: "💻", bg: "#cfe8fa" },
+          { html: "✏️", bg: "#9ab2bf" },
+          { html: "🔗", bg: "#7b9aad" }
+        ]
+      },
+      {
+        type: "tip",
+        variant: "important",
+        title: "IMPORTANT",
+        text: "Type every line of code instead of pasting it. This builds muscle memory!"
+      },
+      {
+        type: "nerdNote",
+        title: "NERD NOTE",
+        text: "The graphical 'desktop' you see when your computer starts is the **Desktop** folder in your user directory!"
+      },
+      {
+        type: "pause",
+        title: "PAUSE",
+        question: "What do you think `cd` stands for?",
+        answer: "`cd` means *change directory*.",
+        toggleLabel: "Show Answer",
+        hideLabel: "Hide Answer"
+      },
+      {
+        type: "proTip",
+        title: "SHOW PRO TIP",
+        hideTitle: "HIDE PRO TIP",
+        text: "Use ↑ and ↓ arrow keys to recall previous terminal commands!"
+      },
+      {
+        type: "code",
+        lang: "bash",
+        code: `cd projects
+mkdir run-buddy
+cd run-buddy
+pwd`
+      },
+      {
+        type: "video",
+        url: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      },
+      {
+        type: "list",
+        ordered: true,
+        items: [
+          { text: "01-HTML Basics", href: "/downloads/01-html.zip" },
+          { text: "02-CSS Layouts", href: "/downloads/02-css.zip" }
+        ]
+      }
+    ];
+
+    // ==== 2️⃣ LessonUI.render() ခေါ်ခြင်း ====
+    LessonUI.render("#lessonBlocks", blocks);
+  </script>
+</body>
+</html>

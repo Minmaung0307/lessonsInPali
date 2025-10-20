@@ -1,0 +1,191 @@
+{
+  "meta": {
+    "generated": "2025-10-19T21:03:56"
+  },
+  "blocks": [
+    {
+      "type": "lessonHero",
+      "bgColor": "#345667",
+      "accentColor": "#5a94b6",
+      "footerColor": "#cfd3d6",
+      "icons": [
+        {
+          "emoji": "🧑‍💻"
+        },
+        {
+          "emoji": "✏️"
+        },
+        {
+          "emoji": "🌿"
+        },
+        {
+          "emoji": "🧑‍💻"
+        },
+        {
+          "emoji": "✏️"
+        },
+        {
+          "emoji": "🌿"
+        }
+      ],
+      "badge": {
+        "text": "1.1.3",
+        "color": "#2d6fb3"
+      },
+      "title": "Get Started with the Command Line",
+      "titleColor": "#1f5d93"
+    },
+    {
+      "type": "infoTip",
+      "variant": "important",
+      "title": "IMPORTANT",
+      "titleBorder": "#2d6fb3",
+      "body": "To succeed in this boot camp, type out every line of code instead of copying and pasting it. This will quickly build the muscle memory you need to become an expert coder.",
+      "bodyLeftBar": "#2d6fb3"
+    },
+    {
+      "type": "warningTip",
+      "title": "Heads up",
+      "icon": "⚠️",
+      "body": "You are about to delete a resource. This cannot be undone.",
+      "tone": "warning"
+    },
+    {
+      "type": "successTip",
+      "title": "Nice!",
+      "icon": "✅",
+      "body": "Your changes have been saved successfully."
+    },
+    {
+      "type": "nerdNote",
+      "title": "NERD NOTE",
+      "icon": "🤓",
+      "body": "The graphical \"desktop\" you see when your computer starts is the **Desktop** folder in your user directory!",
+      "badgeWord": "Desktop",
+      "color": "#3b873e"
+    },
+    {
+      "type": "pauseBlock",
+      "title": "PAUSE",
+      "question": "What do you think `cd` stands for?",
+      "answer": "**change directory**",
+      "icon": "❓",
+      "underline": true,
+      "leftBadge": {
+        "icon": "❓",
+        "bg": "#2d6fb3"
+      }
+    },
+    {
+      "type": "proTip",
+      "title": "SHOW PRO TIP",
+      "icon": "💎",
+      "content": "Press ↑ / ↓ in the terminal to cycle through command history. This saves a ton of time.",
+      "pill": true
+    },
+    {
+      "type": "codeBlock",
+      "lang": "bash",
+      "theme": "light",
+      "code": "cd projects\nmkdir run-buddy\n\ncd run-buddy\npwd\n",
+      "tokens": [
+        {
+          "match": "cd",
+          "color": "#b4007a"
+        },
+        {
+          "match": "pwd",
+          "color": "#b4007a"
+        },
+        {
+          "match": "run-buddy",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        },
+        {
+          "match": "ls",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        },
+        {
+          "match": "touch",
+          "bg": "#fff0f0",
+          "color": "#a33"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "text": "If you were to run the `ls` command inside the `run-buddy` directory, nothing would happen, because currently there are no files to list.\n\nLet's go ahead and make a few files using the `touch` command."
+    },
+    {
+      "type": "section",
+      "title": "Getting Ready for Class",
+      "style": {
+        "bg": "#f5f7fa",
+        "borderLeft": "6px solid #2d6fb3",
+        "radius": "16px"
+      }
+    },
+    {
+      "type": "h1",
+      "text": "Virtual Class 1",
+      "color": "#2d6fb3"
+    },
+    {
+      "type": "text",
+      "text": "Please download the following activity files before class:"
+    },
+    {
+      "type": "ol",
+      "items": [
+        {
+          "text": "01-HTML",
+          "href": "/assets/01-html.zip"
+        },
+        {
+          "text": "02-Attributes",
+          "href": "/assets/02-attributes.zip"
+        },
+        {
+          "text": "03-Git Guide",
+          "href": "/assets/03-git-guide.pdf"
+        }
+      ]
+    },
+    {
+      "type": "hr"
+    },
+    {
+      "type": "h2",
+      "text": "Full-Stack Blog Posts",
+      "color": "#2d6fb3"
+    },
+    {
+      "type": "text",
+      "text": "Check out the Full-Stack Blog for additional resources, like walkthroughs, articles, and installation guides."
+    },
+    {
+      "type": "ul",
+      "items": [
+        {
+          "text": "📖 Getting Started with Git",
+          "href": "https://example.com/git"
+        },
+        {
+          "text": "📖 Professional README Guide",
+          "href": "https://example.com/readme"
+        },
+        {
+          "text": "📖 Full-Stack Blog HTML Cheatsheet",
+          "href": "https://example.com/html-cheatsheet"
+        }
+      ]
+    },
+    {
+      "type": "video",
+      "src": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      "caption": "Watch the video"
+    }
+  ]
+}
