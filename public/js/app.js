@@ -375,24 +375,25 @@ document
   ?.addEventListener("click", () => signOut(auth));
 
 /* ✅ Auth visibility helper (guest/student/admin menu gating) */
-function applyAuthVisibility(user, role) {
+function applyAuthVisibility(user, role = "guest") {
   const authed = !!user;
-  const isStaff = authed && (String(role) === "admin" || String(role) === "ta");
+  const isStaff = authed && (role === "admin" || role === "ta");
 
-  // auth-only / admin-only gating
-  document
-    .querySelectorAll(".auth-only")
-    .forEach((el) => el.classList.toggle("hidden", !authed));
+  // login/logout buttons (desktop + mobile)
+  ["btnLogin", "btnLogin_m"].forEach(id =>
+    document.getElementById(id)?.classList.toggle("hidden", authed)
+  );
+  ["btnLogout", "btnLogout_m"].forEach(id =>
+    document.getElementById(id)?.classList.toggle("hidden", !authed)
+  );
 
-  document
-    .querySelectorAll(".admin-only")
-    .forEach((el) => el.classList.toggle("hidden", !isStaff));
-
-  // buttons (desktop + mobile)
-  document.getElementById("btnLogin")?.classList.toggle("hidden", authed);
-  document.getElementById("btnLogout")?.classList.toggle("hidden", !authed);
-  document.getElementById("btnLogin_m")?.classList.toggle("hidden", authed);
-  document.getElementById("btnLogout_m")?.classList.toggle("hidden", !authed);
+  // gated sections
+  document.querySelectorAll(".auth-only").forEach(el =>
+    el.classList.toggle("hidden", !authed)
+  );
+  document.querySelectorAll(".admin-only").forEach(el =>
+    el.classList.toggle("hidden", !isStaff)
+  );
 }
 
 // ✅ getUserRole() — current user’s role ကို Firestore မှာ query လုပ်ပြီး ပြန်ပေးမယ်
@@ -485,51 +486,6 @@ document
   });
 })();
 
-$("#btnEmailLogin")?.addEventListener("click", async () => {
-  const email = $("#email").value.trim(),
-    pass = $("#password").value;
-  try {
-    await authApi.signInWithEmailAndPassword(auth, email, pass);
-    authDlg.close();
-  } catch (e) {
-    alert(e.message);
-  }
-});
-$("#btnEmailSignup")?.addEventListener("click", async () => {
-  const email = $("#email").value.trim(),
-    pass = $("#password").value;
-  try {
-    await authApi.createUserWithEmailAndPassword(auth, email, pass);
-    authDlg.close();
-  } catch (e) {
-    alert(e.message);
-  }
-});
-$("#btnForgot")?.addEventListener("click", async () => {
-  const email = $("#email").value.trim();
-  try {
-    await authApi.sendPasswordResetEmail(auth, email);
-    alert("Reset email sent.");
-  } catch (e) {
-    alert(e.message);
-  }
-});
-$("#btnGithub")?.addEventListener("click", async () => {
-  try {
-    await authApi.signInWithPopup(auth, providers.github);
-    authDlg.close();
-  } catch (e) {
-    alert(e.message);
-  }
-});
-btnLogout?.addEventListener("click", async () => {
-  try {
-    await authApi.signOut(auth);
-  } catch (e) {
-    console.error(e);
-  }
-});
-
 doLogin?.addEventListener("click", async () => {
   const email = $("#authEmail").value.trim();
   const pass = $("#authPass").value;
@@ -553,73 +509,48 @@ document.getElementById("btnMenu")?.addEventListener("click", () => {
   document.getElementById("navLinks")?.classList.toggle("open");
 });
 
-// role-based gating
-function gateNavByAuth(user, role = "guest") {
-  // login/logout buttons
-  document.getElementById("btnLogin")?.classList.toggle("hidden", !!user);
-  document.getElementById("btnLogout")?.classList.toggle("hidden", !user);
+// Guard to wire onAuthStateChanged only once
+if (window.__AUTH_WIRED__) {
+  console.warn('[auth] onAuthStateChanged already wired; skipping');
+} else {
+  window.__AUTH_WIRED__ = true;
 
-  // auth-only links (Dashboard/Profile/Settings/Certificates/Transcripts)
-  document
-    .querySelectorAll(".auth-only")
-    .forEach((el) => el.classList.toggle("hidden", !user));
+  onAuthStateChanged(auth, async (u) => {
+    currentUser = u || null;
 
-  // admin-only (Admin)
-  const isStaff = role === "admin" || role === "ta";
-  document
-    .querySelectorAll(".admin-only")
-    .forEach((el) => el.classList.toggle("hidden", !isStaff));
+    // 1) Ensure user doc + figure out role (safe defaults)
+    if (u) {
+      try { await ensureUserDoc(u); } catch (e) { console.warn('[auth] ensureUserDoc failed', e); }
+      try {
+        currentRole = (await getUserRole()) || 'student';
+      } catch (e) {
+        console.warn('[auth] getUserRole failed, fallback student', e);
+        currentRole = 'student';
+      }
+      console.log('✅ Logged in as:', u.email, 'Role:', currentRole);
+    } else {
+      currentRole = 'guest';
+      console.log('🚪 Logged out');
+    }
+
+    // 2) Single place to toggle UI (avoid double toggles)
+    applyAuthVisibility(currentUser, currentRole);
+    if (typeof setActiveNav === 'function') setActiveNav();
+
+    // 3) Route re-render (re-entrant guarded)
+    if (!window.__ROUTE_LOCK__) {
+      window.__ROUTE_LOCK__ = true;
+      // queue to microtask to avoid nested reflows/recursion
+      Promise.resolve().then(async () => {
+        try {
+          if (typeof route === 'function') await route();
+        } finally {
+          window.__ROUTE_LOCK__ = false;
+        }
+      });
+    }
+  });
 }
-
-onAuthStateChanged(auth, async (u) => {
-  currentUser = u || null;
-
-  // 1) user doc ကို login ဖြစ်သလို စောစော ensure (role/theme/fs စသည့် default တွေ စီ)
-  if (u) {
-    // 1) users/{uid} မရှိရင် ဖန်တီး
-    await ensureUserDoc(u);
-    // 2) role ဖတ်
-    currentRole = await getUserRole();
-    if (!currentRole) currentRole = "student";
-    console.log("✅ Logged in as:", u.email, "Role:", currentRole);
-  } else {
-    console.log("🚪 Logged out");
-    currentRole = "guest";
-  }
-
-  // 2) role ထုတ်ယူ
-  let role = "guest";
-  if (u) {
-    try {
-      role = await getUserRole(); // users/{uid}.role
-      if (!role) role = "student";
-      console.log("✅ Logged in as:", u.email, "Role:", role);
-    } catch (e) {
-      console.warn('getUserRole failed, fallback "student"', e);
-      role = "student";
-    }
-  } else {
-    console.log("🚪 Logged out");
-  }
-  currentRole = role;
-
-  // 3) UI gating
-  applyAuthVisibility(currentUser, currentRole);
-  if (typeof setActiveNav === "function") setActiveNav();
-  if (typeof gateNavByAuth === "function") {
-    gateNavByAuth(currentUser, currentRole);
-  }
-
-  // 4) route re-render (re-entrant guard)
-  if (!window.__ROUTE_LOCK__) {
-    window.__ROUTE_LOCK__ = true;
-    try {
-      if (typeof route === "function") await route();
-    } finally {
-      window.__ROUTE_LOCK__ = false;
-    }
-  }
-});
 
 // logout
 document
