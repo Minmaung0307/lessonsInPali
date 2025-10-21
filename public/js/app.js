@@ -49,10 +49,13 @@ if (!window.__JSON_IMPORT__) {
   window.__JSON_IMPORT__ = true;
 
   // small helpers
-  const _isNum = v => typeof v === 'number' && !isNaN(v);
-  const _isArr = v => Array.isArray(v);
+  const _isNum = (v) => typeof v === "number" && !isNaN(v);
+  const _isArr = (v) => Array.isArray(v);
   const _pickDefined = (obj) => {
-    const o = {}; Object.entries(obj || {}).forEach(([k,v])=>{ if (v !== undefined) o[k] = v; });
+    const o = {};
+    Object.entries(obj || {}).forEach(([k, v]) => {
+      if (v !== undefined) o[k] = v;
+    });
     return o;
   };
 
@@ -62,7 +65,9 @@ if (!window.__JSON_IMPORT__) {
     const snap = await getDocs(colRef);
     for (const d of snap.docs) {
       // if this doc has nested 'questions' subcol, wipe it first
-      const qs = await getDocs(collection(db, ...pathSegments, d.id, 'questions')).catch(()=>null);
+      const qs = await getDocs(
+        collection(db, ...pathSegments, d.id, "questions")
+      ).catch(() => null);
       if (qs && !qs.empty) {
         for (const qd of qs.docs) await deleteDoc(qd.ref);
       }
@@ -74,20 +79,24 @@ if (!window.__JSON_IMPORT__) {
   // normalize 1 question → safe firestore payload
   function _qPayload(q) {
     const base = {
-      text: q.text || '',
-      type: (q.type || 'scq').toLowerCase(),
-      points: _isNum(q.points) ? q.points : 1
+      text: q.text || "",
+      type: (q.type || "scq").toLowerCase(),
+      points: _isNum(q.points) ? q.points : 1,
     };
     // only include if valid
     if (_isArr(q.choices)) base.choices = q.choices;
-    if (_isArr(q.accept))  base.accept  = q.accept;
-    if (_isNum(q.answerIndex) || _isArr(q.answerIndex)) base.answerIndex = q.answerIndex;
+    if (_isArr(q.accept)) base.accept = q.accept;
+    if (_isNum(q.answerIndex) || _isArr(q.answerIndex))
+      base.answerIndex = q.answerIndex;
     if (q.feedback) base.feedback = q.feedback;
     return base;
   }
 
   // === main import API
   window.importAnyJson = async function importAnyJson(j) {
+    const USE_CATALOG_CASCADE = false; // catalog → chaptersUrl auto-follow (off)
+    const USE_CHAPTER_CASCADE = false; // chapters → lessonsUrl auto-follow (off)
+
     if (!j) throw new Error("Empty JSON");
 
     // 1) catalog.json
@@ -95,18 +104,19 @@ if (!window.__JSON_IMPORT__) {
       let n = 0;
       for (const c of j.courses) {
         const id = c.id || crypto.randomUUID();
-        const copy = { ...c }; delete copy.chaptersUrl;
-        await setDoc(doc(db, 'courses', id), copy, { merge: true });
+        const copy = { ...c };
+        delete copy.chaptersUrl;
+        await setDoc(doc(db, "courses", id), copy, { merge: true });
         n++;
         // optional cascade
-        if (c.chaptersUrl) {
+        if (USE_CATALOG_CASCADE && c.chaptersUrl) {
           try {
-            const r = await fetch(c.chaptersUrl, { cache: 'no-store' });
+            const r = await fetch(c.chaptersUrl, { cache: "no-store" });
             if (r.ok) await importAnyJson(await r.json());
           } catch {}
         }
       }
-      return { kind: 'catalog', count: n };
+      return { kind: "catalog", count: n };
     }
 
     // 2) chapters.json
@@ -116,46 +126,65 @@ if (!window.__JSON_IMPORT__) {
       for (const ch of j.chapters) {
         const chid = ch.id || crypto.randomUUID();
         await setDoc(
-          doc(db, 'courses', cid, 'chapters', chid),
+          doc(db, "courses", cid, "chapters", chid),
           _pickDefined({
-            title: ch.title || '',
+            title: ch.title || "",
             order: _isNum(ch.order) ? ch.order : 1,
-            summary: ch.summary || ''
+            summary: ch.summary || "",
           }),
           { merge: true }
         );
         n++;
-        if (ch.lessonsUrl) {
+        if (USE_CHAPTER_CASCADE && ch.lessonsUrl) {
           try {
-            const r = await fetch(ch.lessonsUrl, { cache: 'no-store' });
-            if (r.ok) await importAnyJson({ ...(await r.json()), _cid: cid, _chid: chid });
+            const r = await fetch(ch.lessonsUrl, { cache: "no-store" });
+            if (r.ok)
+              await importAnyJson({
+                ...(await r.json()),
+                _cid: cid,
+                _chid: chid,
+              });
           } catch {}
         }
+        // if (ch.lessonsUrl) {
+        //   try {
+        //     const r = await fetch(ch.lessonsUrl, { cache: 'no-store' });
+        //     if (r.ok) await importAnyJson({ ...(await r.json()), _cid: cid, _chid: chid });
+        //   } catch {}
+        // }
       }
-      return { kind: 'chapters', count: n };
+      return { kind: "chapters", count: n };
     }
 
     // 3) lesson (hybrid) — supports reading/contents/blocks/quiz
     if (j.lesson && (j._cid || j.courseId)) {
-      const cid  = j._cid || j.courseId;
-      const chid = j._chid || j.chapterId || 'c1';
-      const l    = j.lesson;
-      const lid  = l.id || crypto.randomUUID();
+      const cid = j._cid || j.courseId;
+      const chid = j._chid || j.chapterId || "c1";
+      const l = j.lesson;
+      const lid = l.id || crypto.randomUUID();
 
       // upsert lesson core
       await setDoc(
-        doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid),
+        doc(db, "courses", cid, "chapters", chid, "lessons", lid),
         _pickDefined({
-          title: l.title || '',
+          title: l.title || "",
           order: _isNum(l.order) ? l.order : 1,
-          reading: j.reading || '',
-          theme: j.theme || {}
+          reading: j.reading || "",
+          theme: j.theme || {},
         }),
         { merge: true }
       );
 
       // --- replace contents (wipe → write) ---
-      await _wipeSubcol(['courses', cid, 'chapters', chid, 'lessons', lid, 'contents']);
+      await _wipeSubcol([
+        "courses",
+        cid,
+        "chapters",
+        chid,
+        "lessons",
+        lid,
+        "contents",
+      ]);
       let cCount = 0;
 
       // accept either j.contents or j.blocks; both go to contents subcollection
@@ -166,79 +195,138 @@ if (!window.__JSON_IMPORT__) {
       for (let i = 0; i < merged.length; i++) {
         const b = merged[i] || {};
         const clean = _pickDefined({
-          type: (b.type || 'text'),
+          type: b.type || "text",
           order: _isNum(b.order) ? b.order : i + 1,
-          caption: b.caption || '',
-          text: b.text || '',
-          html: b.html || '',
-          url: b.url ?? '',
+          caption: b.caption || "",
+          text: b.text || "",
+          html: b.html || "",
+          url: b.url ?? "",
+          // url: b.url ?? '',
           // url: b.url || '',
-          class: b.class || '',
+          class: b.class || "",
           data: b.data || null,
-          title: b.title || '',
-          subtitle: b.subtitle || '',
+          title: b.title || "",
+          subtitle: b.subtitle || "",
           icons: b.icons || null,
-          badge: b.badge || '',
-          accent: b.accent || ''
+          badge: b.badge || "",
+          accent: b.accent || "",
         });
         await setDoc(
-          doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'contents', crypto.randomUUID()),
+          doc(
+            db,
+            "courses",
+            cid,
+            "chapters",
+            chid,
+            "lessons",
+            lid,
+            "contents",
+            crypto.randomUUID()
+          ),
           clean
         );
         cCount++;
       }
 
       // --- replace quizzes (wipe all → write one from json.quiz if present) ---
-      const qCol = collection(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes');
+      const qCol = collection(
+        db,
+        "courses",
+        cid,
+        "chapters",
+        chid,
+        "lessons",
+        lid,
+        "quizzes"
+      );
       const qsnap = await getDocs(qCol);
       for (const qd of qsnap.docs) {
-        await _wipeSubcol(['courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qd.id, 'questions']);
+        await _wipeSubcol([
+          "courses",
+          cid,
+          "chapters",
+          chid,
+          "lessons",
+          lid,
+          "quizzes",
+          qd.id,
+          "questions",
+        ]);
         await deleteDoc(qd.ref);
       }
 
-      let qCount = 0, qItemCount = 0;
+      let qCount = 0,
+        qItemCount = 0;
       if (j.quiz && _isArr(j.quiz.questions)) {
         const qid = crypto.randomUUID();
         await setDoc(
-          doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid),
+          doc(
+            db,
+            "courses",
+            cid,
+            "chapters",
+            chid,
+            "lessons",
+            lid,
+            "quizzes",
+            qid
+          ),
           _pickDefined({
-            title: j.quiz.title || 'Quiz',
+            title: j.quiz.title || "Quiz",
             shuffle: !!j.quiz.shuffle,
-            passPct: _isNum(j.quiz.passPct) ? j.quiz.passPct : 70
+            passPct: _isNum(j.quiz.passPct) ? j.quiz.passPct : 70,
           })
         );
         qCount = 1;
         for (const q of j.quiz.questions) {
           await setDoc(
-            doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid, 'questions', crypto.randomUUID()),
+            doc(
+              db,
+              "courses",
+              cid,
+              "chapters",
+              chid,
+              "lessons",
+              lid,
+              "quizzes",
+              qid,
+              "questions",
+              crypto.randomUUID()
+            ),
             _qPayload(q)
           );
           qItemCount++;
         }
       }
 
-      return { kind: 'lesson', contents: cCount, quizzes: qCount, questions: qItemCount, ids: { cid, chid, lid } };
+      return {
+        kind: "lesson",
+        contents: cCount,
+        quizzes: qCount,
+        questions: qItemCount,
+        ids: { cid, chid, lid },
+      };
     }
 
     throw new Error("Unrecognized JSON structure");
   };
 
   // === Wire Admin “Import” button if present ===
-  window.addEventListener('DOMContentLoaded', () => {
-    const ta  = document.getElementById('importJson');
-    const btn = document.getElementById('btnImportCourse');
+  window.addEventListener("DOMContentLoaded", () => {
+    const ta = document.getElementById("importJson");
+    const btn = document.getElementById("btnImportCourse");
     if (btn && ta) {
-      btn.addEventListener('click', async (e) => {
+      btn.addEventListener("click", async (e) => {
         e.preventDefault();
         try {
           const raw = ta.value.trim();
-          if (!raw) return alert('Paste JSON first.');
+          if (!raw) return alert("Paste JSON first.");
           const json = JSON.parse(raw);
           const res = await window.importAnyJson(json);
           alert(`[import] OK: ${res.kind}\n` + JSON.stringify(res, null, 2));
         } catch (err) {
-          console.error('[import] failed:', err);
-          alert('Import failed: ' + (err.message || err));
+          console.error("[import] failed:", err);
+          alert("Import failed: " + (err.message || err));
         }
       });
     }
@@ -583,6 +671,12 @@ document
 function applyAuthVisibility(user, role = "guest") {
   const authed = !!user;
   const isStaff = authed && (role === "admin" || role === "ta");
+  if (!isStaff) {
+    const btn = document.getElementById("btnMarkDone");
+    const msg = document.getElementById("markMsg");
+    btn?.parentElement?.remove(); // or btn?.remove();
+    msg?.remove?.();
+  }
 
   // login/logout buttons (desktop + mobile)
   ["btnLogin", "btnLogin_m"].forEach((id) =>
@@ -723,38 +817,42 @@ if (window.__AUTH_WIRED__) {
   onAuthStateChanged(auth, async (u) => {
     currentUser = u || null;
 
-    // 1) Ensure user doc + figure out role (safe defaults)
+    // 1) Ensure user doc + role (safe defaults)
     if (u) {
       try {
         await ensureUserDoc(u);
       } catch (e) {
         console.warn("[auth] ensureUserDoc failed", e);
       }
+
       try {
         currentRole = (await getUserRole()) || "student";
       } catch (e) {
         console.warn("[auth] getUserRole failed, fallback student", e);
         currentRole = "student";
       }
+
       console.log("✅ Logged in as:", u.email, "Role:", currentRole);
     } else {
       currentRole = "guest";
       console.log("🚪 Logged out");
     }
 
-    // 2) Single place to toggle UI (avoid double toggles)
+    // 2) First pass: toggle anything already in DOM (header/nav etc.)
     applyAuthVisibility(currentUser, currentRole);
     if (typeof setActiveNav === "function") setActiveNav();
 
-    // 3) Route re-render (re-entrant guarded)
+    // 3) Route re-render (re-entrant guarded) — then run a second pass of gating
     if (!window.__ROUTE_LOCK__) {
       window.__ROUTE_LOCK__ = true;
-      // queue to microtask to avoid nested reflows/recursion
       Promise.resolve().then(async () => {
         try {
           if (typeof route === "function") await route();
         } finally {
           window.__ROUTE_LOCK__ = false;
+          // 🔁 Second pass after route so newly-rendered nodes also get gated
+          applyAuthVisibility(currentUser, currentRole);
+          if (typeof setActiveNav === "function") setActiveNav();
         }
       });
     }
@@ -3361,6 +3459,8 @@ async function showCertButtonsIfEligible(courseId, enrRef) {
 /* ========= Course Reader 1 ========= */
 async function renderCourseDetail(courseId, lessonId = null) {
   const app = document.getElementById("app");
+  const HIDE_CHAPTER_SIDEBAR = true;
+
   app.innerHTML = `
     <section class="card max" id="courseReader" data-cid="${courseId}">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -3368,14 +3468,14 @@ async function renderCourseDetail(courseId, lessonId = null) {
         <a class="btn ghost" href="#/dashboard">← Back to Dashboard</a>
       </div>
 
-      <div class="grid-2" style="gap:1rem; align-items:flex-start">
+      <div id="crsWrap" class="grid-2" style="gap:1rem; align-items:flex-start">
         <aside id="crsSidebar" class="card" style="padding:0.5rem; max-height:70vh; overflow:auto"></aside>
         <main id="crsMain" class="card" style="min-height:50vh">Loading…</main>
       </div>
     </section>
   `;
 
-  // --- Course title ---
+  // title
   try {
     const s = await getDoc(doc(db, "courses", courseId));
     if (s.exists())
@@ -3383,18 +3483,27 @@ async function renderCourseDetail(courseId, lessonId = null) {
         s.data().title || "Course";
   } catch {}
 
-  // --- Load tree first (NEEDED for counts) ---
+  // load tree
   const chapters = await loadCourseTree(courseId);
   const sb = document.getElementById("crsSidebar");
   const main = document.getElementById("crsMain");
 
   if (!chapters.length) {
-    sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
+    if (!HIDE_CHAPTER_SIDEBAR && sb)
+      sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
     main.innerHTML = `<div class="muted">No lessons.</div>`;
     return;
   }
 
-  // --- progress state (scoped here) ---
+  // build a flat list for navigation (always)
+  const flat = [];
+  chapters.forEach((ch) => {
+    (ch.lessons || []).forEach((ls) => {
+      flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
+    });
+  });
+
+  // progress
   const uid = auth.currentUser?.uid;
   const enrRef = uid ? doc(db, "users", uid, "enrollments", courseId) : null;
   let progress = {};
@@ -3405,14 +3514,14 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
   } catch {}
 
-  // --- compute counts for progress bar ---
+  // counts
   const allLessons = chapters.flatMap((ch) =>
     (ch.lessons || []).filter((ls) => ls.id !== "__final__")
   );
   const totalCount = allLessons.length;
   const doneCount = Object.values(progress).filter(Boolean).length;
 
-  // --- Final Exam only when completed all normal lessons ---
+  // inject final if complete
   const canShowFinal = totalCount > 0 && doneCount >= totalCount;
   if (canShowFinal && chapters.length) {
     const last = chapters[chapters.length - 1];
@@ -3423,49 +3532,60 @@ async function renderCourseDetail(courseId, lessonId = null) {
         title: "Final Exam",
         isFinal: true,
       });
+      // keep flat list in sync
+      flat.push({ chId: last.id, lsId: "__final__", title: "Final Exam" });
     }
   }
 
-  // --- Sidebar render ---
-  // const flat = [];
-  const flat = renderSidebarAndFlatList(courseId, chapters, lessonId);
-  sb.innerHTML = chapters
-    .map((ch) => {
-      const items = (ch.lessons || [])
-        .map((ls) => {
-          flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
-          const active =
-            lessonId && ls.id === lessonId ? ' class="active"' : "";
-          return `<li${active}><a href="#/courses/${courseId}/lesson/${
-            ls.id
-          }">${ls.title || "Lesson"}</a></li>`;
-        })
-        .join("");
-      return `
-      <details open class="blk">
-        <summary><strong>${ch.order ?? ""} ${ch.title || ""}</strong></summary>
-        <ol class="list clean">${
-          items || '<li class="muted">No lessons</li>'
-        }</ol>
-      </details>
-    `;
-    })
-    .join("");
+  // sidebar UI (hide if asked)
+  if (!HIDE_CHAPTER_SIDEBAR && sb) {
+    sb.innerHTML = chapters
+      .map((ch) => {
+        const items = (ch.lessons || [])
+          .map(
+            (ls) =>
+              `<li><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.order}. ${ls.title}</a></li>`
+          )
+          .join("");
+        return `
+        <details open class="blk">
+          <summary><strong>${ch.order ?? ""} ${
+          ch.title || ""
+        }</strong></summary>
+          <ol class="list clean">${
+            items || '<li class="muted">No lessons</li>'
+          }</ol>
+        </details>
+      `;
+      })
+      .join("");
+  } else {
+    const wrap = document.getElementById("crsWrap");
+    if (sb) sb.remove();
+    if (wrap) {
+      wrap.classList.remove("grid-2");
+      wrap.style.display = "block";
+    }
+    if (main) {
+      main.style.minHeight = "50vh";
+      main.style.width = "100%";
+    }
+  }
 
-  // default select first lesson
+  // default open first lesson
   if (!lessonId && flat.length) {
     location.hash = `#/courses/${courseId}/lesson/${flat[0].lsId}`;
     return;
   }
 
-  // idx + prev/next
+  // locate current
   const idx = flat.findIndex((x) => x.lsId === lessonId);
   if (idx < 0) {
     main.innerHTML = `<div class="card error">Lesson not found.</div>`;
     return;
   }
   const prev = idx > 0 ? flat[idx - 1] : null;
-  const next = idx < flat.length - 1 ? flat[idx + 1] : null;
+  let next = idx < flat.length - 1 ? flat[idx + 1] : null; // ← let (not const)
 
   if (!next) {
     const existsFinal = chapters[chapters.length - 1]?.lessons?.some(
@@ -3474,13 +3594,11 @@ async function renderCourseDetail(courseId, lessonId = null) {
     if (existsFinal) next = { lsId: "__final__" };
   }
 
-  // --- Normal lesson flow ---
   try {
-    // load quiz (optional)
-    let quiz = null,
-      questions = [];
+    // identify chapter for this lesson
     const chId = flat[idx].chId;
 
+    // read lesson doc
     const lessonRef = doc(
       db,
       "courses",
@@ -3497,7 +3615,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
     const L = { id: lsSnap.id, ...lsSnap.data() };
 
-    // prepare helpers
+    // helpers
     const isUrl = (v) => /^https?:\/\//i.test(v || "");
     const isPdf = (v) => /\.pdf($|\?)/i.test(v || "");
     const getYouTubeId = (u = "") => {
@@ -3509,7 +3627,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }
     };
 
-    // load contents
+    // load contents (ordered)
     const contents = [];
     const csnap = await getDocs(
       query(
@@ -3534,15 +3652,9 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }))
     );
 
-    // ✅ normalize quiz object (may be null)
-    const quizObj = quiz
-      ? {
-          title: quiz.title || "Quiz",
-          shuffle: !!quiz.shuffle,
-          passPct: Number(quiz.passPct ?? 70),
-          questions: questions || [],
-        }
-      : null;
+    // load quiz (if any)
+    let quiz = null,
+      questions = [];
     const qsnap = await getDocs(
       collection(
         db,
@@ -3588,29 +3700,27 @@ async function renderCourseDetail(courseId, lessonId = null) {
       return `<div class="card"><div class="reading">${safe}</div></div>`;
     })();
 
-    // --- build header FIRST, then query children safely ---
     main.innerHTML = `
-        <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
-            <div class="progress-bar"><span style="width:0%"></span></div>
-            <div class="progress-text muted"></div>
-          </div>
+      <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
+        <div class="progress-bar"><span style="width:0%"></span></div>
+        <div class="progress-text muted"></div>
+      </div>
 
-        <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
-          <h3 style="margin:0">${L.title || "Lesson"}</h3>
-          <div class="row" style="gap:.5rem;align-items:center">
-            <div id="certBtns"></div>   <!-- 👈 certificate/transcript buttons will appear here -->
-            <button class="btn ghost" ${
-              prev ? "" : "disabled"
-            } data-nav="prev">← Prev</button>
-            <button class="btn" ${
-              next ? "" : "disabled"
-            } data-nav="next" id="btnNext">Next →</button>
-          </div>
+      <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
+        <h3 style="margin:0">${L.title || "Lesson"}</h3>
+        <div class="row" style="gap:.5rem;align-items:center">
+          <div id="certBtns"></div>
+          <button class="btn ghost" ${
+            prev ? "" : "disabled"
+          } data-nav="prev">← Prev</button>
+          <button class="btn" ${
+            next ? "" : "disabled"
+          } data-nav="next" id="btnNext">Next →</button>
         </div>
+      </div>
 
       ${readingHtml}
 
-    
       <div class="row" style="gap:.5rem; margin:.25rem 0 1rem">
         <button class="btn small" id="btnMarkDone">Mark lesson complete</button>
         <span class="muted" id="markMsg"></span>
@@ -3621,114 +3731,170 @@ async function renderCourseDetail(courseId, lessonId = null) {
       ${
         quiz
           ? `<div class="card" id="quizCard">
-              <strong id="quizTitle">Quiz</strong>
-              <p class="muted" id="quizMeta"></p>
-              <div class="row" style="gap:.5rem;flex-wrap:wrap">
-                <button class="btn" id="btnStartQuiz">Start Quiz</button>
-                <span id="quizResult" class="muted"></span>
-              </div>
-              <div id="quizHost" style="margin-top:.5rem"></div>
-            </div>`
+               <strong id="quizTitle">Quiz</strong>
+               <p class="muted" id="quizMeta"></p>
+               <div class="row" style="gap:.5rem;flex-wrap:wrap">
+                 <button class="btn" id="btnStartQuiz">Start Quiz</button>
+                 <span id="quizResult" class="muted"></span>
+               </div>
+               <div id="quizHost" style="margin-top:.5rem"></div>
+             </div>`
           : ``
       }
     `;
 
+    // next gating
     const btnNext = document.getElementById("btnNext");
-
-    // အခုသင်ကြည့်နေတဲ့ lesson ပြီးပြီလား?
     const isDone = !!progress[lessonId];
-    if (btnNext) btnNext.disabled = !isDone; // ❗ Quiz မပတ်လဲ မဖြတ်လမ်းနိုင်အောင်
-
-    // nav buttons (ရှိပြီးသား code)
+    if (btnNext) btnNext.disabled = !isDone;
     btnNext?.addEventListener(
       "click",
       () =>
         next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
     );
 
-    // --- only after innerHTML is set, resolve nodes ---
-    const lessonBlocks = main.querySelector("#lessonBlocks");
-    if (!lessonBlocks) {
-      console.warn(
-        "[reader] #lessonBlocks not found; aborting render to avoid null error"
-      );
-      return;
-    }
-
-    // (optional) inline PDF preview
+    // PDF inline preview (optional)
     if (isUrl(L.reading) && isPdf(L.reading)) {
       main.insertAdjacentHTML(
         "beforeend",
-        `
-        <div class="card" style="margin-top:.5rem">
-          <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
-            <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
-          </div>
-        </div>
-      `
+        `<div class="card" style="margin-top:.5rem">
+           <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
+             <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+           </div>
+         </div>`
       );
     }
 
-    // --- render contents (Hybrid first; fallback legacy) ---
-    try {
-      const lessonBlocks = document.getElementById("lessonBlocks");
-      if (!lessonBlocks) return;
+    // ---------- SINGLE content renderer (Hybrid → fallback legacy) ----------
+    const lessonBlocks = document.getElementById("lessonBlocks");
+    if (lessonBlocks) {
+      const blocks = contentsResolved
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const hybridTypes = new Set([
+        "hero",
+        "h1",
+        "h2",
+        "tip",
+        "pauseblock",
+        "protip",
+        "nerdnote",
+        "list",
+        "downloads",
+        "code",
+        "html",
+      ]);
+      const isHybrid = blocks.some((b) =>
+        hybridTypes.has(String(b.type || "").toLowerCase())
+      );
 
-      const blocks = contentsResolved.slice().sort((a,b)=>(a.order||0)-(b.order||0));
-      const hybridTypes = new Set(['hero','h1','h2','tip','pauseblock','protip','nerdnote','list','downloads','code','html']); // note: case-insensitive
-      const isHybrid = blocks.some(b => hybridTypes.has(String(b.type||'').toLowerCase()));
-
-      if (isHybrid && window.LessonUI && typeof window.LessonUI.render === 'function') {
-        lessonBlocks.innerHTML = '';
+      if (
+        isHybrid &&
+        window.LessonUI &&
+        typeof window.LessonUI.render === "function"
+      ) {
+        lessonBlocks.innerHTML = "";
         window.LessonUI.render(lessonBlocks, blocks);
       } else {
-        // legacy renderer
+        // legacy renderer (HYBRID မရှိရင်ပဲ လုပ်မယ်)
         lessonBlocks.innerHTML = blocks.map(b => {
           const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
           const u = b.url || '';
           const t = (b.type || '').toLowerCase();
-          const yid = getYouTubeId(u);
-          if (t === 'youtube' || yid) {
-            const id = yid || '';
-            return `<div class="card">
-              <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
-                <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
-                  style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
-              </div>${cap}
-            </div>`;
-          }
+
           switch (t) {
-            case 'video': return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-            case 'audio': return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-            case 'image': return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+            case 'h1':
+              return `<div class="card"><h1 style="margin:.25rem 0">${escapeHtml(b.text||b.title||'')}</h1></div>`;
+
+            case 'hr':
+              return `<hr class="muted" style="opacity:.3">`;
+
+            case 'list': {
+              const items = Array.isArray(b.items) ? b.items : [];
+              const tag = b.ordered ? 'ol' : 'ul';
+              const bar = b.data?.bar;
+              const left = bar ? `style="border-left:4px solid ${bar};padding-left:.75rem"` : '';
+              const li = items.map(x=>`<li>${escapeHtml(String(x))}</li>`).join('');
+              return `<div class="card" ${left}><${tag} class="list">${li}</${tag}></div>`;
+            }
+
+            case 'tip': {
+              const variant = (b.variant||'info').toLowerCase();
+              const tok = Array.isArray(b.tokens) ? b.tokens.map(t=>{
+                if (t.type==='kbd')  return `<kbd>${escapeHtml(t.text||'')}</kbd>`;
+                if (t.type==='link') return `<a href="${t.href||'#'}">${escapeHtml(t.text||'link')}</a>`;
+                return '';
+              }).join(' ') : '';
+              const border = b.leftBorder?.color ? `style="border-left:4px solid ${b.leftBorder.color};padding-left:.75rem"` : '';
+              return `<div class="card ${variant}" ${border}>
+                <strong>${escapeHtml(b.title||'Tip')}</strong>
+                <div class="muted" style="margin:.25rem 0">${escapeHtml(b.text||'')}</div>
+                ${tok ? `<div style="margin-top:.25rem">${tok}</div>` : ''}
+              </div>`;
+            }
+
+            case 'pauseblock': {
+              const border = b.leftBorder?.color
+                ? `style="border-left:4px solid ${b.leftBorder.color};padding-left:.75rem"` : '';
+              return `<div class="card" ${border}>
+                <strong>${escapeHtml(b.title||'PAUSE')}</strong>
+                <p style="margin:.25rem 0">${escapeHtml(b.question||'')}</p>
+                ${b.answer ? `<details class="blk"><summary>Answer</summary><div>${escapeHtml(b.answer)}</div></details>` : ''}
+              </div>`;
+            }
+
+            case 'protip':
+              return `<div class="card" style="border-left:4px solid ${b.accent||'#1d4ed8'};padding-left:.75rem">
+                <strong>${escapeHtml(b.title||'Pro Tip')}</strong>
+                <div class="muted" style="margin:.25rem 0">${escapeHtml(b.text||'')}</div>
+              </div>`;
+
+            case 'hero': {
+              const icons = Array.isArray(b.icons) ? b.icons.map(ic => ic.html || '').join(' ') : '';
+              return `<div class="card" style="background:${b.accent||'#f5f7fb'}">
+                <div class="row" style="justify-content:space-between;align-items:center">
+                  <div><div class="muted">${escapeHtml(b.subtitle||'')}</div>
+                      <h2 style="margin:.2rem 0">${escapeHtml(b.title||'')}</h2></div>
+                  <div style="font-size:2rem">${icons}</div>
+                </div>
+                ${b.badge ? `<span class="badge">${escapeHtml(b.badge)}</span>` : ''}
+              </div>`;
+            }
+
+            case 'video':
+              return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+            case 'audio':
+              return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+            case 'image':
+              return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+
+            // youtube ကို ဒီလို သီးသန့်မထည့်ချင်ရင် လုံးဝမထည့်လည်းရ
+            // case 'youtube': ...
+
             case 'text':
-            default:      return `<div class="card">${escapeHtml(b.text||'')}${cap}</div>`;
+            default:
+              // ❗ Default ကို URL link မဟုတ်ပဲ text ကိုပဲ ပြ
+              return `<div class="card">${escapeHtml(b.text||'')}${cap}</div>`;
           }
         }).join('');
       }
-    } catch (e) {
-      console.error('[reader/blocks]', e);
     }
+    // ----------------------------------------------------------------------
 
-    // helper: set Next button state (gray when disabled, blue when enabled)
     function setNextState(passed, isLast) {
       const btnNext = document.getElementById("btnNext");
       if (!btnNext) return;
-
       if (isLast) {
-        // နောက်ဆုံးအခန်း—ရောက်ချင်း disabled (မခွင့်ပြု)
         btnNext.disabled = true;
         btnNext.classList.remove("primary");
         btnNext.title = "This is the last lesson";
         return;
       }
-
-      btnNext.disabled = !passed; // Quiz မဖြတ်မချင်း မခွင့်ပြု
-      btnNext.classList.toggle("primary", !!passed); // passed => ပြာရောင်
+      btnNext.disabled = !passed;
+      btnNext.classList.toggle("primary", !!passed);
       btnNext.title = passed ? "" : "Complete the quiz to proceed";
     }
 
-    // … header DOM တင်ပြီးနောက် (prev/next တွေတွက်ပြီး) —
     const isLastLesson = !next || !next.lsId;
     setNextState(!!progress[lessonId], isLastLesson);
 
@@ -3775,6 +3941,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
 
     // ✦ fallback (B): lessonsUrl JSON ဖိုင်ကနေ ယူချင်ရင်
+    const ALLOW_URL_FALLBACKS = false;
     async function getFallbackQuizFromUrl(url) {
       try {
         if (!url) return null;
@@ -3813,6 +3980,11 @@ async function renderCourseDetail(courseId, lessonId = null) {
           if (url) {
             quizObj = await getFallbackQuizFromUrl(url);
           }
+        }
+
+        if (!quizObj && ALLOW_URL_FALLBACKS) {
+          const u = L.lessonsUrl || L.quizUrl || L.srcUrl;
+          if (u) quizObj = await getFallbackQuizFromUrl(u);
         }
 
         if (!quizObj || !quizObj.questions?.length) {
@@ -3972,7 +4144,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
       })
       .join("");
 
-    // nav buttons
+    // prev/next click
     main
       .querySelector('[data-nav="prev"]')
       ?.addEventListener(
@@ -3995,10 +4167,9 @@ async function renderCourseDetail(courseId, lessonId = null) {
         progress[lessonId] = true;
         if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
         updateProgressUI(main, progress, totalCount);
-        await afterLessonCompleted(); // 👈 here
+        // ensure final injection then maybe auto-nav (optional)
       });
 
-    // initial progress render
     updateProgressUI(main, progress, totalCount);
   } catch (e) {
     console.error("[reader]", e);
