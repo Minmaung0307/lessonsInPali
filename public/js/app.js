@@ -41,6 +41,211 @@ document.getElementById("btnMenu")?.addEventListener("click", () => {
   document.getElementById("navLinks")?.classList.toggle("open");
 });
 
+// import Guard အစ
+/* ===== JSON Import (single-file, no importer.js) ===== */
+
+/* ========= JSON Importer (wipe-then-write) ========= */
+if (!window.__JSON_IMPORT__) {
+  window.__JSON_IMPORT__ = true;
+
+  // small helpers
+  const _isNum = v => typeof v === 'number' && !isNaN(v);
+  const _isArr = v => Array.isArray(v);
+  const _pickDefined = (obj) => {
+    const o = {}; Object.entries(obj || {}).forEach(([k,v])=>{ if (v !== undefined) o[k] = v; });
+    return o;
+  };
+
+  // recursively delete a subcollection
+  async function _wipeSubcol(pathSegments /* [...segments, 'subcol'] */) {
+    const colRef = collection(db, ...pathSegments);
+    const snap = await getDocs(colRef);
+    for (const d of snap.docs) {
+      // if this doc has nested 'questions' subcol, wipe it first
+      const qs = await getDocs(collection(db, ...pathSegments, d.id, 'questions')).catch(()=>null);
+      if (qs && !qs.empty) {
+        for (const qd of qs.docs) await deleteDoc(qd.ref);
+      }
+      await deleteDoc(d.ref);
+    }
+    return snap.size;
+  }
+
+  // normalize 1 question → safe firestore payload
+  function _qPayload(q) {
+    const base = {
+      text: q.text || '',
+      type: (q.type || 'scq').toLowerCase(),
+      points: _isNum(q.points) ? q.points : 1
+    };
+    // only include if valid
+    if (_isArr(q.choices)) base.choices = q.choices;
+    if (_isArr(q.accept))  base.accept  = q.accept;
+    if (_isNum(q.answerIndex) || _isArr(q.answerIndex)) base.answerIndex = q.answerIndex;
+    if (q.feedback) base.feedback = q.feedback;
+    return base;
+  }
+
+  // === main import API
+  window.importAnyJson = async function importAnyJson(j) {
+    if (!j) throw new Error("Empty JSON");
+
+    // 1) catalog.json
+    if (Array.isArray(j.courses)) {
+      let n = 0;
+      for (const c of j.courses) {
+        const id = c.id || crypto.randomUUID();
+        const copy = { ...c }; delete copy.chaptersUrl;
+        await setDoc(doc(db, 'courses', id), copy, { merge: true });
+        n++;
+        // optional cascade
+        if (c.chaptersUrl) {
+          try {
+            const r = await fetch(c.chaptersUrl, { cache: 'no-store' });
+            if (r.ok) await importAnyJson(await r.json());
+          } catch {}
+        }
+      }
+      return { kind: 'catalog', count: n };
+    }
+
+    // 2) chapters.json
+    if (Array.isArray(j.chapters) && j.course?.id) {
+      const cid = j.course.id;
+      let n = 0;
+      for (const ch of j.chapters) {
+        const chid = ch.id || crypto.randomUUID();
+        await setDoc(
+          doc(db, 'courses', cid, 'chapters', chid),
+          _pickDefined({
+            title: ch.title || '',
+            order: _isNum(ch.order) ? ch.order : 1,
+            summary: ch.summary || ''
+          }),
+          { merge: true }
+        );
+        n++;
+        if (ch.lessonsUrl) {
+          try {
+            const r = await fetch(ch.lessonsUrl, { cache: 'no-store' });
+            if (r.ok) await importAnyJson({ ...(await r.json()), _cid: cid, _chid: chid });
+          } catch {}
+        }
+      }
+      return { kind: 'chapters', count: n };
+    }
+
+    // 3) lesson (hybrid) — supports reading/contents/blocks/quiz
+    if (j.lesson && (j._cid || j.courseId)) {
+      const cid  = j._cid || j.courseId;
+      const chid = j._chid || j.chapterId || 'c1';
+      const l    = j.lesson;
+      const lid  = l.id || crypto.randomUUID();
+
+      // upsert lesson core
+      await setDoc(
+        doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid),
+        _pickDefined({
+          title: l.title || '',
+          order: _isNum(l.order) ? l.order : 1,
+          reading: j.reading || '',
+          theme: j.theme || {}
+        }),
+        { merge: true }
+      );
+
+      // --- replace contents (wipe → write) ---
+      await _wipeSubcol(['courses', cid, 'chapters', chid, 'lessons', lid, 'contents']);
+      let cCount = 0;
+
+      // accept either j.contents or j.blocks; both go to contents subcollection
+      const blocks = _isArr(j.blocks) ? j.blocks : [];
+      const contents = _isArr(j.contents) ? j.contents : [];
+      const merged = [...blocks, ...contents];
+
+      for (let i = 0; i < merged.length; i++) {
+        const b = merged[i] || {};
+        const clean = _pickDefined({
+          type: (b.type || 'text'),
+          order: _isNum(b.order) ? b.order : i + 1,
+          caption: b.caption || '',
+          text: b.text || '',
+          html: b.html || '',
+          url: b.url ?? '',
+          // url: b.url || '',
+          class: b.class || '',
+          data: b.data || null,
+          title: b.title || '',
+          subtitle: b.subtitle || '',
+          icons: b.icons || null,
+          badge: b.badge || '',
+          accent: b.accent || ''
+        });
+        await setDoc(
+          doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'contents', crypto.randomUUID()),
+          clean
+        );
+        cCount++;
+      }
+
+      // --- replace quizzes (wipe all → write one from json.quiz if present) ---
+      const qCol = collection(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes');
+      const qsnap = await getDocs(qCol);
+      for (const qd of qsnap.docs) {
+        await _wipeSubcol(['courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qd.id, 'questions']);
+        await deleteDoc(qd.ref);
+      }
+
+      let qCount = 0, qItemCount = 0;
+      if (j.quiz && _isArr(j.quiz.questions)) {
+        const qid = crypto.randomUUID();
+        await setDoc(
+          doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid),
+          _pickDefined({
+            title: j.quiz.title || 'Quiz',
+            shuffle: !!j.quiz.shuffle,
+            passPct: _isNum(j.quiz.passPct) ? j.quiz.passPct : 70
+          })
+        );
+        qCount = 1;
+        for (const q of j.quiz.questions) {
+          await setDoc(
+            doc(db, 'courses', cid, 'chapters', chid, 'lessons', lid, 'quizzes', qid, 'questions', crypto.randomUUID()),
+            _qPayload(q)
+          );
+          qItemCount++;
+        }
+      }
+
+      return { kind: 'lesson', contents: cCount, quizzes: qCount, questions: qItemCount, ids: { cid, chid, lid } };
+    }
+
+    throw new Error("Unrecognized JSON structure");
+  };
+
+  // === Wire Admin “Import” button if present ===
+  window.addEventListener('DOMContentLoaded', () => {
+    const ta  = document.getElementById('importJson');
+    const btn = document.getElementById('btnImportCourse');
+    if (btn && ta) {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          const raw = ta.value.trim();
+          if (!raw) return alert('Paste JSON first.');
+          const json = JSON.parse(raw);
+          const res = await window.importAnyJson(json);
+          alert(`[import] OK: ${res.kind}\n` + JSON.stringify(res, null, 2));
+        } catch (err) {
+          console.error('[import] failed:', err);
+          alert('Import failed: ' + (err.message || err));
+        }
+      });
+    }
+  });
+}
+// import Guard အဆုံး
+
 // Mini guard
 function needAdmin(role) {
   const r = role || window.currentRole || "guest";
@@ -380,20 +585,20 @@ function applyAuthVisibility(user, role = "guest") {
   const isStaff = authed && (role === "admin" || role === "ta");
 
   // login/logout buttons (desktop + mobile)
-  ["btnLogin", "btnLogin_m"].forEach(id =>
+  ["btnLogin", "btnLogin_m"].forEach((id) =>
     document.getElementById(id)?.classList.toggle("hidden", authed)
   );
-  ["btnLogout", "btnLogout_m"].forEach(id =>
+  ["btnLogout", "btnLogout_m"].forEach((id) =>
     document.getElementById(id)?.classList.toggle("hidden", !authed)
   );
 
   // gated sections
-  document.querySelectorAll(".auth-only").forEach(el =>
-    el.classList.toggle("hidden", !authed)
-  );
-  document.querySelectorAll(".admin-only").forEach(el =>
-    el.classList.toggle("hidden", !isStaff)
-  );
+  document
+    .querySelectorAll(".auth-only")
+    .forEach((el) => el.classList.toggle("hidden", !authed));
+  document
+    .querySelectorAll(".admin-only")
+    .forEach((el) => el.classList.toggle("hidden", !isStaff));
 }
 
 // ✅ getUserRole() — current user’s role ကို Firestore မှာ query လုပ်ပြီး ပြန်ပေးမယ်
@@ -511,7 +716,7 @@ document.getElementById("btnMenu")?.addEventListener("click", () => {
 
 // Guard to wire onAuthStateChanged only once
 if (window.__AUTH_WIRED__) {
-  console.warn('[auth] onAuthStateChanged already wired; skipping');
+  console.warn("[auth] onAuthStateChanged already wired; skipping");
 } else {
   window.__AUTH_WIRED__ = true;
 
@@ -520,22 +725,26 @@ if (window.__AUTH_WIRED__) {
 
     // 1) Ensure user doc + figure out role (safe defaults)
     if (u) {
-      try { await ensureUserDoc(u); } catch (e) { console.warn('[auth] ensureUserDoc failed', e); }
       try {
-        currentRole = (await getUserRole()) || 'student';
+        await ensureUserDoc(u);
       } catch (e) {
-        console.warn('[auth] getUserRole failed, fallback student', e);
-        currentRole = 'student';
+        console.warn("[auth] ensureUserDoc failed", e);
       }
-      console.log('✅ Logged in as:', u.email, 'Role:', currentRole);
+      try {
+        currentRole = (await getUserRole()) || "student";
+      } catch (e) {
+        console.warn("[auth] getUserRole failed, fallback student", e);
+        currentRole = "student";
+      }
+      console.log("✅ Logged in as:", u.email, "Role:", currentRole);
     } else {
-      currentRole = 'guest';
-      console.log('🚪 Logged out');
+      currentRole = "guest";
+      console.log("🚪 Logged out");
     }
 
     // 2) Single place to toggle UI (avoid double toggles)
     applyAuthVisibility(currentUser, currentRole);
-    if (typeof setActiveNav === 'function') setActiveNav();
+    if (typeof setActiveNav === "function") setActiveNav();
 
     // 3) Route re-render (re-entrant guarded)
     if (!window.__ROUTE_LOCK__) {
@@ -543,7 +752,7 @@ if (window.__AUTH_WIRED__) {
       // queue to microtask to avoid nested reflows/recursion
       Promise.resolve().then(async () => {
         try {
-          if (typeof route === 'function') await route();
+          if (typeof route === "function") await route();
         } finally {
           window.__ROUTE_LOCK__ = false;
         }
@@ -2963,17 +3172,24 @@ async function renderAdmin() {
 // ===== Draggable horizontal scroll that still allows tapping =====
 function makeDraggableScroll(el) {
   if (!el) return;
-  let isDown = false, startX = 0, startY = 0, scrollLeft = 0, pid = null;
+  let isDown = false,
+    startX = 0,
+    startY = 0,
+    scrollLeft = 0,
+    pid = null;
   let moved = false;
 
-  el.addEventListener('pointerdown', (e) => {
-    isDown = true; moved = false;
-    pid = e.pointerId; el.setPointerCapture(pid);
-    startX = e.clientX; startY = e.clientY;
+  el.addEventListener("pointerdown", (e) => {
+    isDown = true;
+    moved = false;
+    pid = e.pointerId;
+    el.setPointerCapture(pid);
+    startX = e.clientX;
+    startY = e.clientY;
     scrollLeft = el.scrollLeft;
   });
 
-  el.addEventListener('pointermove', (e) => {
+  el.addEventListener("pointermove", (e) => {
     if (!isDown) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
@@ -2982,66 +3198,82 @@ function makeDraggableScroll(el) {
     el.scrollLeft = scrollLeft - dx;
   });
 
-  function endPointer(e){
+  function endPointer(e) {
     if (!isDown) return;
-    isDown = false; if (pid!=null) el.releasePointerCapture(pid); pid = null;
+    isDown = false;
+    if (pid != null) el.releasePointerCapture(pid);
+    pid = null;
 
     // treat as tap only if user didn't drag
     if (!moved) {
-      const btn = e.target.closest('.tab'); // <-- your existing class
+      const btn = e.target.closest(".tab"); // <-- your existing class
       if (btn) btn.click();
     }
   }
-  el.addEventListener('pointerup', endPointer);
-  el.addEventListener('pointercancel', endPointer);
-  el.addEventListener('mouseleave', endPointer);
+  el.addEventListener("pointerup", endPointer);
+  el.addEventListener("pointercancel", endPointer);
+  el.addEventListener("mouseleave", endPointer);
 
   // prevent vertical scroll only when horizontal intent is clear
-  el.addEventListener('touchmove', (e) => {
-    if (!e.touches || !e.touches[0]) return;
-    const t = e.touches[0];
-    const dx = Math.abs(t.clientX - startX);
-    const dy = Math.abs(t.clientY - startY);
-    if (dx > dy) e.preventDefault();
-  }, { passive: false });
+  el.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!e.touches || !e.touches[0]) return;
+      const t = e.touches[0];
+      const dx = Math.abs(t.clientX - startX);
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > dy) e.preventDefault();
+    },
+    { passive: false }
+  );
 }
 
 // Tabs (null-safe)
-const tabStrip = document.getElementById('adminTabs');
+const tabStrip = document.getElementById("adminTabs");
 makeDraggableScroll(tabStrip);
 
-const tabBtns = (tabStrip ? tabStrip.querySelectorAll('.tab') : document.querySelectorAll('.tab'));
-const paneKeys = ['courses','posts','ann','msg','import','certs'];
+const tabBtns = tabStrip
+  ? tabStrip.querySelectorAll(".tab")
+  : document.querySelectorAll(".tab");
+const paneKeys = ["courses", "posts", "ann", "msg", "import", "certs"];
 
-tabBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    // active UI
-    tabBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+tabBtns.forEach((btn) => {
+  btn.addEventListener(
+    "click",
+    () => {
+      // active UI
+      tabBtns.forEach((b) => b.classList.toggle("is-active", b === btn));
 
-    // show pane by data-tab
-    const key = btn.dataset.tab;
-    paneKeys.forEach(k => {
-      const pane = document.getElementById(`tab-${k}`);
-      if (pane) pane.classList.toggle('hidden', k !== key);
-    });
-  }, { passive: true });
+      // show pane by data-tab
+      const key = btn.dataset.tab;
+      paneKeys.forEach((k) => {
+        const pane = document.getElementById(`tab-${k}`);
+        if (pane) pane.classList.toggle("hidden", k !== key);
+      });
+    },
+    { passive: true }
+  );
 });
 
 // Active tab helper (route ပြောင်းတိုင်း ခေါ်ပါ)
 function highlightAdminTab() {
-  const el = document.getElementById('adminTabs');
+  const el = document.getElementById("adminTabs");
   if (!el) return;
-  const hash = location.hash || '';
-  el.querySelectorAll('.admin-tab').forEach(a => {
-    const on = hash.startsWith(a.getAttribute('href'));
-    a.classList.toggle('active', !!on);
+  const hash = location.hash || "";
+  el.querySelectorAll(".admin-tab").forEach((a) => {
+    const on = hash.startsWith(a.getAttribute("href"));
+    a.classList.toggle("active", !!on);
     if (on) {
       // active ကို အလယ်ဘက် သွားအောင်
-      a.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      a.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
     }
   });
 }
-window.addEventListener('hashchange', highlightAdminTab);
+window.addEventListener("hashchange", highlightAdminTab);
 
 /* ========= YouTube helper ========= */
 function getYouTubeId(url = "") {
@@ -3437,43 +3669,45 @@ async function renderCourseDetail(courseId, lessonId = null) {
       );
     }
 
-    // --- render contents (guard again) ---
+    // --- render contents (Hybrid first; fallback legacy) ---
     try {
-      lessonBlocks.innerHTML = contentsResolved
-        .map((b) => {
-          const cap = b.caption
-            ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
-                b.caption
-              )}</div>`
-            : "";
-          const u = b.url || "";
-          const t = (b.type || "").toLowerCase();
+      const lessonBlocks = document.getElementById("lessonBlocks");
+      if (!lessonBlocks) return;
+
+      const blocks = contentsResolved.slice().sort((a,b)=>(a.order||0)-(b.order||0));
+      const hybridTypes = new Set(['hero','h1','h2','tip','pauseblock','protip','nerdnote','list','downloads','code','html']); // note: case-insensitive
+      const isHybrid = blocks.some(b => hybridTypes.has(String(b.type||'').toLowerCase()));
+
+      if (isHybrid && window.LessonUI && typeof window.LessonUI.render === 'function') {
+        lessonBlocks.innerHTML = '';
+        window.LessonUI.render(lessonBlocks, blocks);
+      } else {
+        // legacy renderer
+        lessonBlocks.innerHTML = blocks.map(b => {
+          const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
+          const u = b.url || '';
+          const t = (b.type || '').toLowerCase();
           const yid = getYouTubeId(u);
-          if (t === "youtube" || yid) {
+          if (t === 'youtube' || yid) {
+            const id = yid || '';
             return `<div class="card">
-            <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
-              <iframe src="https://www.youtube.com/embed/${yid}" allowfullscreen
-                style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
-            </div>${cap}
-          </div>`;
+              <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
+                <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
+                  style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+              </div>${cap}
+            </div>`;
           }
           switch (t) {
-            case "video":
-              return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-            case "audio":
-              return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-            case "image":
-              return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
-            case "text":
-            default:
-              return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(
-                u
-              )}</a>${cap}</div>`;
+            case 'video': return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+            case 'audio': return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+            case 'image': return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+            case 'text':
+            default:      return `<div class="card">${escapeHtml(b.text||'')}${cap}</div>`;
           }
-        })
-        .join("");
+        }).join('');
+      }
     } catch (e) {
-      console.error("[reader/blocks]", e);
+      console.error('[reader/blocks]', e);
     }
 
     // helper: set Next button state (gray when disabled, blue when enabled)
@@ -4610,7 +4844,8 @@ async function importAnyJson(json) {
     }
 
     // quiz
-    if (json.quiz) {
+    // ✅ safe writer: SA/SCQ/MCQ အားလုံးအတွက် undefined မတင်အောင် sanitize
+    if (json.quiz && Array.isArray(json.quiz.questions)) {
       const qid = crypto.randomUUID();
       await setDoc(
         doc(
@@ -4627,11 +4862,28 @@ async function importAnyJson(json) {
         {
           title: json.quiz.title || "Quiz",
           shuffle: !!json.quiz.shuffle,
-          passPct: json.quiz.passPct ?? 70,
+          passPct:
+            typeof json.quiz.passPct === "number" ? json.quiz.passPct : 70,
         }
       );
-      for (const q of json.quiz.questions || []) {
+
+      for (const q of json.quiz.questions) {
         const id = crypto.randomUUID();
+        const payload = {};
+
+        payload.text = q.text || "";
+        payload.type = (q.type || "scq").toLowerCase();
+        payload.points = typeof q.points === "number" ? q.points : 1;
+
+        // choices/accept/answerIndex ကို valid ဖြစ်မှ ထည့်
+        if (Array.isArray(q.choices)) payload.choices = q.choices;
+        if (Array.isArray(q.accept)) payload.accept = q.accept;
+        if (typeof q.answerIndex === "number" || Array.isArray(q.answerIndex)) {
+          payload.answerIndex = q.answerIndex;
+        }
+
+        if (q.feedback) payload.feedback = q.feedback;
+
         await setDoc(
           doc(
             db,
@@ -4646,12 +4898,7 @@ async function importAnyJson(json) {
             "questions",
             id
           ),
-          {
-            text: q.text,
-            choices: q.choices,
-            answerIndex: q.answerIndex,
-            points: q.points ?? 1,
-          }
+          payload
         );
       }
     }
