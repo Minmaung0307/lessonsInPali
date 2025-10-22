@@ -41,65 +41,17 @@ document.getElementById("btnMenu")?.addEventListener("click", () => {
   document.getElementById("navLinks")?.classList.toggle("open");
 });
 
-// import Guard အစ
-/* ===== JSON Import (single-file, no importer.js) ===== */
-
-/* ========= JSON Importer (wipe-then-write) ========= */
+// ---- ONE importer only ----
 if (!window.__JSON_IMPORT__) {
   window.__JSON_IMPORT__ = true;
 
-  // small helpers
-  const _isNum = (v) => typeof v === "number" && !isNaN(v);
-  const _isArr = (v) => Array.isArray(v);
-  const _pickDefined = (obj) => {
-    const o = {};
-    Object.entries(obj || {}).forEach(([k, v]) => {
-      if (v !== undefined) o[k] = v;
-    });
-    return o;
-  };
-
-  // recursively delete a subcollection
-  async function _wipeSubcol(pathSegments /* [...segments, 'subcol'] */) {
-    const colRef = collection(db, ...pathSegments);
-    const snap = await getDocs(colRef);
-    for (const d of snap.docs) {
-      // if this doc has nested 'questions' subcol, wipe it first
-      const qs = await getDocs(
-        collection(db, ...pathSegments, d.id, "questions")
-      ).catch(() => null);
-      if (qs && !qs.empty) {
-        for (const qd of qs.docs) await deleteDoc(qd.ref);
-      }
-      await deleteDoc(d.ref);
-    }
-    return snap.size;
-  }
-
-  // normalize 1 question → safe firestore payload
-  function _qPayload(q) {
-    const base = {
-      text: q.text || "",
-      type: (q.type || "scq").toLowerCase(),
-      points: _isNum(q.points) ? q.points : 1,
-    };
-    // only include if valid
-    if (_isArr(q.choices)) base.choices = q.choices;
-    if (_isArr(q.accept)) base.accept = q.accept;
-    if (_isNum(q.answerIndex) || _isArr(q.answerIndex))
-      base.answerIndex = q.answerIndex;
-    if (q.feedback) base.feedback = q.feedback;
-    return base;
-  }
-
-  // === main import API
   window.importAnyJson = async function importAnyJson(j) {
-    const USE_CATALOG_CASCADE = false; // catalog → chaptersUrl auto-follow (off)
-    const USE_CHAPTER_CASCADE = false; // chapters → lessonsUrl auto-follow (off)
+    const USE_CATALOG_CASCADE = false;
+    const USE_CHAPTER_CASCADE = false;
 
     if (!j) throw new Error("Empty JSON");
 
-    // 1) catalog.json
+    // 1) catalog
     if (Array.isArray(j.courses)) {
       let n = 0;
       for (const c of j.courses) {
@@ -108,7 +60,6 @@ if (!window.__JSON_IMPORT__) {
         delete copy.chaptersUrl;
         await setDoc(doc(db, "courses", id), copy, { merge: true });
         n++;
-        // optional cascade
         if (USE_CATALOG_CASCADE && c.chaptersUrl) {
           try {
             const r = await fetch(c.chaptersUrl, { cache: "no-store" });
@@ -119,7 +70,7 @@ if (!window.__JSON_IMPORT__) {
       return { kind: "catalog", count: n };
     }
 
-    // 2) chapters.json
+    // 2) chapters
     if (Array.isArray(j.chapters) && j.course?.id) {
       const cid = j.course.id;
       let n = 0;
@@ -127,11 +78,12 @@ if (!window.__JSON_IMPORT__) {
         const chid = ch.id || crypto.randomUUID();
         await setDoc(
           doc(db, "courses", cid, "chapters", chid),
-          _pickDefined({
+          {
             title: ch.title || "",
-            order: _isNum(ch.order) ? ch.order : 1,
+            order:
+              typeof ch.order === "number" && !isNaN(ch.order) ? ch.order : 1,
             summary: ch.summary || "",
-          }),
+          },
           { merge: true }
         );
         n++;
@@ -146,17 +98,11 @@ if (!window.__JSON_IMPORT__) {
               });
           } catch {}
         }
-        // if (ch.lessonsUrl) {
-        //   try {
-        //     const r = await fetch(ch.lessonsUrl, { cache: 'no-store' });
-        //     if (r.ok) await importAnyJson({ ...(await r.json()), _cid: cid, _chid: chid });
-        //   } catch {}
-        // }
       }
       return { kind: "chapters", count: n };
     }
 
-    // 3) lesson (hybrid) — supports reading/contents/blocks/quiz
+    // 3) lesson (reading / contents / quiz)
     if (j.lesson && (j._cid || j.courseId)) {
       const cid = j._cid || j.courseId;
       const chid = j._chid || j.chapterId || "c1";
@@ -166,12 +112,12 @@ if (!window.__JSON_IMPORT__) {
       // upsert lesson core
       await setDoc(
         doc(db, "courses", cid, "chapters", chid, "lessons", lid),
-        _pickDefined({
+        {
           title: l.title || "",
-          order: _isNum(l.order) ? l.order : 1,
+          order: typeof l.order === "number" && !isNaN(l.order) ? l.order : 1,
           reading: j.reading || "",
           theme: j.theme || {},
-        }),
+        },
         { merge: true }
       );
 
@@ -188,29 +134,36 @@ if (!window.__JSON_IMPORT__) {
       let cCount = 0;
 
       // accept either j.contents or j.blocks; both go to contents subcollection
-      const blocks = _isArr(j.blocks) ? j.blocks : [];
-      const contents = _isArr(j.contents) ? j.contents : [];
+      const blocks = Array.isArray(j.blocks) ? j.blocks : [];
+      const contents = Array.isArray(j.contents) ? j.contents : [];
       const merged = [...blocks, ...contents];
 
       for (let i = 0; i < merged.length; i++) {
         const b = merged[i] || {};
-        const clean = _pickDefined({
-          type: b.type || "text",
-          order: _isNum(b.order) ? b.order : i + 1,
-          caption: b.caption || "",
-          text: b.text || "",
-          html: b.html || "",
-          url: b.url ?? "",
-          // url: b.url ?? '',
-          // url: b.url || '',
-          class: b.class || "",
-          data: b.data || null,
-          title: b.title || "",
-          subtitle: b.subtitle || "",
-          icons: b.icons || null,
-          badge: b.badge || "",
-          accent: b.accent || "",
-        });
+
+        // ✅ Always give type/order; never let them be undefined
+        const clean = {
+          type: String(b.type || "text").toLowerCase(),
+          order:
+            typeof b.order === "number" && !isNaN(b.order) ? b.order : i + 1,
+        };
+
+        // ✅ Only attach props that actually exist on the JSON
+        if ("caption" in b) clean.caption = b.caption ?? "";
+        if ("text" in b) clean.text = b.text ?? ""; // <- very important
+        if ("html" in b) clean.html = b.html ?? "";
+        if ("url" in b) clean.url = b.url ?? "";
+        if ("class" in b) clean.class = b.class ?? "";
+        if ("data" in b) clean.data = b.data ?? null;
+        if ("title" in b) clean.title = b.title ?? "";
+        if ("subtitle" in b) clean.subtitle = b.subtitle ?? "";
+        if ("icons" in b) clean.icons = b.icons ?? null;
+        if ("badge" in b) clean.badge = b.badge ?? "";
+        if ("accent" in b) clean.accent = b.accent ?? "";
+
+        // (optional) debug
+        // console.log('[import] content clean =', clean);
+
         await setDoc(
           doc(
             db,
@@ -223,12 +176,13 @@ if (!window.__JSON_IMPORT__) {
             "contents",
             crypto.randomUUID()
           ),
-          clean
+          clean,
+          { merge: false } // fresh write — avoid Ghost merges
         );
         cCount++;
       }
 
-      // --- replace quizzes (wipe all → write one from json.quiz if present) ---
+      // wipe quizzes then re-create (if any)
       const qCol = collection(
         db,
         "courses",
@@ -257,7 +211,7 @@ if (!window.__JSON_IMPORT__) {
 
       let qCount = 0,
         qItemCount = 0;
-      if (j.quiz && _isArr(j.quiz.questions)) {
+      if (j.quiz && Array.isArray(j.quiz.questions)) {
         const qid = crypto.randomUUID();
         await setDoc(
           doc(
@@ -271,11 +225,14 @@ if (!window.__JSON_IMPORT__) {
             "quizzes",
             qid
           ),
-          _pickDefined({
+          {
             title: j.quiz.title || "Quiz",
             shuffle: !!j.quiz.shuffle,
-            passPct: _isNum(j.quiz.passPct) ? j.quiz.passPct : 70,
-          })
+            passPct:
+              typeof j.quiz.passPct === "number" && !isNaN(j.quiz.passPct)
+                ? j.quiz.passPct
+                : 70,
+          }
         );
         qCount = 1;
         for (const q of j.quiz.questions) {
@@ -310,28 +267,28 @@ if (!window.__JSON_IMPORT__) {
 
     throw new Error("Unrecognized JSON structure");
   };
-
-  // === Wire Admin “Import” button if present ===
-  window.addEventListener("DOMContentLoaded", () => {
-    const ta = document.getElementById("importJson");
-    const btn = document.getElementById("btnImportCourse");
-    if (btn && ta) {
-      btn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        try {
-          const raw = ta.value.trim();
-          if (!raw) return alert("Paste JSON first.");
-          const json = JSON.parse(raw);
-          const res = await window.importAnyJson(json);
-          alert(`[import] OK: ${res.kind}\n` + JSON.stringify(res, null, 2));
-        } catch (err) {
-          console.error("[import] failed:", err);
-          alert("Import failed: " + (err.message || err));
-        }
-      });
-    }
-  });
 }
+
+// === Wire Admin “Import” button if present ===
+window.addEventListener("DOMContentLoaded", () => {
+  const ta = document.getElementById("importJson");
+  const btn = document.getElementById("btnImportCourse");
+  if (btn && ta) {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const raw = ta.value.trim();
+        if (!raw) return alert("Paste JSON first.");
+        const json = JSON.parse(raw);
+        const res = await window.importAnyJson(json);
+        alert(`[import] OK: ${res.kind}\n` + JSON.stringify(res, null, 2));
+      } catch (err) {
+        console.error("[import] failed:", err);
+        alert("Import failed: " + (err.message || err));
+      }
+    });
+  }
+});
 // import Guard အဆုံး
 
 // Mini guard
@@ -3544,7 +3501,9 @@ async function renderCourseDetail(courseId, lessonId = null) {
         const items = (ch.lessons || [])
           .map(
             (ls) =>
-              `<li><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.order}. ${ls.title}</a></li>`
+              `<li><a href="#/courses/${courseId}/lesson/${ls.id}">${
+                ls.title || "Lesson"
+              }</a></li>`
           )
           .join("");
         return `
@@ -3572,20 +3531,20 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
   }
 
-  // default open first lesson
+  // default select first lesson
   if (!lessonId && flat.length) {
     location.hash = `#/courses/${courseId}/lesson/${flat[0].lsId}`;
     return;
   }
 
-  // locate current
+  // idx + prev/next
   const idx = flat.findIndex((x) => x.lsId === lessonId);
   if (idx < 0) {
     main.innerHTML = `<div class="card error">Lesson not found.</div>`;
     return;
   }
   const prev = idx > 0 ? flat[idx - 1] : null;
-  let next = idx < flat.length - 1 ? flat[idx + 1] : null; // ← let (not const)
+  const next = idx < flat.length - 1 ? flat[idx + 1] : null;
 
   if (!next) {
     const existsFinal = chapters[chapters.length - 1]?.lessons?.some(
@@ -3594,11 +3553,13 @@ async function renderCourseDetail(courseId, lessonId = null) {
     if (existsFinal) next = { lsId: "__final__" };
   }
 
+  // --- Normal lesson flow ---
   try {
-    // identify chapter for this lesson
+    // load quiz (optional)
+    let quiz = null,
+      questions = [];
     const chId = flat[idx].chId;
 
-    // read lesson doc
     const lessonRef = doc(
       db,
       "courses",
@@ -3615,7 +3576,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
     }
     const L = { id: lsSnap.id, ...lsSnap.data() };
 
-    // helpers
+    // prepare helpers
     const isUrl = (v) => /^https?:\/\//i.test(v || "");
     const isPdf = (v) => /\.pdf($|\?)/i.test(v || "");
     const getYouTubeId = (u = "") => {
@@ -3627,7 +3588,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }
     };
 
-    // load contents (ordered)
+    // load contents
     const contents = [];
     const csnap = await getDocs(
       query(
@@ -3652,9 +3613,15 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }))
     );
 
-    // load quiz (if any)
-    let quiz = null,
-      questions = [];
+    // ✅ normalize quiz object (may be null)
+    const quizObj = quiz
+      ? {
+          title: quiz.title || "Quiz",
+          shuffle: !!quiz.shuffle,
+          passPct: Number(quiz.passPct ?? 70),
+          questions: questions || [],
+        }
+      : null;
     const qsnap = await getDocs(
       collection(
         db,
@@ -3700,27 +3667,29 @@ async function renderCourseDetail(courseId, lessonId = null) {
       return `<div class="card"><div class="reading">${safe}</div></div>`;
     })();
 
+    // --- build header FIRST, then query children safely ---
     main.innerHTML = `
-      <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
-        <div class="progress-bar"><span style="width:0%"></span></div>
-        <div class="progress-text muted"></div>
-      </div>
+        <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
+            <div class="progress-bar"><span style="width:0%"></span></div>
+            <div class="progress-text muted"></div>
+          </div>
 
-      <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
-        <h3 style="margin:0">${L.title || "Lesson"}</h3>
-        <div class="row" style="gap:.5rem;align-items:center">
-          <div id="certBtns"></div>
-          <button class="btn ghost" ${
-            prev ? "" : "disabled"
-          } data-nav="prev">← Prev</button>
-          <button class="btn" ${
-            next ? "" : "disabled"
-          } data-nav="next" id="btnNext">Next →</button>
+        <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
+          <h3 style="margin:0">${L.title || "Lesson"}</h3>
+          <div class="row" style="gap:.5rem;align-items:center">
+            <div id="certBtns"></div>   <!-- 👈 certificate/transcript buttons will appear here -->
+            <button class="btn ghost" ${
+              prev ? "" : "disabled"
+            } data-nav="prev">← Prev</button>
+            <button class="btn" ${
+              next ? "" : "disabled"
+            } data-nav="next" id="btnNext">Next →</button>
+          </div>
         </div>
-      </div>
 
       ${readingHtml}
 
+    
       <div class="row" style="gap:.5rem; margin:.25rem 0 1rem">
         <button class="btn small" id="btnMarkDone">Mark lesson complete</button>
         <span class="muted" id="markMsg"></span>
@@ -3731,43 +3700,59 @@ async function renderCourseDetail(courseId, lessonId = null) {
       ${
         quiz
           ? `<div class="card" id="quizCard">
-               <strong id="quizTitle">Quiz</strong>
-               <p class="muted" id="quizMeta"></p>
-               <div class="row" style="gap:.5rem;flex-wrap:wrap">
-                 <button class="btn" id="btnStartQuiz">Start Quiz</button>
-                 <span id="quizResult" class="muted"></span>
-               </div>
-               <div id="quizHost" style="margin-top:.5rem"></div>
-             </div>`
+              <strong id="quizTitle">Quiz</strong>
+              <p class="muted" id="quizMeta"></p>
+              <div class="row" style="gap:.5rem;flex-wrap:wrap">
+                <button class="btn" id="btnStartQuiz">Start Quiz</button>
+                <span id="quizResult" class="muted"></span>
+              </div>
+              <div id="quizHost" style="margin-top:.5rem"></div>
+            </div>`
           : ``
       }
     `;
 
-    // next gating
     const btnNext = document.getElementById("btnNext");
+
+    // အခုသင်ကြည့်နေတဲ့ lesson ပြီးပြီလား?
     const isDone = !!progress[lessonId];
-    if (btnNext) btnNext.disabled = !isDone;
+    if (btnNext) btnNext.disabled = !isDone; // ❗ Quiz မပတ်လဲ မဖြတ်လမ်းနိုင်အောင်
+
+    // nav buttons (ရှိပြီးသား code)
     btnNext?.addEventListener(
       "click",
       () =>
         next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
     );
 
-    // PDF inline preview (optional)
+    // --- only after innerHTML is set, resolve nodes ---
+    const lessonBlocks = main.querySelector("#lessonBlocks");
+    if (!lessonBlocks) {
+      console.warn(
+        "[reader] #lessonBlocks not found; aborting render to avoid null error"
+      );
+      return;
+    }
+
+    // (optional) inline PDF preview
     if (isUrl(L.reading) && isPdf(L.reading)) {
       main.insertAdjacentHTML(
         "beforeend",
-        `<div class="card" style="margin-top:.5rem">
-           <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
-             <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
-           </div>
-         </div>`
+        `
+        <div class="card" style="margin-top:.5rem">
+          <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
+            <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+          </div>
+        </div>
+      `
       );
     }
 
-    // ---------- SINGLE content renderer (Hybrid → fallback legacy) ----------
-    const lessonBlocks = document.getElementById("lessonBlocks");
-    if (lessonBlocks) {
+    // --- render contents (Hybrid first; fallback legacy) ---
+    try {
+      const lessonBlocks = document.getElementById("lessonBlocks");
+      if (!lessonBlocks) return;
+
       const blocks = contentsResolved
         .slice()
         .sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -3788,113 +3773,73 @@ async function renderCourseDetail(courseId, lessonId = null) {
         hybridTypes.has(String(b.type || "").toLowerCase())
       );
 
+      lessonBlocks.innerHTML = ""; // clear once
+
       if (
         isHybrid &&
         window.LessonUI &&
         typeof window.LessonUI.render === "function"
       ) {
-        lessonBlocks.innerHTML = "";
         window.LessonUI.render(lessonBlocks, blocks);
       } else {
-        // legacy renderer (HYBRID မရှိရင်ပဲ လုပ်မယ်)
-        lessonBlocks.innerHTML = blocks.map(b => {
-          const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : '';
-          const u = b.url || '';
-          const t = (b.type || '').toLowerCase();
-
-          switch (t) {
-            case 'h1':
-              return `<div class="card"><h1 style="margin:.25rem 0">${escapeHtml(b.text||b.title||'')}</h1></div>`;
-
-            case 'hr':
-              return `<hr class="muted" style="opacity:.3">`;
-
-            case 'list': {
-              const items = Array.isArray(b.items) ? b.items : [];
-              const tag = b.ordered ? 'ol' : 'ul';
-              const bar = b.data?.bar;
-              const left = bar ? `style="border-left:4px solid ${bar};padding-left:.75rem"` : '';
-              const li = items.map(x=>`<li>${escapeHtml(String(x))}</li>`).join('');
-              return `<div class="card" ${left}><${tag} class="list">${li}</${tag}></div>`;
+        lessonBlocks.innerHTML = blocks
+          .map((b) => {
+            const cap = b.caption
+              ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
+                  b.caption
+                )}</div>`
+              : "";
+            const u = b.url || "";
+            const t = (b.type || "").toLowerCase();
+            const yid = getYouTubeId(u);
+            if (t === "youtube" || yid) {
+              const id = yid || "";
+              return `<div class="card">
+              <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
+                <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
+                  style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
+              </div>${cap}
+            </div>`;
             }
-
-            case 'tip': {
-              const variant = (b.variant||'info').toLowerCase();
-              const tok = Array.isArray(b.tokens) ? b.tokens.map(t=>{
-                if (t.type==='kbd')  return `<kbd>${escapeHtml(t.text||'')}</kbd>`;
-                if (t.type==='link') return `<a href="${t.href||'#'}">${escapeHtml(t.text||'link')}</a>`;
-                return '';
-              }).join(' ') : '';
-              const border = b.leftBorder?.color ? `style="border-left:4px solid ${b.leftBorder.color};padding-left:.75rem"` : '';
-              return `<div class="card ${variant}" ${border}>
-                <strong>${escapeHtml(b.title||'Tip')}</strong>
-                <div class="muted" style="margin:.25rem 0">${escapeHtml(b.text||'')}</div>
-                ${tok ? `<div style="margin-top:.25rem">${tok}</div>` : ''}
-              </div>`;
+            switch (t) {
+              case "video":
+                return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+              case "audio":
+                return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+              case "image":
+                return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+              case "text":
+              default:
+                return `<div class="card">${escapeHtml(
+                  b.text || ""
+                )}${cap}</div>`;
             }
-
-            case 'pauseblock': {
-              const border = b.leftBorder?.color
-                ? `style="border-left:4px solid ${b.leftBorder.color};padding-left:.75rem"` : '';
-              return `<div class="card" ${border}>
-                <strong>${escapeHtml(b.title||'PAUSE')}</strong>
-                <p style="margin:.25rem 0">${escapeHtml(b.question||'')}</p>
-                ${b.answer ? `<details class="blk"><summary>Answer</summary><div>${escapeHtml(b.answer)}</div></details>` : ''}
-              </div>`;
-            }
-
-            case 'protip':
-              return `<div class="card" style="border-left:4px solid ${b.accent||'#1d4ed8'};padding-left:.75rem">
-                <strong>${escapeHtml(b.title||'Pro Tip')}</strong>
-                <div class="muted" style="margin:.25rem 0">${escapeHtml(b.text||'')}</div>
-              </div>`;
-
-            case 'hero': {
-              const icons = Array.isArray(b.icons) ? b.icons.map(ic => ic.html || '').join(' ') : '';
-              return `<div class="card" style="background:${b.accent||'#f5f7fb'}">
-                <div class="row" style="justify-content:space-between;align-items:center">
-                  <div><div class="muted">${escapeHtml(b.subtitle||'')}</div>
-                      <h2 style="margin:.2rem 0">${escapeHtml(b.title||'')}</h2></div>
-                  <div style="font-size:2rem">${icons}</div>
-                </div>
-                ${b.badge ? `<span class="badge">${escapeHtml(b.badge)}</span>` : ''}
-              </div>`;
-            }
-
-            case 'video':
-              return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-            case 'audio':
-              return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-            case 'image':
-              return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
-
-            // youtube ကို ဒီလို သီးသန့်မထည့်ချင်ရင် လုံးဝမထည့်လည်းရ
-            // case 'youtube': ...
-
-            case 'text':
-            default:
-              // ❗ Default ကို URL link မဟုတ်ပဲ text ကိုပဲ ပြ
-              return `<div class="card">${escapeHtml(b.text||'')}${cap}</div>`;
-          }
-        }).join('');
+          })
+          .join("");
       }
+    } catch (e) {
+      console.error("[reader/blocks]", e);
     }
-    // ----------------------------------------------------------------------
 
+    // helper: set Next button state (gray when disabled, blue when enabled)
     function setNextState(passed, isLast) {
       const btnNext = document.getElementById("btnNext");
       if (!btnNext) return;
+
       if (isLast) {
+        // နောက်ဆုံးအခန်း—ရောက်ချင်း disabled (မခွင့်ပြု)
         btnNext.disabled = true;
         btnNext.classList.remove("primary");
         btnNext.title = "This is the last lesson";
         return;
       }
-      btnNext.disabled = !passed;
-      btnNext.classList.toggle("primary", !!passed);
+
+      btnNext.disabled = !passed; // Quiz မဖြတ်မချင်း မခွင့်ပြု
+      btnNext.classList.toggle("primary", !!passed); // passed => ပြာရောင်
       btnNext.title = passed ? "" : "Complete the quiz to proceed";
     }
 
+    // … header DOM တင်ပြီးနောက် (prev/next တွေတွက်ပြီး) —
     const isLastLesson = !next || !next.lsId;
     setNextState(!!progress[lessonId], isLastLesson);
 
@@ -3943,6 +3888,12 @@ async function renderCourseDetail(courseId, lessonId = null) {
     // ✦ fallback (B): lessonsUrl JSON ဖိုင်ကနေ ယူချင်ရင်
     const ALLOW_URL_FALLBACKS = false;
     async function getFallbackQuizFromUrl(url) {
+      // if (!quizObj && ALLOW_URL_FALLBACKS) {
+      //   const url = L.lessonsUrl || L.quizUrl || L.srcUrl;
+      //   if (url) {
+      //     quizObj = await getFallbackQuizFromUrl(url);
+      //   }
+      // }
       try {
         if (!url) return null;
         const res = await fetch(url, { cache: "no-cache" });
@@ -4105,46 +4056,10 @@ async function renderCourseDetail(courseId, lessonId = null) {
       }
     }
 
-    // contents render (ensure host exists NOW)
-    const host = document.getElementById("lessonBlocks");
-    host.innerHTML = contentsResolved
-      .map((b) => {
-        const cap = b.caption
-          ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
-              b.caption
-            )}</div>`
-          : "";
-        const u = b.url || "";
-        const t = (b.type || "").toLowerCase();
-        const yid = getYouTubeId(u);
-        if (t === "youtube" || yid) {
-          const id = yid;
-          if (id) {
-            return `<div class="card">
-            <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
-              <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
-                style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
-            </div>${cap}
-          </div>`;
-          }
-        }
-        switch (t) {
-          case "video":
-            return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
-          case "audio":
-            return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
-          case "image":
-            return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
-          case "text":
-          default:
-            return `<div class="card"><a href="${u}" target="_blank" rel="noopener">${escapeHtml(
-              u
-            )}</a>${cap}</div>`;
-        }
-      })
-      .join("");
+    console.log("[debug] contentsResolved", contentsResolved);
+    console.log("[debug] render blocks count =", contentsResolved.length);
 
-    // prev/next click
+    // nav buttons
     main
       .querySelector('[data-nav="prev"]')
       ?.addEventListener(
@@ -4167,9 +4082,10 @@ async function renderCourseDetail(courseId, lessonId = null) {
         progress[lessonId] = true;
         if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
         updateProgressUI(main, progress, totalCount);
-        // ensure final injection then maybe auto-nav (optional)
+        await afterLessonCompleted(); // 👈 here
       });
 
+    // initial progress render
     updateProgressUI(main, progress, totalCount);
   } catch (e) {
     console.error("[reader]", e);

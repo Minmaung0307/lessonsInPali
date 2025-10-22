@@ -1,0 +1,81 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+
+  "lesson": { "id": "l1", "order": 1, "title": "သရဏဂုံ ၃-ပါး" },
+
+  "reading": "01: သရဏဂုံ ၃ပါး(အရကျက်)\n\n၁။ ဗုဒ္ဓံ သရဏံ ဂစ္ဆာမိ = ဘုရား ကိုးကွယ်ပါ၏။\n၂။ ဓမ္မံ သရဏံ ဂစ္ဆာမိ = တရား ကိုးကွယ်ပါ၏။\n၃။ သဃံ သရဏံ ဂစ္ဆာမိ = အရိယာ သံဃာကို ကိုးကွယ်ပါ၏။",
+
+  "contents": [
+    {
+        "type": "text",
+        "text": "သရဏဂုံ သုံးပါးကို ရွတ်ဆိုရာတွင် စကားလုံးတိုင်းကို သန့်သပ်စွာ အသံထွက်ပါ။ ဗုဒ္ဓံ ဆိုသည်မှာ မြတ်စွာဘုရား၏ အကြောင်းကို ပြောခြင်းဖြစ်ပါသည်။",
+        "caption": "အပိုဒ် (၁)",
+        "order": 1
+    },
+    {
+        "type": "text",
+        "text": "ဓမ္မံ ဆိုသည်မှာ မြတ်စွာဘုရားက သွန်သင်ထားသော တရားတော်များဖြစ်ပြီး သံဃံ ဆိုသည်မှာ အရိယာဖြစ်သော သံဃာတော်များဖြစ်သည်။",
+        "caption": "အပိုဒ် (၂)",
+        "order": 2
+    },
+    {
+        "type": "image",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Shwedagon_Pagoda_at_dusk.jpg/640px-Shwedagon_Pagoda_at_dusk.jpg",
+        "caption": "ရွှေတိဂုံဘုရား ဓာတ်ပုံ",
+        "order": 3
+    },
+    {
+        "type": "audio",
+        "url": "https://www.w3schools.com/html/horse.mp3",
+        "caption": "သရဏဂုံ ရွတ်ဆိုသံ နမူနာ",
+        "order": 4
+    },
+    {
+        "type": "youtube",
+        "url": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj",
+        "caption": "သရဏဂုံ ဗီဒီယို အနုညှန်း",
+        "order": 5
+    }
+    ],
+
+  "quiz": {
+    "title": "Lesson 1 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "scq",
+        "text": "ဗုဒ္ဓ-ဆိုတာ ဘာကို ဆိုလိုသလဲ?",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ"],
+        "answerIndex": 2,
+        "points": 1
+      },
+      {
+        "id": "q2",
+        "type": "scq",
+        "text": "ဓမ္မ-ဆိုတာ ဘာကို ဆိုလိုသလဲ?",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ"],
+        "answerIndex": 1,
+        "points": 1
+      },
+      {
+        "id": "q3",
+        "type": "scq",
+        "text": "သံဃ-ဆိုတာ ဘာကို ဆိုလိုသလဲ?",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ"],
+        "answerIndex": 0,
+        "points": 1
+      },
+      {
+        "id": "q4",
+        "type": "mcq",
+        "text": "သရဏဂုံ-ဆိုတာ ဘာကို ဆိုလိုသလဲ?",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ", "ဘုန်းကြီးကျောင်းများ"],
+        "answerIndex": [0, 1, 2],
+        "points": 1
+      }
+    ]
+  }
+}
