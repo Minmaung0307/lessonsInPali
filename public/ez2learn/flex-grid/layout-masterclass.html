@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Layout Masterclass — Flexbox + Grid (Beginner-Friendly)</title>
+  <link rel="stylesheet" href="layout.css" />
+</head>
+<body class="page-col">
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="#">LayoutMaster</a>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">☰</button>
+      <nav class="menu" data-open="false">
+        <a href="#flex">Flexbox</a>
+        <a href="#grid">Grid</a>
+        <a href="#compare">Compare</a>
+        <a href="#forms">Forms</a>
+        <a href="#pitfalls">Pitfalls</a>
+        <a href="#notes">Notes</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- FLEXBOX -->
+    <section id="flex" class="card">
+      <h1>Flexbox Playground</h1>
+      <p>Play with <code>flex-direction</code>, <code>flex-wrap</code>, <code>justify-content</code>, <code>align-items</code> and <code>gap</code>. This is <strong>one‑dimension</strong> layout.</p>
+
+      <div class="controls grid">
+        <label>Direction
+          <select id="f_dir">
+            <option>row</option>
+            <option>row-reverse</option>
+            <option>column</option>
+            <option>column-reverse</option>
+          </select>
+        </label>
+        <label>Wrap
+          <select id="f_wrap">
+            <option>nowrap</option>
+            <option>wrap</option>
+            <option>wrap-reverse</option>
+          </select>
+        </label>
+        <label>Justify (main axis)
+          <select id="f_justify">
+            <option>flex-start</option>
+            <option>center</option>
+            <option>flex-end</option>
+            <option>space-between</option>
+            <option>space-around</option>
+            <option>space-evenly</option>
+          </select>
+        </label>
+        <label>Align (cross axis)
+          <select id="f_align">
+            <option>stretch</option>
+            <option>flex-start</option>
+            <option>center</option>
+            <option>flex-end</option>
+          </select>
+        </label>
+        <label>Gap (px)
+          <input type="range" id="f_gap" min="0" max="40" value="12" />
+          <span class="out" id="f_gap_out">12</span>
+        </label>
+      </div>
+
+      <div class="flex-sandbox" id="flexSandbox" aria-live="polite">
+        <div class="box">1</div><div class="box">2</div><div class="box">3</div>
+        <div class="box long">4 long long</div><div class="box">5</div><div class="box">6</div>
+      </div>
+    </section>
+
+    <!-- GRID -->
+    <section id="grid" class="card">
+      <h1>Grid Playground</h1>
+      <p>Play with <code>grid-template-columns</code> using <em>fixed</em>, <em>auto-fit</em>, <em>auto-fill</em>, and <code>minmax()</code>. This is <strong>two‑dimension</strong> layout.</p>
+
+      <div class="controls grid">
+        <label>Strategy
+          <select id="g_strategy">
+            <option value="fixed">repeat(n, 1fr)</option>
+            <option value="auto-fit" selected>repeat(auto-fit, minmax(...))</option>
+            <option value="auto-fill">repeat(auto-fill, minmax(...))</option>
+          </select>
+        </label>
+        <label>Columns (n)
+          <input type="range" id="g_cols" min="1" max="6" value="3" />
+          <span class="out" id="g_cols_out">3</span>
+        </label>
+        <label>Min-Width (px)
+          <input type="number" id="g_min" min="120" step="10" value="220" />
+        </label>
+        <label>Gap (px)
+          <input type="range" id="g_gap" min="0" max="40" value="12" />
+          <span class="out" id="g_gap_out">12</span>
+        </label>
+        <label>Auto Rows (px)
+          <input type="range" id="g_rows" min="80" max="240" value="140" />
+          <span class="out" id="g_rows_out">140</span>
+        </label>
+        <label>Justify Items
+          <select id="g_justify_items">
+            <option>stretch</option><option>start</option><option>center</option><option>end</option>
+          </select>
+        </label>
+        <label>Align Items
+          <select id="g_align_items">
+            <option>stretch</option><option>start</option><option>center</option><option>end</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="grid-sandbox" id="gridSandbox">
+        <div class="cell">A</div><div class="cell">B</div><div class="cell">C</div><div class="cell tall">D</div>
+        <div class="cell">E</div><div class="cell">F</div><div class="cell">G</div><div class="cell">H</div>
+      </div>
+    </section>
+
+    <!-- COMPARE -->
+    <section id="compare" class="card">
+      <h1>Flex vs Grid — Same Problem, Two Solutions</h1>
+      <div class="compare-wrap">
+        <div class="compare-col">
+          <h3>Cards (Flex)</h3>
+          <div class="cards-flex">
+            <article class="item"><h4>Card 1</h4><p>Flexible width with wrapping.</p></article>
+            <article class="item"><h4>Card 2</h4><p>Use <code>flex: 1 1 220px</code>.</p></article>
+            <article class="item"><h4>Card 3</h4><p><code>min-width:0</code> to avoid overflow.</p></article>
+            <article class="item"><h4>Card 4</h4><p>Gap via <code>gap</code> on container.</p></article>
+          </div>
+        </div>
+        <div class="compare-col">
+          <h3>Cards (Grid)</h3>
+          <div class="cards-grid">
+            <article class="item"><h4>Card A</h4><p>Auto columns with <code>auto-fit</code>.</p></article>
+            <article class="item"><h4>Card B</h4><p><code>minmax(220px,1fr)</code>.</p></article>
+            <article class="item"><h4>Card C</h4><p>Equal row heights.</p></article>
+            <article class="item tall"><h4>Card D</h4><p>Span 2 rows.</p></article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORMS -->
+    <section id="forms" class="card">
+      <h1>Forms: Flex vs Grid</h1>
+      <div class="compare-wrap">
+        <div class="compare-col">
+          <h3>Login (Flex)</h3>
+          <form id="loginForm" class="login-flex" novalidate>
+            <input id="loginEmail" type="email" placeholder="Email" required />
+            <div class="pass-row">
+              <input id="loginPass" type="password" placeholder="Password (min 6)" minlength="6" required />
+              <button type="button" id="togglePass" class="btn ghost small">Show</button>
+            </div>
+            <button class="btn primary">Login</button>
+          </form>
+        </div>
+        <div class="compare-col">
+          <h3>CTA (Grid)</h3>
+          <form id="ctaForm" class="form-grid" novalidate>
+            <label for="fullName">Name</label>
+            <input id="fullName" required />
+            <label for="email">Email</label>
+            <input id="email" type="email" required />
+            <label for="role">Role</label>
+            <select id="role" required>
+              <option value="">Choose…</option>
+              <option>Designer</option><option>Developer</option><option>PM</option>
+            </select>
+            <label for="msg">Message</label>
+            <textarea id="msg" rows="3"></textarea>
+            <div class="actions">
+              <button type="submit" class="btn primary">Send</button>
+              <button type="button" class="btn ghost" id="clearCTA">Clear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- PITFALLS / NOTES -->
+    <section id="pitfalls" class="card">
+      <h1>Pitfalls</h1>
+      <ul class="bullets">
+        <li>Flex: <code>min-width:0</code> မပေးရင် overflow ဖြစ်တတ်</li>
+        <li>Grid: gutters အတွက် <code>gap</code> သုံး (margins မဟုတ်)</li>
+        <li>Grid: <code>auto-fit</code> / <code>auto-fill</code> ခြားနားချက် မပျောက်စေ</li>
+        <li>Mobile-first: defaults → <code>@media (min-width:768px)</code> မှာ ဆက်တိုး</li>
+      </ul>
+    </section>
+
+    <section id="notes" class="card">
+      <h1>Lesson Notes</h1>
+      <p>See the full Markdown notes: <a href="layout-notes.md">layout-notes.md</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">Built for learning — Flexbox + Grid Masterclass</div>
+  </footer>
+
+  <script src="layout.js"></script>
+</body>
+</html>

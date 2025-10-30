@@ -1,3 +1,17 @@
+// === Suppress pop-up alerts (convert to console logs) ===
+(function () {
+  try {
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window._nativeAlert = window.alert;
+      window.alert = function () {
+        try {
+          console.log("[alert suppressed]", ...arguments);
+        } catch (e) {}
+      };
+    }
+  } catch (_e) {}
+})();
+
 // /js/app.js
 import { auth, db, storage } from "./firebase.js";
 
@@ -278,7 +292,7 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       try {
         const raw = ta.value.trim();
-        if (!raw) return alert("Paste JSON first.");
+        if (!raw) return;
         const json = JSON.parse(raw);
         const res = await window.importAnyJson(json);
         alert(`[import] OK: ${res.kind}\n` + JSON.stringify(res, null, 2));
@@ -1341,7 +1355,7 @@ function ensureCourseDetailsDialog() {
     <footer class="dlg-foot">
       <div class="row" id="cdMetaChips" style="gap:.5rem"></div>
       <menu style="display:flex; gap:.5rem; margin:0">
-        <button class="btn ghost" id="cdOpenPage" type="button">Open details page</button>
+        <a id="cdOpenPage"></a>
         <button class="btn" id="cdEnroll" type="button">Enroll</button>
       </menu>
     </footer>
@@ -2618,7 +2632,7 @@ async function renderAdmin() {
         if (!requireStaff()) return;
         const uid = pickUid();
         const cid = pickCid();
-        if (!cid) return alert("Choose a course");
+        if (!cid) return;
         await renderCertificate(cid, uid, "view");
       });
     document
@@ -2627,7 +2641,7 @@ async function renderAdmin() {
         if (!requireStaff()) return;
         const uid = pickUid();
         const cid = pickCid();
-        if (!cid) return alert("Choose a course");
+        if (!cid) return;
         await renderCertificate(cid, uid, "download");
       });
     document
@@ -2673,7 +2687,7 @@ async function renderAdmin() {
           auth.currentUser?.uid ||
           "";
         const cid = document.getElementById("certCourse")?.value || "";
-        if (!cid) return alert("Choose a course");
+        if (!cid) return;
         try {
           await renderCertificate?.(cid, uid); // global function
         } catch (e) {
@@ -2710,7 +2724,7 @@ async function renderAdmin() {
         raw = raw.trim().replace(/^\uFEFF/, ""); // strip BOM
 
         // Guard: empty
-        if (!raw) return alert("Paste some JSON");
+        if (!raw) return;
 
         // Support: some people paste multiple JSON roots at once.
         // If so, try to detect and split safely.
@@ -3803,16 +3817,65 @@ async function renderCourseDetail(courseId, lessonId = null) {
             }
             switch (t) {
               case "video":
-                return `<div class="card"><video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}</div>`;
+                return `
+                  <div class="card ${b.class || ""}" id="${b.id || ""}">
+                    <video src="${u}" controls style="width:100%;border-radius:12px"></video>
+                    ${cap}
+                  </div>
+                `;
+
               case "audio":
-                return `<div class="card"><audio src="${u}" controls style="width:100%"></audio>${cap}</div>`;
+                return `
+                  <div class="card ${b.class || ""}" id="${b.id || ""}">
+                    <audio src="${u}" controls style="width:100%"></audio>
+                    ${cap}
+                  </div>
+                `;
+
               case "image":
-                return `<div class="card"><img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}</div>`;
+                return `
+                  <div class="card ${b.class || ""}" id="${b.id || ""}">
+                    <img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />
+                    ${cap}
+                  </div>
+                `;
+
+              case "html":
+                return `
+                  <div class="card ${b.class || ""}" id="${b.id || ""}">
+                    ${b.html || ""}
+                    ${cap}
+                  </div>
+                `;
+
               case "text":
-              default:
-                return `<div class="card">${escapeHtml(
-                  b.text || ""
-                )}${cap}</div>`;
+              default: {
+                // 1) raw text
+                const raw = String(b.text || "");
+
+                // 2) whitelist <br> that author already put (keep them)
+                //    -> နှားထားဖို့ placeholder ထည့်ပြီး နောက်မှပြန်တည်ဆောက်မယ်
+                let tmp = raw.replace(/<br\s*\/?>/gi, "__BR__");
+
+                // 3) now escape everything safely
+                tmp = tmp
+                  .replace(/&/g, "&amp;")
+                  .replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;");
+
+                // 4) convert newlines to <br>
+                tmp = tmp.replace(/\r?\n/g, "__BR__");
+
+                // 5) bring placeholders back to real <br>
+                const safeHtml = tmp.replace(/__BR__/g, "<br>");
+
+                return `
+                    <div class="card ${b.class || ""}" id="${b.id || ""}">
+                      ${safeHtml}
+                      ${cap}
+                    </div>
+                  `;
+              }
             }
           })
           .join("");
@@ -5072,7 +5135,7 @@ async function openCourseEditor(id) {
 // Certificate Template (with PDF export)
 async function renderCertificate(courseId, uidOpt, mode = "view") {
   const cid = (courseId || "").trim();
-  if (!cid) return alert("Choose a course first.");
+  if (!cid) return;
   const uid = (uidOpt || auth.currentUser?.uid || "").trim();
   if (!uid) return alert("No UID (login first).");
 
@@ -5300,39 +5363,129 @@ renderTranscript(user, records);
 
 // ---------- small helpers ----------
 function profileViewHTML(p = {}) {
-  const line = (label, val) => `
+  const esc = (x) => (typeof escapeHtml === "function" ? escapeHtml(String(x ?? "")) : String(x ?? ""));
+
+  // -------- helpers (self-contained) --------
+  const normalizeUrl = (u) => {
+    if (!u) return "";
+    const s = String(u).trim();
+    if (/^(mailto:|https?:\/\/)/i.test(s)) return s;
+    if (/^[\w.+-]+@[\w.-]+\.\w+$/.test(s)) return `mailto:${s}`;
+    return `https://${s}`;
+  };
+  const prettyUrl = (u) => {
+    try {
+      const url = new URL(normalizeUrl(u));
+      return url.hostname.replace(/^www\./, "") + (url.pathname === "/" ? "" : url.pathname);
+    } catch {
+      return String(u);
+    }
+  };
+  const link = (u, text = null) => {
+    if (!u) return `<span class="muted">—</span>`;
+    const href = normalizeUrl(u);
+    const label = text ?? esc(prettyUrl(u));
+    return `<a class="link" href="${href}" target="_blank" rel="noopener">${label}</a>`;
+  };
+  const toList = (s) => (Array.isArray(s) ? s.filter(Boolean) : s ? String(s).split(/[\s,]+/).filter(Boolean) : []);
+  const findByHosts = (list, hosts) => {
+    for (const raw of list) {
+      if (!raw) continue;
+      const str = String(raw).trim();
+      // try URL host
+      try {
+        const h = new URL(/^(mailto:|https?:\/\/)/i.test(str) ? str : `https://${str}`)
+          .hostname.replace(/^www\./, "")
+          .toLowerCase();
+        if (hosts.some((v) => h.includes(v))) return raw;
+      } catch {}
+      // fallback substring
+      const low = str.toLowerCase();
+      if (hosts.some((v) => low.includes(v))) return raw;
+    }
+    return "";
+  };
+  // X/Twitter: accept URL, @handle, bare handle
+  const findTwitter = (explicit, list) => {
+    if (explicit) {
+      const s = String(explicit).trim();
+      const m = s.match(/^@?([A-Za-z0-9_\.]{1,30})$/);
+      return m ? `https://x.com/${m[1]}` : s;
+    }
+    const urlHit = findByHosts(list, ["twitter.com", "x.com", "t.co", "mobile.twitter"]);
+    if (urlHit) return urlHit;
+    for (const raw of list) {
+      const s = String(raw || "").trim();
+      const m = s.match(/^@?([A-Za-z0-9_\.]{1,30})$/);
+      if (m) return `https://x.com/${m[1]}`;
+    }
+    return "";
+  };
+
+  // icons for colored labels (use your existing CSS colors)
+  const icons = {
+    name: "👤",
+    dob: "🎂",
+    email: "✉️",
+    contact: "☎️",
+    address: "📍",
+    education: "🎓",
+    skills: "🧠",
+    portfolio: "🌐",
+    github: "🐙",
+    youtube: "▶️",
+    facebook: "📘",
+    twitter: "🅧", // X icon
+    instagram: "📷",
+    tiktok: "🎵",
+  };
+
+  // pretty label row
+  const chip = (key, label, htmlVal) => `
     <div class="kv">
-      <div class="kv-k">${label}</div>
-      <div class="kv-v">${
-        val ? escapeHtml(val) : '<span class="muted">—</span>'
-      }</div>
+      <div class="kv-k chip-label ${key}">
+        <span>${icons[key] || "•"}</span> ${label}
+      </div>
+      <div class="kv-v">${htmlVal || '<span class="muted">—</span>'}</div>
     </div>`;
+
+  // -------- socials detect --------
+  const socialsList = toList(p.socials);
+  const yt = p.youtube || findByHosts(socialsList, ["youtube", "youtu.be"]);
+  const fb = p.facebook || findByHosts(socialsList, ["facebook", "fb.com"]);
+  const ig = p.instagram || findByHosts(socialsList, ["instagram"]);
+  const tk = p.tiktok || findByHosts(socialsList, ["tiktok"]);
+  const tw = findTwitter(p.twitter || p.x, socialsList); // ← fixed
+
+  // -------- view --------
   return `
     <div class="profile-view">
       <div class="profile-head">
-        <img class="avatar" src="${
-          p.photoURL || "/icons/icon-192.png"
-        }" alt="avatar">
+        <img class="avatar" src="${esc(p.photoURL || "/icons/icon-192.png")}" alt="avatar">
         <div>
-          <h3 class="h3 tight">${escapeHtml(p.name || "Unnamed")}</h3>
-          <div class="muted">${escapeHtml(p.email || "")}</div>
+          <h3 class="h3 tight">${esc(p.name || "Unnamed")}</h3>
+          <div class="muted">${p.email ? link(p.email, esc(p.email)) : ""}</div>
         </div>
       </div>
-      <div class="grid-2 sm1">
-        <div class="card sub">${line("Contact", p.contact)}${line(
-    "DoB",
-    p.dob
-  )}</div>
-        <div class="card sub">${line("Education", p.education)}${line(
-    "Skills",
-    p.skills
-  )}</div>
-        <div class="card sub">${line("Address", p.address)}</div>
-        <div class="card sub">${line("Portfolio", p.portfolio)}${line(
-    "GitHub",
-    p.github
-  )}</div>
-        <div class="card sub">${line("Socials", p.socials)}</div>
+
+      <div class="card sub profile-single">
+        ${chip("name", "Full name", esc(p.name || ""))}
+        ${chip("dob", "Date of Birth", esc(p.dob || ""))}
+        ${chip("email", "Email", p.email ? link(p.email, esc(p.email)) : "")}
+        ${chip("contact", "Contact", esc(p.contact || ""))}
+        ${chip("address", "Address", esc(p.address || ""))}
+        ${chip("education", "Education", esc(p.education || ""))}
+        ${chip("skills", "Skills", esc(p.skills || ""))}
+        ${chip("portfolio", "Portfolio", p.portfolio ? link(p.portfolio) : "")}
+        ${chip("github", "GitHub", p.github ? link(p.github) : "")}
+
+        <div class="divider"></div>
+        <div class="kv-title">Social Links</div>
+        ${chip("youtube", "YouTube", yt ? link(yt) : "")}
+        ${chip("facebook", "Facebook", fb ? link(fb) : "")}
+        ${chip("twitter", "Twitter", tw ? link(tw) : "")}
+        ${chip("instagram", "Instagram", ig ? link(ig) : "")}
+        ${chip("tiktok", "TikTok", tk ? link(tk) : "")}
       </div>
     </div>
   `;

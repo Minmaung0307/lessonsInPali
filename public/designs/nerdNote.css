@@ -1,0 +1,71 @@
+/* <div class="nerdnote-box">
+  <div class="nerdnote-icon">
+    <img src="https://cdn-icons-png.flaticon.com/512/942/942751.png" alt="Nerd Glasses">
+  </div>
+  <div class="nerdnote-content">
+    <div class="nerdnote-title">NERD NOTE</div>
+    <p>
+      The graphical "desktop" you see when your computer starts is the 
+      <span class="kbd">Desktop</span> folder in your user directory!
+    </p>
+  </div>
+</div> */
+.nerdnote-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #f8f8f8;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  padding: 20px 24px 20px 90px;
+  margin: 1rem 0;
+  color: #333;
+  font-family: system-ui, sans-serif;
+}
+
+.nerdnote-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 70px;
+  height: 70px;
+  background: #4f9460;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+}
+
+.nerdnote-icon img {
+  width: 36px;
+  height: 36px;
+  filter: brightness(0) invert(1);
+}
+
+.nerdnote-content {
+  margin-left: 20px;
+}
+
+.nerdnote-title {
+  font-weight: 800;
+  color: #2b6a3f;
+  font-size: 1.1rem;
+  margin-bottom: 6px;
+}
+
+.nerdnote-box p {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #a33;
+  font-family: monospace;
+}

@@ -1,0 +1,26 @@
+/* <div class="code-block">
+<pre><code>
+rm hello.txt
+
+ls
+</code></pre>
+</div> */
+.code-block {
+  background: #f8f5f4;              /* light beige background */
+  border: 1px solid #aaa;           /* subtle gray border */
+  border-radius: 8px;               /* rounded corners */
+  padding: 12px 16px;               /* inner spacing */
+  margin: 1rem 0;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;  /* code font */
+  font-size: 15px;
+  line-height: 1.6;
+  color: #222;
+  overflow-x: auto;                 /* scroll horizontally if too long */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.code-block pre {
+  margin: 0;
+  white-space: pre-wrap;           /* preserve newlines but wrap long lines */
+  word-wrap: break-word;
+}

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mobile‑First (No Flex/Grid) — Forms + Dialogs</title>
+  <link rel="stylesheet" href="noflex-nogrid.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="#">NoFlexNoGrid</a>
+
+      <!-- Mobile menu without JS -->
+      <details class="nav mobile-only">
+        <summary>☰ Menu</summary>
+        <nav>
+          <a href="#login">Login</a>
+          <a href="#cta">CTA</a>
+          <a href="#dialogs">Dialogs</a>
+        </nav>
+      </details>
+
+      <!-- Desktop nav (enhanced with inline-block) -->
+      <nav class="nav-bar" aria-label="Primary">
+        <a href="#login">Login</a>
+        <a href="#cta">CTA</a>
+        <a href="#dialogs">Dialogs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Mobile‑First Site (No Flexbox, No Grid)</h1>
+      <p class="muted">Built with normal flow, inline‑block, floats, and positioned overlays.</p>
+      <p>
+        <button class="btn" data-open="#loginModal">Open Login Dialog</button>
+        <button class="btn ghost" data-open="#ctaModal">Open CTA Dialog</button>
+      </p>
+    </section>
+
+    <!-- LOGIN (page section) -->
+    <section id="login" class="card">
+      <h2>Login Form (Block Flow)</h2>
+      <form id="loginForm" class="form" novalidate>
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" type="email" required placeholder="you@example.com" />
+
+        <label for="loginPass">Password</label>
+        <div class="row-inline">
+          <input id="loginPass" type="password" minlength="6" required placeholder="min 6 chars" />
+          <button type="button" id="togglePass" class="btn ghost small">Show</button>
+        </div>
+
+        <p><button class="btn primary">Login</button></p>
+      </form>
+    </section>
+
+    <!-- CTA (page section) -->
+    <section id="cta" class="card">
+      <h2>CTA Form (Inline‑block on Tablet+)</h2>
+      <form id="ctaForm" class="form form-inline" novalidate>
+        <div class="field">
+          <label for="fullName">Name</label>
+          <input id="fullName" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" required />
+        </div>
+        <div class="field">
+          <label for="role">Role</label>
+          <select id="role" required>
+            <option value="">Choose…</option>
+            <option>Designer</option><option>Developer</option><option>PM</option>
+          </select>
+        </div>
+        <div class="field wide">
+          <label for="msg">Message</label>
+          <textarea id="msg" rows="3" placeholder="Tell us more…"></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn primary">Send</button>
+          <button type="button" class="btn ghost" id="clearCTA">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- DIALOGS (custom modal, not <dialog>) -->
+    <section id="dialogs" class="card">
+      <h2>Custom Dialogs (No Flex/Grid)</h2>
+      <p>These overlays are centered using <code>position:fixed</code> + <code>transform</code>. Backdrop uses an absolutely positioned element.</p>
+      <p>
+        <button class="btn" data-open="#loginModal">Open Login Dialog</button>
+        <button class="btn ghost" data-open="#ctaModal">Open CTA Dialog</button>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">© NoFlexNoGrid — classic techniques only.</div>
+  </footer>
+
+  <!-- LOGIN MODAL -->
+  <div class="modal" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="backdrop" data-close></div>
+    <div class="modal-panel" role="document">
+      <button class="close" title="Close" data-close>×</button>
+      <h3 id="loginTitle">Login</h3>
+      <form id="loginFormModal" class="form" novalidate>
+        <label for="mEmail">Email</label>
+        <input id="mEmail" type="email" required />
+        <label for="mPass">Password</label>
+        <input id="mPass" type="password" minlength="6" required />
+        <p><button class="btn primary">Login</button></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- CTA MODAL -->
+  <div class="modal" id="ctaModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ctaTitle">
+    <div class="backdrop" data-close></div>
+    <div class="modal-panel" role="document">
+      <button class="close" title="Close" data-close>×</button>
+      <h3 id="ctaTitle">Contact Us</h3>
+      <form id="ctaFormModal" class="form" novalidate>
+        <label for="cmName">Name</label>
+        <input id="cmName" required />
+        <label for="cmEmail">Email</label>
+        <input id="cmEmail" type="email" required />
+        <label for="cmMsg">Message</label>
+        <textarea id="cmMsg" rows="3"></textarea>
+        <p class="right"><button class="btn primary">Send</button></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="noflex-nogrid.js"></script>
+</body>
+</html>

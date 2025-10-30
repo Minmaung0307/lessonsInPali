@@ -1,0 +1,95 @@
+/* <div class="lesson-header">
+  <div class="lesson-top">
+    <div class="lesson-icons">
+      <div class="icon"><img src="https://cdn-icons-png.flaticon.com/512/2721/2721267.png" alt="code"></div>
+      <div class="icon dim"><img src="https://cdn-icons-png.flaticon.com/512/1828/1828911.png" alt="design"></div>
+      <div class="icon"><img src="https://cdn-icons-png.flaticon.com/512/565/565547.png" alt="branch"></div>
+      <div class="icon"><img src="https://cdn-icons-png.flaticon.com/512/2721/2721267.png" alt="code"></div>
+      <div class="icon dim"><img src="https://cdn-icons-png.flaticon.com/512/1828/1828911.png" alt="design"></div>
+      <div class="icon"><img src="https://cdn-icons-png.flaticon.com/512/565/565547.png" alt="branch"></div>
+    </div>
+  </div>
+
+  <div class="lesson-bottom">
+    <div class="lesson-badge">1.1.4</div>
+    <div class="lesson-title">Add a Little HTML</div>
+  </div>
+</div> */
+.lesson-header {
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* ==== TOP SECTION ==== */
+.lesson-top {
+  background: #36586a;
+  padding: 28px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.lesson-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+
+.icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #8bb7cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+.icon img {
+  width: 60px;
+  height: 60px;
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
+}
+.icon.dim {
+  background: #688796;
+  opacity: 0.7;
+}
+.icon:hover {
+  transform: scale(1.08);
+}
+
+/* ==== BOTTOM SECTION ==== */
+.lesson-bottom {
+  display: flex;
+  align-items: center;
+  background: #c5c9cc;
+  padding: 24px 40px;
+  border-top-left-radius: 80px;
+}
+
+.lesson-badge {
+  width: 110px;
+  height: 110px;
+  background: #2f6fa5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  font-size: 28px;
+  border: 8px solid #bfc3c6;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  flex-shrink: 0;
+}
+
+.lesson-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #2f6fa5;
+  margin-left: 28px;
+  text-shadow: 2px 2px 0 #fff;
+}

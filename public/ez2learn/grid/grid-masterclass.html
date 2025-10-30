@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CSS Grid — Beginner Masterclass</title>
+  <link rel="stylesheet" href="grid.css" />
+</head>
+<body class="page-col">
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="#">GridMaster</a>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">☰</button>
+      <nav class="menu" data-open="false">
+        <a href="#intro">Intro</a>
+        <a href="#cheatsheet">Cheat‑Sheet</a>
+        <a href="#sandbox">Sandbox</a>
+        <a href="#patterns">Patterns</a>
+        <a href="#forms">Forms</a>
+        <a href="#areas">Areas</a>
+        <a href="#pitfalls">Pitfalls</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="intro" class="card">
+      <h1>CSS Grid — Beginner to Pro (Mobile‑First)</h1>
+      <p>Build responsive layouts with <strong>grid-template-columns</strong>, <strong>minmax()</strong>,
+      <strong>auto-fit/auto-fill</strong>, and <strong>grid-template-areas</strong>. Use the sandbox to “see” each property.</p>
+      <ul class="bullets">
+        <li>Mobile‑first defaults, then enhance at <code>@media (min-width: 768px)</code></li>
+        <li>Zero‑to‑hero: cards grid, sidebar layout, and a login/CTA form</li>
+        <li>Beginner friendly: sliders/selects control the live grid</li>
+      </ul>
+    </section>
+
+    <section id="cheatsheet" class="card">
+      <h2>Cheat‑Sheet (Quick Recall)</h2>
+      <div class="grid cheat">
+        <div><code>display: grid</code></div>
+        <div><code>grid-template-columns: repeat(3, 1fr)</code></div>
+        <div><code>grid-auto-rows: 140px</code></div>
+        <div><code>gap: 12px</code></div>
+        <div><code>grid-column: 1 / -1</code></div>
+        <div><code>grid-row: span 2</code></div>
+        <div><code>grid-template-areas</code></div>
+        <div><code>minmax(220px, 1fr)</code></div>
+        <div><code>auto-fit | auto-fill</code></div>
+      </div>
+    </section>
+
+    <section id="sandbox" class="card">
+      <h2>Interactive Sandbox</h2>
+      <div class="controls grid">
+        <label>Columns:
+          <input type="range" id="cols" min="1" max="6" value="3" />
+          <span class="out" id="colsOut">3</span>
+        </label>
+        <label>Min‑Width (px):
+          <input type="number" id="minw" value="220" min="120" step="10" />
+        </label>
+        <label>Strategy:
+          <select id="strategy">
+            <option value="fixed">repeat(n, 1fr)</option>
+            <option value="auto-fit" selected>repeat(auto-fit, minmax(...))</option>
+            <option value="auto-fill">repeat(auto-fill, minmax(...))</option>
+          </select>
+        </label>
+        <label>Gap (px):
+          <input type="range" id="gap" min="0" max="40" value="12" />
+          <span class="out" id="gapOut">12</span>
+        </label>
+        <label>Auto Rows (px):
+          <input type="range" id="rows" min="80" max="240" value="140" />
+          <span class="out" id="rowsOut">140</span>
+        </label>
+        <label>Justify Items:
+          <select id="justifyItems">
+            <option>stretch</option><option>start</option><option>center</option><option>end</option>
+          </select>
+        </label>
+        <label>Align Items:
+          <select id="alignItems">
+            <option>stretch</option><option>start</option><option>center</option><option>end</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="demo grid-sandbox" id="gridSandbox" aria-live="polite">
+        <div class="cell a">A</div>
+        <div class="cell b">B</div>
+        <div class="cell c">C</div>
+        <div class="cell d">D</div>
+        <div class="cell e">E</div>
+        <div class="cell f">F</div>
+        <div class="cell g">G</div>
+        <div class="cell h">H</div>
+      </div>
+
+      <details class="note">
+        <summary>What am I seeing?</summary>
+        <p>The grid uses your controls to build a <code>grid-template-columns</code> value.
+        With <em>auto‑fit</em>/<em>auto‑fill</em>, tracks expand/collapse by the minmax() rule, creating truly fluid grids.</p>
+      </details>
+    </section>
+
+    <section id="patterns" class="card">
+      <h2>Patterns: Cards & Responsive Gallery</h2>
+      <div class="cards grid auto">
+        <article class="card item"><h4>Card A</h4><p>Fluid using <code>auto-fit</code> + <code>minmax</code>.</p><button class="btn small">View</button></article>
+        <article class="card item"><h4>Card B</h4><p>Equal heights by default (grid auto rows).</p><button class="btn small">View</button></article>
+        <article class="card item"><h4>Card C</h4><p>Gaps handled by <code>gap</code>, not margins.</p><button class="btn small">View</button></article>
+        <article class="card item tall"><h4>Card D (tall)</h4><p>Spans 2 rows.</p><button class="btn small">View</button></article>
+        <article class="card item"><h4>Card E</h4><p>Auto placement fills the next free cell.</p><button class="btn small">View</button></article>
+        <article class="card item"><h4>Card F</h4><p>Resize your window to see columns change.</p><button class="btn small">View</button></article>
+      </div>
+    </section>
+
+    <section id="forms" class="card">
+      <h2>Mobile‑First Form with Grid</h2>
+      <form id="ctaForm" class="form-grid" novalidate>
+        <label for="fullName">Name</label>
+        <input id="fullName" required />
+        <label for="email">Email</label>
+        <input id="email" type="email" required />
+        <label for="role">Role</label>
+        <select id="role" required>
+          <option value="">Choose…</option>
+          <option>Designer</option><option>Developer</option><option>PM</option>
+        </select>
+        <label for="msg">Message</label>
+        <textarea id="msg" rows="3"></textarea>
+        <div class="actions">
+          <button type="submit" class="btn primary">Get Started</button>
+          <button type="button" class="btn ghost" id="clearCTA">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="areas" class="card">
+      <h2>Grid Template Areas: Header / Sidebar / Content / Footer</h2>
+      <div class="layout-areas">
+        <header class="box header">Header</header>
+        <aside class="box sidebar">Sidebar</aside>
+        <main class="box content">Content</main>
+        <footer class="box footer">Footer</footer>
+      </div>
+      <p class="dim">Mobile: stacked. ≥768px: two columns. ≥1024px: sidebar+content with header/footer spanning.</p>
+    </section>
+
+    <section id="pitfalls" class="card">
+      <h2>Pitfalls (Common Mistakes)</h2>
+      <ol>
+        <li><strong>Using margins for gutters:</strong> Prefer <code>gap</code> on the grid container.</li>
+        <li><strong>Forgetting minmax with auto‑fit:</strong> Without <code>minmax()</code> tracks can collapse awkwardly.</li>
+        <li><strong>Confusing auto‑fit vs auto‑fill:</strong> <em>fit</em> compacts tracks; <em>fill</em> reserves empty tracks.</li>
+        <li><strong>Hardcoding widths:</strong> Let Grid manage columns with <code>1fr</code> and <code>minmax()</code>.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">Built for learning — CSS Grid Masterclass</div>
+  </footer>
+
+  <script src="grid.js"></script>
+</body>
+</html>

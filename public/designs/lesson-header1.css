@@ -1,0 +1,65 @@
+/* <div class="lesson-icons">
+  <div class="icon-circle active">
+    <img src="https://cdn-icons-png.flaticon.com/512/2721/2721273.png" alt="Code">
+  </div>
+  <div class="icon-circle">
+    <img src="https://cdn-icons-png.flaticon.com/512/2920/2920258.png" alt="Design">
+  </div>
+  <div class="icon-circle">
+    <img src="https://cdn-icons-png.flaticon.com/512/906/906334.png" alt="Branch">
+  </div>
+  <div class="icon-circle">
+    <img src="https://cdn-icons-png.flaticon.com/512/2920/2920258.png" alt="Ruler">
+  </div>
+</div> */
+.lesson-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  background: #3a5a6b;
+  padding: 40px 0;
+  border-radius: 10px;
+}
+
+.icon-circle {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.icon-circle img {
+  width: 64px;
+  height: 64px;
+  opacity: 0.8;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  filter: brightness(0) invert(1);
+}
+
+/* Hover Effect */
+.icon-circle:hover {
+  transform: scale(1.08);
+}
+
+.icon-circle:hover img {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Active (current lesson) */
+.icon-circle.active {
+  background: #a3d6f5;
+}
+
+.icon-circle.active img {
+  opacity: 1;
+  transform: scale(1.15);
+  filter: brightness(1) invert(0);
+}

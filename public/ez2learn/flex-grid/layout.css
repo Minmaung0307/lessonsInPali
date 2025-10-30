@@ -1,0 +1,65 @@
+/* --- Base Theme --- */
+*{ box-sizing: border-box; }
+:root{ --bg:#0f172a; --card:#111827; --ink:#e5e7eb; --ink-dim:#9ca3af; --line:#1f2937; --gap:12px; }
+body{ margin:0; font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif; background:var(--bg); color:var(--ink); }
+a{ color:#93c5fd; text-decoration:none; }
+a:hover{ text-decoration:underline; }
+.container{ width:min(1100px,92%); margin-inline:auto; }
+.page-col{ min-height:100dvh; display:flex; flex-direction:column; }
+.site-footer{ margin-top:auto; padding:16px 0; border-top:1px solid var(--line); color:var(--ink-dim); }
+.card{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:16px 0; }
+.bullets{ margin:0; padding-left:18px; color:var(--ink-dim); }
+
+/* --- Header / Nav --- */
+.nav{ display:flex; align-items:center; gap:8px; padding:10px 0; }
+.brand{ font-weight:800; letter-spacing:.3px; }
+.nav-toggle{ margin-left:auto; background:#0b1220; color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer; }
+.menu{ display:none; flex-direction:column; gap:8px; }
+.menu[data-open="true"]{ display:flex; }
+@media (min-width:768px){
+  .nav-toggle{ display:none; }
+  .menu{ display:flex !important; flex-direction:row; gap:16px; margin-left:auto; }
+}
+
+/* --- Controls (shared) --- */
+.controls.grid{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); }
+.controls label{ display:flex; align-items:center; gap:8px; background:#0b1220; border:1px solid #1f2937; border-radius:10px; padding:8px 10px; }
+.controls input[type="range"]{ width:140px; }
+.out{ opacity:.8; font-variant-numeric:tabular-nums; }
+
+/* --- Flex sandbox --- */
+.flex-sandbox{ display:flex; gap:var(--gap); flex-wrap:wrap; background:#0b1220; border:1px solid #1f2937; border-radius:10px; padding:10px; margin-top:12px; }
+.box{ background:#1e293b; border:1px solid #334155; border-radius:10px; color:var(--ink); padding:12px; font-weight:700; min-width:120px; text-align:center; }
+.box.long{ min-width:220px; }
+
+/* --- Grid sandbox --- */
+.grid-sandbox{ display:grid; gap:var(--gap); grid-auto-rows:140px; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); background:#0b1220; border:1px solid #1f2937; border-radius:10px; padding:10px; margin-top:12px; }
+.cell{ display:grid; place-items:center; background:#1e293b; border:1px solid #334155; border-radius:10px; font-weight:800; }
+.cell.tall{ grid-row: span 2; }
+
+/* --- Compare: Flex vs Grid cards --- */
+.compare-wrap{ display:grid; gap:12px; grid-template-columns: 1fr; }
+.compare-col{ background:#0b1220; border:1px solid #1f2937; border-radius:10px; padding:12px; }
+.cards-flex{ display:flex; flex-wrap:wrap; gap:12px; }
+.cards-flex .item{ flex:1 1 220px; min-width:0; background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px; }
+.cards-grid{ display:grid; gap:12px; grid-auto-rows:160px; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); }
+.cards-grid .item{ background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px; display:grid; grid-template-rows:auto 1fr; }
+.cards-grid .item.tall{ grid-row: span 2; }
+@media (min-width:768px){ .compare-wrap{ grid-template-columns: 1fr 1fr; } }
+
+/* --- Forms --- */
+.login-flex{ display:flex; flex-direction:column; gap:10px; }
+.pass-row{ display:flex; gap:8px; }
+.form-grid{ display:grid; gap:12px; grid-template-columns: 1fr; }
+.form-grid input, .form-grid select, .form-grid textarea, .login-flex input{ width:100%; padding:10px; border-radius:10px; border:1px solid #334155; background:#0b1220; color:var(--ink); }
+.form-grid .actions{ display:flex; flex-wrap:wrap; gap:8px; }
+.form-grid .actions .btn.ghost{ margin-left:auto; }
+@media (min-width:768px){
+  .form-grid{ grid-template-columns: 140px 1fr; align-items:center; }
+  .form-grid .actions{ grid-column: 1 / -1; }
+}
+
+/* --- Buttons --- */
+.btn{ background:#2563eb; color:#fff; border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
+.btn.ghost{ background:transparent; border:1px solid #334155; color:#cbd5e1; }
+.btn.small{ padding:6px 10px; font-size:.9rem; }
