@@ -827,7 +827,7 @@ h3 {
   border: none;
   /* background: #0000; */
   background: #f2f2f2;
-  /* color: inherit; */
+  color: inherit;
   cursor: pointer;
   padding: 0.45rem 0.75rem;
   border-radius: 0.6rem;
@@ -1307,7 +1307,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
-  /* width: 100%; */
+  width: 100%;
   box-sizing: border-box;
   -webkit-appearance: none;
   appearance: none;
@@ -2424,6 +2424,18 @@ dialog.modal .sheet {
   border-color: color-mix(in oklab, var(--line) 70%, transparent) !important;
   box-shadow: 0 1px 8px #0001;
 }
+a.link {
+text-decoration: none;
+}
+.link {
+  color: #666667;
+}
+.link:hover {
+  color: #959696;
+}
+.kv-v {
+  color: #6f7070;
+}
 
 /* Deduplicate nav spacing rules */
 .nav-desktop{ gap: .75rem !important; }
@@ -2442,15 +2454,12 @@ dialog.modal .sheet {
 .profile-single .kv {
   display:grid;
   grid-template-columns: 150px 1fr;
-  gap:.5rem;
+  gap:1.2rem;
   padding:.45rem 0;
 }
 .profile-single .kv-k {
   color:var(--muted);
   font-weight:500;
-}
-.profile-single .kv-v .link {
-  text-decoration:underline;
 }
 .divider {
   margin:.8rem 0;
@@ -2478,20 +2487,3 @@ dialog.modal .sheet {
 .chip-label span {
   font-size:1rem;
 }
-
-/* Color accents per field (customizable themes) */
-.chip-label.name       { background:#dbeafe; color:#1e3a8a; } /* blue */
-.chip-label.dob        { background:#fef3c7; color:#92400e; } /* amber */
-.chip-label.email      { background:#fce7f3; color:#9d174d; } /* pink */
-.chip-label.contact    { background:#dcfce7; color:#166534; } /* green */
-.chip-label.address    { background:#e0f2fe; color:#075985; } /* sky */
-.chip-label.education  { background:#fef9c3; color:#854d0e; } /* yellow */
-.chip-label.skills     { background:#ede9fe; color:#5b21b6; } /* violet */
-.chip-label.portfolio  { background:#e0e7ff; color:#3730a3; } /* indigo */
-.chip-label.github     { background:#f3f4f6; color:#111827; } /* gray */
-
-.chip-label.youtube    { background:#fee2e2; color:#b91c1c; } /* red */
-.chip-label.facebook   { background:#dbeafe; color:#1e3a8a; } /* blue */
-.chip-label.twitter    { background:#e0f2fe; color:#0369a1; } /* sky */
-.chip-label.instagram  { background:#fae8ff; color:#a21caf; } /* fuchsia */
-.chip-label.tiktok     { background:#f0fdf4; color:#065f46; } /* emerald */
