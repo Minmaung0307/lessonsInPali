@@ -1,0 +1,22 @@
+{
+  "courseId": "pali-primary",
+  "chapterId": "ch1",
+  "lesson": { "id": "l5", "order": 5, "title": "ကတ္တားနှင့် ကြိယာ • ပဌမာဝိဘတ်" },
+
+  "reading": "ဝိဘတ်များ—(တိ, အန္တိ) / (သိ, ထ) / (မိ, မ)… ကတ္တား/ကြိယာ အဓိပ္ပါယ်နှင့် ဧကဝုစ်/ဗဟုဝုစ် သုံးပုံ…",
+
+  "contents": [
+    { "type": "text",  "url": "https://example.com/pali/l5-tables", "caption": "ကတ္တား + ကြိယာ ဇယား", "order": 1 },
+    { "type": "audio", "url": "https://samplelib.com/lib/preview/mp3/sample-6s.mp3", "caption": "ပုဒ်လိုက် Drill", "order": 2 }
+  ],
+
+  "quiz": {
+    "title": "Lesson 5 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      { "id": "q1", "type": "scq", "text": "“အယံ” သည် …?", "choices": ["ကတ္တား","ကြိယာ"], "answerIndex": 0, "points": 1 },
+      { "id": "q2", "type": "scq", "text": "“ဘဝတိ” သည် …?", "choices": ["ကတ္တား","ကြိယာ"], "answerIndex": 1, "points": 1 }
+    ]
+  }
+}

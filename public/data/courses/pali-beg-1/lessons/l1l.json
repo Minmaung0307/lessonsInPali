@@ -13,7 +13,7 @@
   "quiz": {
     "title": "Lesson 1 Quiz",
     "shuffle": true,
-    "passPct": 70,
+    "passPct": 55,
     "questions": [
       {
         "id": "q1",

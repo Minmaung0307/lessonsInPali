@@ -2487,3 +2487,321 @@ text-decoration: none;
 .chip-label span {
   font-size:1rem;
 }
+
+/* (optional) drop these into styles.css if you want nicer layout */
+.q-figure { margin:.75rem 0; }
+.q-img { width:100%; max-height:380px; object-fit:contain; border-radius:10px; background:#f5f5f5; }
+.q-cap { font-size:.9rem; color:var(--muted,#6b7280); margin-top:.25rem; }
+
+.q-choices.mcq { display:grid; gap:.5rem; }
+.choice { display:flex; align-items:center; gap:.6rem; padding:.5rem; border:1px solid var(--line,#e5e7eb); border-radius:10px; cursor:pointer; }
+.choice input { transform:scale(1.1); }
+.choice-body { display:flex; align-items:center; gap:.6rem; }
+.choice-img { width:72px; height:72px; object-fit:cover; border-radius:8px; background:#f3f3f3; }
+.choice-text { line-height:1.2; }
+
+.q-choices.short .short-input { width:100%; padding:.6rem .8rem; border:1px solid var(--line,#e5e7eb); border-radius:10px; }
+
+.quiz-card .q-title { font-weight:600; }
+.quiz-result .ok { color:#16a34a; }
+.quiz-result .bad { color:#dc2626; }
+
+
+/* မေးခွန်းများအတွက် */
+/* ===== QUIZ FIX: inline chips + proper radio/checkbox ===== */
+
+/* 1) Grid layout: desktop 4-up, tablet 2-up, mobile 1-up */
+.choices{
+  display:grid !important;
+  grid-template-columns: repeat(4, minmax(0,1fr)) !important;
+  gap:.6rem !important;
+  align-items:start !important;
+}
+@media (max-width: 1024px){
+  .choices{ grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+}
+@media (max-width: 640px){
+  .choices{ grid-template-columns: 1fr !important; }
+}
+
+/* 2) Choice chip: no full-width */
+.choice{
+  display:flex !important;
+  align-items:center !important;
+  gap:.45rem !important;
+  /* remove any old full-width styles */
+  width:auto !important;
+  min-width: 140px;
+  padding:.5rem .7rem !important;
+  border:1px solid var(--line) !important;
+  border-radius:.6rem !important;
+  background:var(--surface) !important;
+  cursor:pointer !important;
+  user-select:none !important;
+}
+.choice:hover{ background:var(--hover) !important; }
+
+/* 3) Inputs must look native: radio = circle, checkbox = square */
+.choice input[type="radio"],
+.choice input[type="checkbox"]{
+  appearance:auto !important;
+  -webkit-appearance:auto !important;
+  width:18px; height:18px;
+  margin:0;
+  accent-color: var(--accent, #17803d);
+}
+
+/* 4) Tight text */
+.choice .choice-text{ line-height:1.2; white-space:nowrap; }
+
+/* (optional) image choices stay small chip */
+.choice-img{
+  width:48px; height:48px; object-fit:cover;
+  border-radius:8px; border:1px solid var(--line);
+}
+
+/* Modern SCQ/MCQ UI */
+.quiz-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  background: var(--card);
+  transition: 0.2s ease;
+}
+.quiz-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.q-head {
+  font-weight: 600;
+  margin-bottom: .5rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.q-no {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.q-body label.opt {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .55rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--bg);
+  transition: .15s ease;
+}
+.q-body label.opt:hover {
+  background: var(--hover);
+}
+.q-body input {
+  width: 18px;
+  height: 18px;
+}
+
+label.opt.selected {
+  border-color: var(--accent);
+  background: rgba(218, 179, 116, .2);
+}
+
+/* === SCQ/MCQ Layout Flex (stretch & wrap) === */
+.q-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+
+/* each option full width, but can wrap naturally */
+.q-body label.opt {
+  flex: 1 1 300px;        /* >=300px stretch, else wrap */
+  min-width: 240px;       /* mobile safe size */
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--card);
+  transition: .15s;
+}
+
+.q-body label.opt:hover {
+  background: var(--hover);
+}
+.q-body input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  border-radius: 4px; /* square checkbox look */
+}
+
+/* === Modern Quiz Layout === */
+.quiz-card { padding: 1rem; border: 1px solid var(--border); border-radius: 14px; margin-bottom: .9rem; background: var(--card); }
+.q-head { font-weight: 700; margin-bottom: .5rem; display:flex; align-items:center; gap:.4rem; }
+.q-no { color: var(--accent); font-weight: 800; }
+
+.q-body { display:flex; flex-wrap:wrap; gap:.55rem; }
+.q-body label.opt {
+  display:flex; align-items:center; gap:.7rem;
+  padding:.7rem .85rem; border:1px solid var(--border); border-radius:10px;
+  background: var(--bg); cursor:pointer; transition:.15s ease;
+  flex: 1 1 300px; min-width: 240px; /* row တစ်ကြောင်းမဝင်ရင် wrap */
+}
+.q-body label.opt:hover { background: var(--hover); }
+.q-body input[type="radio"], .q-body input[type="checkbox"] { width:18px; height:18px; }
+.q-body input[type="checkbox"] { accent-color: var(--accent); border-radius:4px; }
+label.opt.selected { border-color: var(--accent); background: rgba(218,179,116,.18); }
+
+/* ===== QUIZ CHOICE LAYOUT ===== */
+.q-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin: .8rem 0;
+}
+
+.q-choices .choice {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border: 1px solid var(--line, #ddd);
+  padding: .6rem .9rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: .2s;
+  background: #fff;
+  min-width: 160px;
+  flex: 1 1 calc(25% - 0.75rem); /* 4 per row desktop */
+}
+
+/* mobile responsive */
+@media(max-width:700px){
+  .q-choices .choice{
+    flex: 1 1 100%;
+  }
+}
+
+/* hover + selected style */
+.q-choices .choice input {
+  margin: 0;
+  accent-color: var(--accent, #2e7d32);
+}
+
+.q-choices .choice:hover {
+  background: #fafafa;
+  border-color: var(--accent, #2e7d32);
+}
+
+.q-choices .choice:has(input:checked) {
+  background: #e8f5e9;
+  border-color: var(--accent, #2e7d32);
+  font-weight: 600;
+}
+
+/* image inside choice */
+.choice-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* question card wrapping nicer */
+.quiz-card { 
+  margin-bottom: 2rem;
+}
+
+/* prev / next footer sticky */
+.quiz-nav-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg, #fff);
+  padding: 1rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* === Quiz choices: row-wrap (SCQ + MCQ) === */
+.q-choices.scq,
+.q-choices.mcq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+/* force tile layout for both types (override any old 100% width) */
+.q-choices.scq .choice,
+.q-choices.mcq .choice {
+  display: flex !important;
+  align-items: center;
+  gap: .5rem;
+  border: 1px solid var(--line, #ddd);
+  background: var(--card, #fff);
+  border-radius: 10px;
+  padding: .6rem .9rem;
+  cursor: pointer;
+  transition: .2s;
+  width: auto !important;
+  min-width: 180px;
+  flex: 1 1 calc(25% - .75rem);   /* ≈ 4 per row on desktop */
+}
+/* 
+.q-choices.scq .choice:hover,
+.q-choices.mcq .choice:hover { border-color: var(--accent, #2e7d32); background: #fafafa; }
+
+.q-choices.scq .choice:has(input:checked),
+.q-choices.mcq .choice:has(input:checked) { background: #e8f5e9; border-color: var(--accent, #2e7d32); font-weight: 600; }
+
+/* inputs 
+.q-choices .choice input { margin: 0; accent-color: var(--accent, #2e7d32); }
+.choice-img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+
+/* responsive 
+@media (max-width: 900px) {
+  .q-choices.scq .choice,
+  .q-choices.mcq .choice { flex: 1 1 calc(33.33% - .75rem); }   /* 3 per row 
+}
+@media (max-width: 700px) {
+  .q-choices.scq .choice,
+  .q-choices.mcq .choice { flex: 1 1 100%; }                    /* mobile: 1 per row 
+}
+
+/* bottom nav bar 
+.quiz-bottom-nav {
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--line, #eee);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quiz-bottom-nav{
+  margin-top:1rem;
+  padding-top:.75rem;
+  border-top:1px solid var(--line,#eee);
+  display:flex;
+  justify-content:space-between;
+  gap:1rem;
+} */
+/* 
+.q-figure { margin:.5rem 0 }
+.q-img { max-width:100%; display:block; border-radius:10px }
+.q-cap { font-size:.85rem; color:#666; margin-top:.25rem }
+
+.q-body { display:flex; flex-wrap:wrap; gap:.6rem }
+.opt { display:inline-flex; align-items:center; gap:.45rem; border:1px solid var(--line,#e5e7eb); border-radius:10px; padding:.4rem .6rem }
+.opt input { margin:0 }
+.opt-body { display:flex; align-items:center; gap:.45rem }
+.opt-img { width:42px; height:42px; object-fit:cover; border-radius:8px }
+
+@media (min-width:900px){ .opt{ flex:1 1 calc(25% - .6rem) } }
+@media (max-width:899px){ .opt{ flex:1 1 100% } } */

@@ -1,0 +1,13 @@
+{
+  "course": { "id": "pali-primary" },
+  "chapters": [
+    { "id": "ch1", "order": 1, "title": "အခြေခံဝါကတည်ဆောက်ပုံများ" },
+    { "id": "ch2", "order": 2, "title": "သန္ဓိကျဉ်း" },
+    { "id": "ch3", "order": 3, "title": "နာမ်ကျဉ်း" },
+    { "id": "ch4", "order": 4, "title": "အာချာတ်ကျဉ်း" },
+    { "id": "ch5", "order": 5, "title": "သမာသ်ကျဉ်း" },
+    { "id": "ch6", "order": 6, "title": "တဒ္ဓိတ်ကျဉ်း" },
+    { "id": "ch7", "order": 7, "title": "ကိတ်ကျဉ်း" },
+    { "id": "ch8", "order": 8, "title": "ကာရကကျဉ်း" }
+  ]
+}

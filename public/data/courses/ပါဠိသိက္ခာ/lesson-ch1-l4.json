@@ -1,0 +1,20 @@
+{
+  "courseId": "pali-primary",
+  "chapterId": "ch1",
+  "lesson": { "id": "l4", "order": 4, "title": "တုလျတ် / လိင်္ဂတ် အတိုချုံး" },
+
+  "reading": "အမေးဝါကျနှင့် အဖြေဝါကျခွဲ—တူညီအနက် (တုလျတ်), လိင်္ဂသာမန် (လိင်္ဂတ်) စသဖြင့် သဘောတရား…",
+
+  "contents": [
+    { "type": "text", "url": "https://example.com/pali/l4-qa", "caption": "မေး/ဖြေ လေ့ကျင့်မှု", "order": 1 }
+  ],
+
+  "quiz": {
+    "title": "Lesson 4 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      { "id": "q1", "type": "scq", "text": "တူညီအနက်ကြောင့်ခေါ်သည့် အမည်?", "choices": ["တုလျတ်","လိင်္ဂတ်","ဝိဘတ်"], "answerIndex": 0, "points": 1 }
+    ]
+  }
+}

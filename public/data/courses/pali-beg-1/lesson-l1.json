@@ -1,0 +1,91 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+
+  "lesson": { "id": "l1", "order": 1, "title": "သရဏဂုံ ၃-ပါး" },
+
+  "reading": "01: သရဏဂုံ ၃ပါး(အရကျက်)\n\n၁။ ဗုဒ္ဓံ သရဏံ ဂစ္ဆာမိ = ဘုရား ကိုးကွယ်ပါ၏။\n၂။ ဓမ္မံ သရဏံ ဂစ္ဆာမိ = တရား ကိုးကွယ်ပါ၏။\n၃။ သဃံ သရဏံ ဂစ္ဆာမိ = အရိယာ သံဃာကို ကိုးကွယ်ပါ၏။\n\nကြည့်ရှု့ရန်အမှာ။ ။\nဒ္ဓံ- ဓမ်- ဃံ- စ္ဆာ တို့ကို ခပ်ပြင်းပြင်း ရွတ်ပါ။\n\"ဗုဒ္ဓံ = ဘုရား\"ဟု ဆိုရာ၌ သက်တော်ထင်ရှား ဘုရားရှင်ကို မှန်းပါ။\n\"ဓမ္မံ = တရား\"ဟု ဆိုရာ၌ မဂ်တရား ဖိုလ်တရား နိဗ္ဗာန်တရားနှင့် ပိဋကတ်တရားတော်များကို မှန်းပါ။\n\"သံဃံ = အရိယာသံဃာ\"ဟု ဆိုရာ၌ အရိယာဖြစ်ပြီးသော သံဃာတော်များကို မှန်းပါ။\n",
+
+  "contents": [
+    { "type": "video", "url": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj", "caption": "သရဏဂုံ အကြမ်းဖော်ပြချက်", "order": 1 },
+    { "type": "audio", "url": "https://samplelib.com/lib/preview/mp3/sample-6s.mp3", "caption": "သရဏဂုံ အသံဖိုင် (ကျက်ရန်)", "order": 2 },
+    { "type": "image", "url": "https://i.imgur.com/4ZQZ4GZ.png", "caption": "ဝေါဟာရ အစုံအလင်", "order": 3 },
+    { "type": "text", "url": "https://example.com/notes", "caption": "ဆက်ဖတ်ရန် မှတ်စုများ", "order": 4 }
+  ],
+
+  "blocks": [
+    {
+      "layout": "text-image",
+      "text": "သရဏဂုံ ၃ ပါးကို ရှင်းလင်းဖော်ပြထားပါသည်။ ပထမတန်းကျောင်းသားများအတွက် အများသိသာအောင် ရွတ်ဆိုလေ့ကျင့်ပါ။",
+      "img": "https://i.imgur.com/4ZQZ4GZ.png",
+      "caption": "အကြောင်းအရာ အနှစ်ချုပ်"
+    },
+    {
+      "layout": "text-audio",
+      "text": "လေ့ကျင့်သံတွဲ—တစ်ကြိမ်စီ ၃ ကြိမ်ကျော် ပြန်ဆိုပါ။",
+      "audio": "https://samplelib.com/lib/preview/mp3/sample-6s.mp3",
+      "caption": "ဖတ်သာမက ပြန်ဆိုပါ"
+    },
+    {
+      "layout": "text-video",
+      "text": "အသံထွက်၊ အလေးထားချက်များကို ဗီဒီယိုအတိုကို ကြည့်ပြီး ထပ်ကြားပါ။",
+      "video": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj",
+      "caption": "အသံထွက် ဗီဒီယို"
+    }
+  ],
+
+  "quiz": {
+    "title": "Lesson 1 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "scq",
+        "text": "ဗုဒ္ဓ-ဆိုတာ ဘာကို ဆိုလိုသလဲ?",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ"],
+        "answerIndex": 2,
+        "points": 1
+      },
+      {
+        "id": "q2",
+        "type": "mcq",
+        "text": "သရဏဂုံ (၃) ပါးတွင် ပါဝင်သူများကို ရွေးပါ။",
+        "choices": ["သံဃာ", "တရား", "ဘုရား", "စေတီ", "ဗိမာန်"],
+        "answerIndexes": [0, 1, 2],
+        "points": 2
+      },
+      {
+        "id": "q3",
+        "type": "sa",
+        "text": "သရဏဂုံ ၃ ပါးကို ပါဠိအတိုကောက်ဖြင့် (သုံးလုံး) ရေးပါ။",
+        "acceptedAnswers": ["ဗုဒ္ဓံ ဓမ္မံ သဃံ", "Buddha Dhamma Saṅgha", "Buddha Dhamma Sangha"],
+        "caseInsensitive": true,
+        "points": 2
+      },
+      {
+        "id": "q4",
+        "type": "scq",
+        "text": "ဤပုံကို ကြည့်ပြီး မှန်ကန်သော အဖြေရွေးပါ။",
+        "imageUrl": "https://i.imgur.com/4ZQZ4GZ.png",
+        "imageAlt": "Alphabet chart",
+        "imageCaption": "အက္ခရာဇယား",
+        "choices": ["စေတီ", "ဘုရား", "ဗိမာန်", "ခေါင်မိုး"],
+        "answerIndex": 1,
+        "points": 1
+      },
+      {
+        "id": "q5",
+        "type": "scq",
+        "text": "အောက်ပါ ရုပ်ပုံရွေးချယ်မှုများထဲမှ ဘုရားနှင့်သက်ဆိုင်သည့်အရာကို ရွေးပါ။",
+        "choices": [
+          { "text": "သံဃာ", "img": "https://i.imgur.com/9i3tC9y.jpeg" },
+          { "text": "ဘုရား", "img": "https://i.imgur.com/4ZQZ4GZ.png" },
+          { "text": "စေတီ", "img": "https://i.imgur.com/9i3tC9y.jpeg" }
+        ],
+        "answerIndex": 1,
+        "points": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "courseId": "pali-beg-1",
+  "chapterId": "ch1",
+
+  "lesson": { "id": "l3", "order": 3, "title": "ပထမခန်း [ကိံ နာမော] (ကျက်မှတ်ရန်)" },
+
+  "reading": "နာမ-မည်၏။\nကိံ နာမော - အဘယ် အမည်ရှိသနည်း။\nကိံ နာမာ - အဘယ် အမည် ရှိကုန်သနည်း။\n",
+
+  "contents": [
+    { "type": "text",  "url": "https://example.com/reading", "caption": "ဆက်ဖတ်ရန်", "order": 1 },
+    { "type": "video", "url": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj", "caption": "ဝေါဟာရ သင်ခန်းစာ", "order": 2 }
+  ],
+
+  "blocks": [
+    {
+      "layout": "text-video",
+      "text": "မေးခွန်းဖွဲ့စည်းပုံ (ကိံ/ကိိံဟာ) ကို ဗီဒီယိုဖြင့် လေ့လာပါ။",
+      "video": "https://youtu.be/TbdhjNLdumU?si=ZwA0e533wX5gEiHj",
+      "caption": "Q-form practice"
+    }
+  ],
+
+  "quiz": {
+    "title": "Lesson 3 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      {
+        "id": "q1",
+        "type": "sa",
+        "text": "“ကိံ နာမော?” ကို မြန်မာလို ဘာအဓိပ္ပါယ် ဆိုလိုသလဲ?",
+        "acceptedAnswers": ["အမည်ဘယ်လိုခေါ်သလဲ", "နာမည်ဘာလဲ", "အမည်ဘာလဲ"],
+        "caseInsensitive": true,
+        "points": 2
+      },
+      {
+        "id": "q2",
+        "type": "scq",
+        "text": "အောက်ပါရွေးချယ်မှုများထဲမှ “နာမ” သက်ဆိုင်ရာကို ရွေးပါ။",
+        "choices": ["အမည်", "အရပ်", "အရွယ်", "အခန်း"],
+        "answerIndex": 0,
+        "points": 1
+      },
+      {
+        "id": "q3",
+        "type": "mcq",
+        "text": "ရုပ်ပုံများကြည့်ပြီး “နာမ” နှင့် သက်ဆိုင်သည့် (စာသား) ကို ရွေးပါ။",
+        "choices": [
+          { "text": "အမည်", "img": "https://i.imgur.com/4ZQZ4GZ.png" },
+          { "text": "အရွယ်", "img": "https://i.imgur.com/9i3tC9y.jpeg" },
+          { "text": "အရပ်", "img": "https://i.imgur.com/9i3tC9y.jpeg" },
+          { "text": "အခန်း", "img": "https://i.imgur.com/9i3tC9y.jpeg" }
+        ],
+        "answerIndexes": [0],
+        "points": 2
+      }
+    ]
+  }
+}

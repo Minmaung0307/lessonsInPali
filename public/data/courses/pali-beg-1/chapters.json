@@ -1,39 +1,8 @@
 {
-  "course": { "id": "pali-beg-1" },
+  "courseId": "pali-beg-1",
   "chapters": [
-    {
-      "id": "ch1",
-      "order": 1,
-      "title": "ပထမခန်း: သရဏဂုံ",
-      "summary": "သရဏဂုံ အကြောင်းကို ပါဠိဘာသာဖြင့် စတင်မိတ်ဆက်ခြင်း",
-      "lessons": [
-        {
-          "id": "l1",
-          "order": 1,
-          "title": "01: သရဏဂုံ ၃ပါး(အရကျက်)",
-          "lessonsUrl": "data/courses/pali-beg-1/lessons/l1.json"
-        },
-        {
-          "id": "l2",
-          "order": 2,
-          "title": "ပထမခန်း [ပဌမာဝိဘတ်နက် (ကျက်ရန်)]",
-          "lessonsUrl": "data/courses/pali-beg-1/lessons/l2.json"
-        }
-      ]
-    },
-    {
-      "id": "ch2",
-      "order": 2,
-      "title": "ဒုတိယခန်း: ပုရိသ်များ",
-      "summary": "ပုရိသ်များ အကြောင်း မိတ်ဆက်ခြင်း",
-      "lessons": [
-        {
-          "id": "l3",
-          "order": 1,
-          "title": "ပထမခန်း [ကိံ နာမော] (ကျက်မှတ်ရန်)",
-          "lessonsUrl": "data/courses/pali-beg-1/lessons/l3.json"
-        }
-      ]
-    }
+    { "id": "ch1", "order": 1, "title": "Alphabet & Basic Chants" },
+    { "id": "ch2", "order": 2, "title": "Pronouns & Cases" },
+    { "id": "ch3", "order": 3, "title": "Common Questions & Names" }
   ]
 }

@@ -1,0 +1,23 @@
+{
+  "courseId": "pali-primary",
+  "chapterId": "ch1",
+  "lesson": { "id": "l2", "order": 2, "title": "ပဌမာဝိဘတ်နက် (ကျက်ရန်)" },
+
+  "reading": "အယံ - ဤသူ/ဤသူမ/ဤဟာ၊ ဣမေ - ဤသူတို့/ဤဟာတွေ၊ ဣမာ - ဤသူမတို့၊တွံ - သင်/နင်/မင်း/ခင်ဗျား၊ တုမှေ - သင်တို့၊ အဟံ - ငါ၊ မယံ - ငါတို့…\n\nကြည့်ရှု့ရန် — အယံ (နီးကပ် ဧကဝုစ်), ဣမေ (ဗဟုဝုစ် အထီး), ဣမာ (ဗဟုဝုစ် အမ) … တို႔ကို သဘောတရားအလိုက် သုံးပါ။",
+
+  "contents": [
+    { "type": "text", "url": "https://example.com/pali/l2-table", "caption": "ပုဒ်ဇယား (Pronouns Table)", "order": 1 },
+    { "type": "audio", "url": "https://samplelib.com/lib/preview/mp3/sample-6s.mp3", "caption": "လိုက်ဖတ် လေ့ကျင့်", "order": 2 }
+  ],
+
+  "quiz": {
+    "title": "Lesson 2 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      { "id": "q1", "type": "scq", "text": "“အယံ” ၏ အဓိပ္ပါယ်?", "choices": ["ဤသူ/ဤဟာ","ဤသူတို့","ထိုသူ","သူတို့"], "answerIndex": 0, "points": 1 },
+      { "id": "q2", "type": "scq", "text": "“အဟံ” ၏ အဓိပ္ပါယ်?", "choices": ["ငါ","ငါတို့","မင်းတို့","သူတို့"], "answerIndex": 0, "points": 1 },
+      { "id": "q3", "type": "mcq", "text": "အောက်ပါထဲမှ ဗဟုဝုစ်ကို ရွေးပါ", "choices": ["ဣမေ","အယံ","မယံ","ဣမာ"], "answerIndexes": [0,2,3], "points": 2 }
+    ]
+  }
+}

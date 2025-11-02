@@ -50,6 +50,21 @@ import {
   getDownloadURL,
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
+// === Progress helpers (paste here, near the top after Firebase init) ===
+async function getCourseProgress(uid, courseId) {
+  const ref = doc(db, "users", uid, "courseProgress", courseId);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data() : { completed: {}, lastLessonId: null };
+}
+
+async function markLessonComplete(uid, courseId, lessonId) {
+  const ref = doc(db, "users", uid, "courseProgress", courseId);
+  await setDoc(ref, {
+    lastLessonId: lessonId,
+    completed: { [lessonId]: true }
+  }, { merge: true });
+}
+
 // ===== Mobile menu toggle (topbar → underbar nav) =====
 document.getElementById("btnMenu")?.addEventListener("click", () => {
   document.getElementById("navLinks")?.classList.toggle("open");
@@ -245,7 +260,7 @@ if (!window.__JSON_IMPORT__) {
             passPct:
               typeof j.quiz.passPct === "number" && !isNaN(j.quiz.passPct)
                 ? j.quiz.passPct
-                : 70,
+                : 55,
           }
         );
         qCount = 1;
@@ -1898,94 +1913,388 @@ async function openCourse(courseId) {
     );
 }
 
-async function openLesson(lessonId) {
-  if (!auth.currentUser) {
-    authDlg.showModal();
-    return;
-  }
-  const ref = doc(db, "lessons", lessonId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    alert("Not found");
-    return;
-  }
-  const L = { id: snap.id, ...snap.data() };
+// ===================== QUIZ HELPERS =====================
+// === Text normalizer & SA matcher (paste once, near your quiz helpers) ===
+function _normText(s = "", { caseInsensitive = true } = {}) {
+  let t = String(s || "").trim();
+  if (caseInsensitive) t = t.toLowerCase();
+  // collapse spaces + Myanmar ZWJ/ZWNJ etc.
+  t = t.replace(/[\u200B-\u200D\u2060]/g, ""); // zero-width
+  t = t.replace(/\s+/g, " ");
+  return t;
+}
 
-  // quiz gate (single or multiple choice demo)
-  const qq = query(
-    collection(db, "quizzes"),
-    where("lessonId", "==", L.id),
-    orderBy("ts", "asc")
-  );
-  const qs = await getDocs(qq);
-  let qHtml = "";
-  qs.forEach((qd) => {
-    const q = { id: qd.id, ...qd.data() };
-    if (q.type === "mc") {
-      qHtml += `<div class="card"><p><strong>Q:</strong> ${escapeHtml(
-        q.text
-      )}</p>
-      ${(q.options || [])
-        .map(
-          (opt, i) =>
-            `<label><input type="radio" name="q_${
-              q.id
-            }" value="${i}"> ${escapeHtml(opt)}</label>`
-        )
-        .join("<br>")}
-      </div>`;
-    } else {
-      qHtml += `<div class="card"><p><strong>Q:</strong> ${escapeHtml(
-        q.text
-      )}</p>
-      <input data-free id="q_${q.id}" placeholder="Your answer"></div>`;
+function _saMatch(userText, accepted = [], keywords = [], opts = { caseInsensitive:true }) {
+  const u = _normText(userText, opts);
+  if (!u) return false;
+
+  // Exact matches first
+  for (const a of (accepted || [])) {
+    if (_normText(a, opts) === u) return true;
+  }
+
+  // Fallback: keyword AND-match (all keywords must appear)
+  if (Array.isArray(keywords) && keywords.length) {
+    const tokens = keywords.map(k => _normText(k, opts)).filter(Boolean);
+    return tokens.every(tok => u.includes(tok));
+  }
+  return false;
+}
+
+function _quizItemHTML(q, idx = 0) {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'
+  }[m]));
+
+  const qid = String(q.id || `q_${idx}`);
+
+  // ---- Type guard (SCQ | MCQ | SA) ----
+  let type = String(q.type || "").toLowerCase().trim();
+  if (type === "mc" || type === "multi" || type === "checkbox") type = "mcq";
+  if (type === "sc" || type === "single" || type === "radio")   type = "scq";
+  if (!["scq","mcq","sa","short"].includes(type)) {
+    const isMCQ = q.multiple === true || q.multi === true ||
+                  Array.isArray(q.answerIndexes) || Array.isArray(q.answers) ||
+                  /mc/.test(String(q.type||"").toLowerCase());
+    const isSA  = /short|free|text|sa/.test(String(q.type||"").toLowerCase());
+    type = isMCQ ? "mcq" : (isSA ? "sa" : "scq");
+  }
+  if (type === "short") type = "sa";
+
+  console.debug("[quiz type]", type, q);
+
+  // ---- Question-level media/caption ----
+  const qImg = q.img || q.image || q.imageUrl || "";
+  const qAlt = q.imgAlt || q.imageAlt || q.alt || "";
+  const qCap = q.imgCaption || q.imageCaption || q.caption || "";
+
+  const figure = qImg ? `
+    <figure class="q-figure">
+      <img class="q-img" src="${esc(qImg)}" alt="${esc(qAlt)}">
+      ${qCap ? `<figcaption class="q-cap">${esc(qCap)}</figcaption>` : ""}
+    </figure>` : "";
+
+  // ---- Choices normalize ----
+  const rawChoices = Array.isArray(q.choices) ? q.choices
+                   : (Array.isArray(q.options) ? q.options : []);
+  const normChoice = (c) => {
+    if (c && typeof c === "object") {
+      return {
+        text: String(c.text ?? c.label ?? c.value ?? "").trim(),
+        img:  String(c.img  || c.image || c.imageUrl || "").trim(),
+        alt:  String(c.alt  || c.imageAlt || "").trim()
+      };
     }
+    return { text: String(c ?? "").trim(), img: "", alt: "" };
+  };
+  const choices = rawChoices.map(normChoice);
+
+  // ---- Body renderer ----
+  let body = "";
+  if (type === "sa") {
+    body = `<textarea name="${esc(qid)}" rows="3" placeholder="အဖြေထည့်ပါ…"></textarea>`;
+  } else {
+    const isMCQ = (type === "mcq");
+    const inputType = isMCQ ? "checkbox" : "radio";
+    const nameAttr  = isMCQ ? `${qid}[]` : qid;
+
+    body = choices.map((c, i) => {
+      const cid = `${qid}__opt${i}`;
+      return `
+        <label class="opt" for="${esc(cid)}">
+          <input type="${inputType}" id="${esc(cid)}" name="${esc(nameAttr)}" value="${i}">
+          <div class="opt-body">
+            ${c.img ? `<img class="opt-img" src="${esc(c.img)}" alt="${esc(c.alt || c.text)}">` : ""}
+            <span class="opt-text">${esc(c.text)}</span>
+          </div>
+        </label>`;
+    }).join("");
+  }
+
+  return `
+    <div class="card quiz-card" data-qid="${esc(qid)}" data-qtype="${esc(type)}">
+      <div class="q-head">
+        <span class="q-no">Q${idx + 1}.</span>
+        <span class="q-title">${esc(q.text || "")}</span>
+      </div>
+      ${figure}
+      <div class="q-body">${body}</div>
+    </div>`;
+}
+
+// Read answers & score
+function _scoreQuiz(questions, host=document) {
+  let score = 0, totalPts = 0;
+  const results = [];
+
+  const getCheckedVals = (name)=>
+    Array.from(host.querySelectorAll(`input[name="${name}[]"]:checked`))
+      .map(el=>Number(el.value));
+
+  questions.forEach((raw, idx)=>{
+    // normalize
+    const q = { ...raw };
+    q.type = (q.type||"scq").toLowerCase();
+    if (!q.choices) q.choices = Array.isArray(q.options) ? q.options : [];
+    if (q.answerIndexes && !Array.isArray(q.answerIndexes) && Array.isArray(q.answers)) q.answerIndexes = q.answers;
+
+    const qid = q.id || `q_${idx}`;
+    const pts = Number.isFinite(q.points) ? Number(q.points) : 1;
+    totalPts += pts;
+
+    let correct = false, user = null;
+
+    if (q.type === "scq") {
+      const el = host.querySelector(`input[name="${qid}"]:checked`);
+      user = el ? Number(el.value) : null;
+      correct = (typeof q.answerIndex === "number") && (user === Number(q.answerIndex));
+    } else if (q.type === "mcq") {
+      user = getCheckedVals(qid);
+      const key = Array.isArray(q.answerIndexes) ? q.answerIndexes.map(Number).sort((a,b)=>a-b) : [];
+      const got = user.slice().map(Number).sort((a,b)=>a-b);
+      correct = key.length>0 && key.length===got.length && key.every((v,i)=> v===got[i]);
+    } else { // sa
+      const el = host.querySelector(`textarea[name="${qid}"]`);
+      const val = (el?.value||"").trim();
+      user = val;
+
+      const accepts = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [];
+      const keys    = Array.isArray(q.keywords) ? q.keywords : [];
+      if (accepts.length || keys.length) {
+        correct = _saMatch(val, accepts, keys, { caseInsensitive: !!q.caseInsensitive });
+      } else {
+        correct = !!val; // no key → any non-empty counts
+      }
+    }
+
+    if (correct) score += pts;
+    results.push({ id: qid, type: q.type, correct, pts, user });
   });
+
+  const pct = totalPts ? Math.round((score/totalPts)*100) : 0;
+  return { score, totalPts, pct, results };
+}
+// =================== END QUIZ HELPERS ===================
+
+// Unified lesson loader using nested course/chapter/lesson structure + quiz passPct
+async function openLesson(courseId, chId, lessonId) {
+  if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+
+  // 1) read lesson doc (nested path)
+  const lref = doc(db, "courses", courseId, "chapters", chId, "lessons", lessonId);
+  const lsnap = await getDoc(lref);
+  if (!lsnap.exists()) { alert("Lesson not found"); return; }
+  const L = { id: lsnap.id, ...lsnap.data(), courseId, chapterId: chId };
+
+  // 2) read quiz (and questions) from the SAME nested lesson path
+  const quizObj = await loadLessonQuiz(courseId, chId, lessonId);
+  // quizObj = { id, title, shuffle, passPct, questions }
+
+  // 3) render lesson + quiz header
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
+  const qHostId = "quizHost";
+  const headerMeta = quizObj
+    ? `${quizObj.questions.length} questions · Pass ${Number(quizObj.passPct ?? 55)}%`
+    : `No quiz`;
 
   appEl.innerHTML = `
     <article class="card">
-      <h2>${escapeHtml(L.title)}</h2>
-      <div class="card">${L.content || ""}</div>
-      <h3>Quiz</h3>
-      ${qHtml || "<p class='muted'>No questions yet</p>"}
-      <div class="row-2" style="margin-top:.6rem">
-        <button class="btn" id="btnSubmitQuiz">Submit</button>
-        <button class="btn ghost" onclick="history.back()">Back</button>
+      <h2 id="quizTitle">${esc(L.title || "Lesson")}</h2>
+      <div id="quizMeta" class="muted">${headerMeta}</div>
+      ${L.content ? `<div class="card sub">${L.content}</div>` : ""}
+      <div id="${qHostId}" class="quiz-stack"></div>
+      <div class="row" style="margin-top:1rem; gap:.75rem">
+        <button class="btn" id="btnSubmitQuiz" ${!quizObj ? "disabled" : ""}>Submit</button>
+        <button class="btn ghost" type="button" onclick="openChapter('${courseId}','${chId}')">Back</button>
       </div>
     </article>
   `;
 
-  $("#btnSubmitQuiz")?.addEventListener("click", async () => {
-    // simple scoring with public keys collection (admin-only)
-    const keySnap = await getDoc(doc(db, "quizKeys", L.id));
-    let score = 0,
-      total = 0;
-    if (keySnap.exists()) {
-      const key = keySnap.data();
-      for (const [qid, ans] of Object.entries(key)) {
-        total++;
-        const selected = document.querySelector(
-          `input[name='q_${qid}']:checked`
-        );
-        const free = document.getElementById(`q_${qid}`);
-        const val = selected
-          ? Number(selected.value)
-          : free
-          ? free.value.trim()
-          : "";
-        if (String(val) === String(ans)) score++;
-      }
+  if (!quizObj) return;
+
+  // 4) render quiz UI using your helpers (keeps MCQ/SCQ/SA names and name="qid"/"qid[]")
+  const qHost = document.getElementById(qHostId);
+  renderQuizUI(qHost, quizObj); // already in file
+
+  // 5) submit: score via _scoreQuiz and use quizObj.passPct (NOT lesson L.passPct)
+  document.getElementById("btnSubmitQuiz")?.addEventListener("click", async () => {
+    // 1) compute score with existing helper
+    const { score, totalPts, pct, results } = _scoreQuiz(qsNorm, document);
+
+    // 2) decide pass% (from quiz meta or lesson fallback)
+    let passPct = 55; // default
+    try {
+      // if you loaded quiz meta somewhere, use it; else take from lesson
+      passPct = Number(
+        (window.currentQuizMeta && window.currentQuizMeta.passPct) ??
+        (L.passPct) ?? 55
+      );
+    } catch(_) {}
+    const passed = pct >= passPct;
+
+    // 3) save attempt (optional try/catch)
+    try {
+      await addDoc(collection(db, "users", auth.currentUser.uid, "attempts"), {
+        userId: auth.currentUser.uid,
+        courseId: L.courseId,
+        chapterId: L.chapterId,
+        lessonId: L.id,
+        scorePct: pct,
+        pass: passed,
+        ts: serverTimestamp(),
+        detail: results
+      });
+    } catch (e) {
+      console.warn("save attempt failed", e);
     }
-    const pct = total ? Math.round((score / total) * 100) : 0;
-    const passed = pct >= 65;
-    await addDoc(collection(db, "users", uid, "attempts"), {
-      userId: auth.currentUser.uid,
-      lessonId: L.id,
-      score: pct,
-      pass: passed,
-      ts: serverTimestamp(),
-    });
+
+    // 4) mark progress + auto-advance (optional)
+    try {
+      await markLessonComplete(auth.currentUser.uid, L.courseId, L.id);
+    } catch (e) {
+      console.warn("[progress]", e);
+    }
+    openChapter(L.courseId, L.chapterId);
+
+    // 5) show result
     alert(`Score: ${pct}% ${passed ? "✅ pass" : "❌ fail"}`);
+  });
+}
+
+// === Chapters/Lessons UI (paste near other openXxx() functions) ===
+function groupLessonsByChapter(lessons) {
+  const m = new Map();
+  lessons.forEach(L => {
+    const cid = L.chapterId;
+    if (!m.has(cid)) m.set(cid, []);
+    m.get(cid).push(L);
+  });
+  for (const arr of m.values()) arr.sort((a,b)=> (a.order||0)-(b.order||0));
+  return m;
+}
+
+function computeChapterStatuses(chapters, lessonsByCh, progress) {
+  const res = {};
+  let foundActive = false;
+  chapters.forEach(ch => {
+    const ls = lessonsByCh.get(ch.id) || [];
+    const total = ls.length;
+    const done  = ls.filter(L => progress.completed?.[L.id]).length;
+    let status = "locked";
+    if (total === 0) status = "active";
+    else if (done >= total) status = "done";
+    else if (!foundActive) { status = "active"; foundActive = true; }
+    res[ch.id] = { total, done, status };
+  });
+  return res;
+}
+
+async function openCourseHome(courseId) {
+  if (!auth.currentUser) { authDlg?.showModal?.(); return; }
+
+  const chSnap = await getDocs(query(
+    collection(db, "chapters"),
+    where("courseId","==",courseId),
+    orderBy("order","asc")
+  ));
+  const chapters = []; chSnap.forEach(d=>chapters.push({ id:d.id, ...d.data() }));
+
+  const lsSnap = await getDocs(query(
+    collection(db, "lessons"),
+    where("courseId","==",courseId)
+  ));
+  const lessons = []; lsSnap.forEach(d=>lessons.push({ id:d.id, ...d.data() }));
+
+  const byCh = groupLessonsByChapter(lessons);
+  const progress = await getCourseProgress(auth.currentUser.uid, courseId);
+  const statuses = computeChapterStatuses(chapters, byCh, progress);
+
+  const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  const cards = chapters.map(ch=>{
+    const st = statuses[ch.id];
+    const badgeCls = st.status==="active"?"active":(st.status==="done"?"done":"locked");
+    const lockedCls = st.status==="locked" ? " locked" : "";
+    return `
+      <div class="chapter-card${lockedCls}">
+        <div class="title"><strong>${esc(ch.title||ch.id)}</strong></div>
+        <div class="meta">${st.done}/${st.total} lessons</div>
+        <div class="badges"><span class="badge ${badgeCls}">${st.status.toUpperCase()}</span></div>
+        <div class="actions">
+          <button class="btn" data-open-ch="${esc(ch.id)}">Open</button>
+          <button class="btn ghost" data-review-ch="${esc(ch.id)}">Review</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  appEl.innerHTML = `
+    <article class="card">
+      <h2>${esc(courseId)} • Chapters</h2>
+      <div class="chapter-grid">${cards}</div>
+    </article>
+  `;
+
+  appEl.querySelectorAll("[data-open-ch]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const cid = btn.getAttribute("data-open-ch");
+      const st  = statuses[cid];
+      if (st?.status === "locked") return;
+      openChapter(courseId, cid);
+    });
+  });
+  appEl.querySelectorAll("[data-review-ch]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const cid = btn.getAttribute("data-review-ch");
+      openChapter(courseId, cid);
+    });
+  });
+}
+
+async function openChapter(courseId, chapterId) {
+  const lsSnap = await getDocs(query(
+    collection(db,"lessons"),
+    where("courseId","==",courseId),
+    where("chapterId","==",chapterId),
+    orderBy("order","asc")
+  ));
+  const lessons = []; lsSnap.forEach(d=>lessons.push({ id:d.id, ...d.data() }));
+
+  const progress = await getCourseProgress(auth.currentUser.uid, courseId);
+  const next = lessons.find(L => !progress.completed?.[L.id]) || lessons[0];
+
+  const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+  const rows = lessons.map(L=>{
+    const done = !!progress.completed?.[L.id];
+    return `
+      <div class="row card" style="align-items:center; justify-content:space-between;">
+        <div>
+          <div><strong>${esc(L.title||L.id)}</strong></div>
+          <div class="muted">Lesson ${esc(L.order||"")}${done?" • ✅ Completed":""}</div>
+        </div>
+        <div class="row" style="gap:.4rem">
+          <button class="btn" data-open-lesson="${esc(L.id)}">Open</button>
+          ${done?`<button class="btn ghost" data-review-lesson="${esc(L.id)}">Review</button>`:""}
+        </div>
+      </div>`;
+  }).join("");
+
+  appEl.innerHTML = `
+    <article class="card">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h3>Chapter • ${esc(chapterId)}</h3>
+        <button class="btn ghost" onclick="openCourseHome('${courseId}')">← Back to chapters</button>
+      </div>
+      <div class="col" style="gap:.6rem">${rows}</div>
+      <div class="row" style="margin-top:.8rem; justify-content:flex-end;">
+        <button class="btn" id="btnStartNext">Start ${esc(next?.title||"lesson")}</button>
+      </div>
+    </article>
+  `;
+
+  appEl.querySelectorAll("[data-open-lesson]").forEach(btn=>{
+    btn.addEventListener("click", ()=> openLesson(btn.getAttribute("data-open-lesson")));
+  });
+  appEl.querySelector("#btnStartNext")?.addEventListener("click", ()=>{
+    if (next?.id) openLesson(next.id);
   });
 }
 
@@ -2466,7 +2775,7 @@ async function renderAdmin() {
           <label>Image URL <input name="img" placeholder="https://…"></label>
           <label>Benefits (comma-separated) <input name="benefits" placeholder="A, B, C"></label>
 
-          <label>Final Pass % <input name="passPct" type="number" min="0" max="100" value="65"></label>
+          <label>Final Pass % <input name="passPct" type="number" min="0" max="100" value="55"></label>
           <label>Final Question Limit <input name="finalLimit" type="number" min="1" value="12"></label>
 
           <div style="grid-column:1/-1; display:flex; gap:.5rem; justify-content:flex-end">
@@ -2809,7 +3118,7 @@ async function renderAdmin() {
             <li>Level: ${c.level ?? 0}</li>
             <li>Credits: ${c.credits ?? 0}</li>
             <li>Benefits: ${(c.benefits || []).slice(0, 3).join(" • ")}</li>
-            <li>Pass ≥ ${c.passPct ?? 65}%</li>              <!-- NEW -->
+            <li>Pass ≥ ${c.passPct ?? 55}%</li>              <!-- NEW -->
             <li>Final Qs: ${c.finalLimit ?? 12}</li>         <!-- NEW -->
           </ul>
           <div class="footer">
@@ -2851,9 +3160,9 @@ async function renderAdmin() {
       : c.benefits || "";
 
     // ✅ NEW: final exam settings
-    formCourse.passPct.value = typeof c.passPct === "number" ? c.passPct : 65;
+    formCourse.passPct.value = typeof c.passPct === "number" ? c.passPct : 55;
     formCourse.finalLimit.value =
-      typeof c.finalLimit === "number" ? c.finalLimit : 12;
+      typeof c.finalLimit === "number" ? c.finalLimit : 10;
   }
 
   document
@@ -2875,8 +3184,8 @@ async function renderAdmin() {
       benefits: normBenefits(f.benefits.value),
 
       // ✅ NEW: final exam settings
-      passPct: Number(f.passPct.value || 65),
-      finalLimit: Number(f.finalLimit.value || 12),
+      passPct: Number(f.passPct.value || 55),
+      finalLimit: Number(f.finalLimit.value || 10),
 
       ts: serverTimestamp(),
     };
@@ -3632,7 +3941,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
       ? {
           title: quiz.title || "Quiz",
           shuffle: !!quiz.shuffle,
-          passPct: Number(quiz.passPct ?? 70),
+          passPct: Number(quiz.passPct ?? 55),
           questions: questions || [],
         }
       : null;
@@ -3913,7 +4222,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
         id: raw.id || "",
         title: raw.title || "Quiz",
         shuffle: !!raw.shuffle,
-        passPct: Number(raw.passPct ?? 70),
+        passPct: Number(raw.passPct ?? 55),
         questions: Array.isArray(raw.questions)
           ? raw.questions.map((x) => ({
               id: x.id || "",
@@ -4013,9 +4322,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
         const meta = document.getElementById("quizMeta");
         if (ttl) ttl.textContent = quizObj.title || "Quiz";
         if (meta)
-          meta.textContent = `${quizObj.questions.length} questions · Pass ${
-            quizObj.passPct ?? 70
-          }%`;
+          meta.textContent = `${quizObj.questions.length} questions · Pass ${Number(quizObj.passPct ?? 55)}%`;
 
         // pass-on complete callback
         quizObj.onSubmit = async ({ passed }) => {
@@ -4095,7 +4402,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
         id: qdoc.id,
         title: qdata.title || "Quiz",
         shuffle: !!qdata.shuffle,
-        passPct: Number(qdata.passPct ?? 70),
+        passPct: Number(qdata.passPct ?? 55),
         questions,
       };
     }
@@ -4210,193 +4517,293 @@ function shuffle(arr) {
     .map((x) => x[1]);
 }
 
+const safeId = (s) => {
+  const t = String(s || "");
+  const head = /^[A-Za-z_]/.test(t) ? "" : "q_";
+  return head + t.replace(/[^A-Za-z0-9_-]/g, "-");
+};
+
 // === (A) QUIZ RENDERER: radio / checkbox / textarea ===
-function renderQuizUI(hostEl, quiz) {
-  if (!hostEl) return;
-  if (!quiz || !Array.isArray(quiz.questions) || !quiz.questions.length) {
-    hostEl.innerHTML = `<div class="muted">This lesson has no quiz yet.</div>`;
-    return;
-  }
+function renderQuizUI(host, quiz) {
+  if (!host) return;
+  host.innerHTML = "";
 
-  const qs = quiz.shuffle
-    ? [...quiz.questions].sort(() => Math.random() - 0.5)
-    : [...quiz.questions];
+  // shallow clone to preserve original quiz
+  const qz = {
+    title: quiz.title || "Quiz",
+    passPct: Number(quiz.passPct ?? 55),
+    shuffle: !!quiz.shuffle,
+    questions: Array.isArray(quiz.questions) ? quiz.questions.slice() : [],
+    onSubmit: typeof quiz.onSubmit === "function" ? quiz.onSubmit : null,
+  };
 
-  const html = qs
-    .map((q, qi) => {
-      const name = `q_${qi}`;
-      const rawType = String(q.type || "").toLowerCase();
-      const isMCQ = rawType === "mcq" || Array.isArray(q.answerIndex);
-      const type = isMCQ ? "mcq" : rawType || "scq";
+  // ===== helpers =====
+  const esc = (s) =>
+    String(s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 
-      const choiceHtml = Array.isArray(q.choices)
-        ? q.choices
-            .map((c, ci) => {
-              const input = isMCQ
-                ? `<input type="checkbox" name="${name}" value="${ci}">`
-                : `<input type="radio" name="${name}" value="${ci}">`;
-              return `<label class="quiz-choice">${input}<span class="quiz-choice-text">${escapeHtml(
-                String(c)
-              )}</span></label>`;
-            })
-            .join("")
-        : "";
+  const normalizeType = (t) => {
+    const x = String(t || "").trim().toLowerCase();
+    if (x === "mc" || x === "multi" || x === "checkbox") return "mcq";
+    if (x === "sc" || x === "single" || x === "radio") return "scq";
+    if (x === "sa" || x === "short" || x === "text") return "short";
+    if (x === "mcq" || x === "scq") return x;
+    return "scq"; // default
+  };
 
-      const saHtml =
-        rawType === "sa"
-          ? `<textarea name="${name}" rows="3" class="quiz-textarea" placeholder="Type your answer…"></textarea>`
-          : "";
+  const isMulti = (q) =>
+    q.type === "mcq" ||
+    q.multiple === true ||
+    q.multi === true ||
+    (Array.isArray(q.answerIndexes) && q.answerIndexes.length > 0);
 
-      return `
-      <div class="quiz-q" data-type="${type}">
-        <div class="quiz-qtext"><span class="q-num">${
-          qi + 1
-        }.</span> ${escapeHtml(q.text || "")}</div>
-        <div class="quiz-choices">${choiceHtml || saHtml}</div>
-        <div class="quiz-feedback" style="display:none"></div>
-      </div>
-    `;
-    })
-    .join("");
+  const isShort = (q) => q.type === "short";
 
-  hostEl.innerHTML = `
-    <div class="quiz-wrap">
-      ${html}
-      <div class="row" style="gap:.5rem;margin-top:.75rem">
-        <button class="btn" id="btnSubmitQuiz">Submit</button>
-        <button class="btn ghost" id="btnResetQuiz">Reset</button>
-        <span id="quizScore" class="muted" style="margin-left:auto"></span>
-      </div>
-    </div>
-  `;
+  // ===== normalize each question =====
+  const normQ = (q) => {
+    const type = normalizeType(q.type);
 
-  const submitBtn = hostEl.querySelector("#btnSubmitQuiz");
-  const resetBtn = hostEl.querySelector("#btnResetQuiz");
-
-  submitBtn?.addEventListener("click", () => {
-    let got = 0,
-      total = 0;
-    let firstWrong = null;
-
-    hostEl.querySelectorAll(".quiz-q").forEach((wrap, i) => {
-      const q = qs[i] || {};
-      const rawType = String(q.type || "").toLowerCase();
-      const isMCQ = rawType === "mcq" || Array.isArray(q.answerIndex);
-      const type = isMCQ ? "mcq" : rawType || "scq";
-
-      const fb = wrap.querySelector(".quiz-feedback");
-      const pts = Number(q.points || 1);
-      total += pts;
-
-      let ok = false;
-      let sel = [];
-
-      if (type === "mcq") {
-        sel = [...wrap.querySelectorAll('input[type="checkbox"]:checked')]
-          .map((x) => Number(x.value))
-          .sort();
-        const ans = (Array.isArray(q.answerIndex) ? q.answerIndex : [])
-          .map(Number)
-          .sort();
-        ok = JSON.stringify(sel) === JSON.stringify(ans);
-      } else if (type === "scq") {
-        const r = wrap.querySelector('input[type="radio"]:checked');
-        sel = r ? [Number(r.value)] : [];
-        ok = r && Number(r.value) === Number(q.answerIndex);
-      } else if (rawType === "sa") {
-        const v = (wrap.querySelector("textarea")?.value || "").trim();
-        if (Array.isArray(q.accept)) {
-          ok = q.accept.some(
-            (a) => String(a).toLowerCase().trim() === v.toLowerCase()
-          );
-        } else {
-          ok = !!v;
-        }
+    // normalize choices
+    const rawChoices = Array.isArray(q.choices) ? q.choices : [];
+    const choices = rawChoices.map((c) => {
+      if (c && typeof c === "object") {
+        return {
+          text: String(c.text ?? "").trim(),
+          img: String(c.img || c.image || c.imageUrl || "").trim(),
+          alt: String(c.alt || c.imageAlt || "").trim(),
+        };
       }
-
-      if (ok) got += pts;
-      else if (!firstWrong) firstWrong = wrap;
-
-      // ===== feedback handling =====
-      let msg = ok ? q.feedback?.correct?.text : q.feedback?.incorrect?.text;
-      let color = ok
-        ? q.feedback?.correct?.color
-        : q.feedback?.incorrect?.color;
-
-      // fallback if none found
-      if (!msg && Array.isArray(q.feedback?.byChoice) && sel.length) {
-        msg = q.feedback.byChoice[sel[0]];
-      }
-
-      fb.style.display = "block";
-      fb.textContent = msg || (ok ? "မှန်ကန်ပါတယ် ✅" : "ထပ်ကြိုးစားပါ ❌");
-      fb.classList.toggle("good", !!ok);
-      fb.classList.toggle("bad", !ok);
-      fb.style.color = color || "";
-
-      wrap.querySelectorAll(".quiz-choice").forEach((lbl) => {
-        const inp = lbl.querySelector("input");
-        if (!inp) return;
-        lbl.classList.remove("is-correct", "is-wrong");
-        if (inp.checked) lbl.classList.add(ok ? "is-correct" : "is-wrong");
-      });
-
-      if (!ok && (type === "mcq" || type === "scq")) {
-        const ansIdxs = Array.isArray(q.answerIndex)
-          ? q.answerIndex.map(Number)
-          : [Number(q.answerIndex)];
-        wrap.querySelectorAll(".quiz-choice").forEach((lbl, ci) => {
-          lbl.style.outline = ansIdxs.includes(ci)
-            ? "2px dashed #28a74555"
-            : "";
-        });
-      } else {
-        wrap
-          .querySelectorAll(".quiz-choice")
-          .forEach((lbl) => (lbl.style.outline = ""));
-      }
+      return { text: String(c ?? "").trim(), img: "", alt: "" };
     });
 
-    const pct = total ? Math.round((got / total) * 100) : 0;
-    const need = Number(quiz.passPct ?? 70);
-    const _scoreEl = hostEl.querySelector("#quizScore");
-    if (_scoreEl) _scoreEl.textContent = `Score: ${got}/${total} (${pct}%)`;
+    const nq = {
+      id: q.id || crypto.randomUUID?.() || String(Date.now()),
+      type, // "mcq" | "scq" | "short"
+      text: String(q.text || "").trim(),
+      // question-level image
+      img: String(q.img || q.image || q.imageUrl || "").trim(),
+      imgAlt: String(q.imgAlt || q.imageAlt || "").trim(),
+      imgCaption: String(q.imgCaption || q.caption || "").trim(),
 
-    if (typeof quiz.onSubmit === "function") {
-      quiz.onSubmit({ got, total, pct, passed: pct >= need });
+      choices,
+      // answers
+      answerIndex: typeof q.answerIndex === "number" ? q.answerIndex : null,
+      answerIndexes: Array.isArray(q.answerIndexes) ? q.answerIndexes : null,
+
+      acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : null,
+      caseInsensitive: !!q.caseInsensitive,
+
+      feedback: q.feedback || null,
+      points: Number.isFinite(q.points) ? Number(q.points) : 1,
+      multi: false, // will fill after
+    };
+
+    // decide multi after normalization
+    nq.multi = isMulti(nq);
+
+    // 🔎 DEBUG
+    console.log("[quiz normalize]", { id: nq.id, type: nq.type, multi: nq.multi, choices: nq.choices.length, nq });
+
+    return nq;
+  };
+
+  let qs = qz.questions.map(normQ);
+  if (qz.shuffle) qs = qs.slice().sort(() => Math.random() - 0.5);
+
+  // state
+  const state = {
+    idx: 0,
+    answers: new Map(), // q.id -> value (num | num[] | string)
+    score: 0,
+    max: qs.reduce((s, x) => s + (x.points || 1), 0),
+  };
+
+  const imgFigureHTML = (url, alt, cap) => {
+    if (!url) return "";
+    const a = esc(alt);
+    const c = esc(cap);
+    return `
+      <figure class="q-figure">
+        <img class="q-img" src="${esc(url)}" alt="${a}">
+        ${c ? `<figcaption class="q-cap">${c}</figcaption>` : ""}
+      </figure>`;
+  };
+
+  const choiceHTML = (q, i) => {
+    const c = q.choices[i] || { text: "" };
+    const id = `${safeId(q.id)}__c__${i}`;
+    const input = q.multi
+      ? `<input type="checkbox" name="${q.id}" value="${i}" id="${id}">`
+      : `<input type="radio"    name="${q.id}" value="${i}" id="${id}">`;
+
+    const thumb = c.img
+      ? `<img class="choice-img" src="${esc(c.img)}" alt="${esc(c.alt || c.text || "")}">`
+      : "";
+
+    return `
+      <label class="choice" for="${id}">
+        ${input}
+        <div class="choice-body">
+          ${thumb}
+          <span class="choice-text">${esc(c.text || "")}</span>
+        </div>
+      </label>`;
+  };
+
+  function renderOne(q) {
+    // compute
+    const isShortQ   = isShort(q);
+    const isMultiQ   = !!q.multi;
+    const choicesCls = isShortQ ? "short" : (isMultiQ ? "mcq" : "scq");
+    const prevDisabled = (state.idx === 0) ? "disabled" : "";
+    const nextLabel    = (state.idx < qs.length - 1) ? "Next →" : "✅ Submit";
+
+    // build controls
+    let controls = "";
+    if (isShortQ) {
+      controls = `<input class="short-input" id="${safeId(q.id)}__short" placeholder="Type your answer">`;
+    } else {
+      controls = (q.choices || []).map((_, i) => choiceHTML(q, i)).join("");
     }
 
-    firstWrong?.scrollIntoView({ behavior: "smooth", block: "center" });
-  });
+    // render (ONE bottom nav only)
+    const html = `
+      <div class="quiz-card">
+        <div class="q-text">
+          <div class="q-title">${esc(q.text)}</div>
+          ${imgFigureHTML(q.img, q.imgAlt, q.imgCaption)}
+        </div>
+        <div class="q-choices ${choicesCls}">
+          ${controls}
+        </div>
+        <div class="quiz-bottom-nav">
+          <button class="btn ghost" id="btnPrev" ${prevDisabled}>← Prev</button>
+          <button class="btn" id="btnNext">${nextLabel}</button>
+        </div>
+      </div>
+    `;
+    host.innerHTML = html;
 
-  resetBtn?.addEventListener("click", () => {
-    hostEl
-      .querySelectorAll('input[type="radio"],input[type="checkbox"]')
-      .forEach((i) => (i.checked = false));
-    hostEl.querySelectorAll("textarea").forEach((t) => (t.value = ""));
-    hostEl.querySelectorAll(".quiz-feedback").forEach((f) => {
-      f.style.display = "none";
-      f.textContent = "";
-      f.style.color = "";
-      f.classList.remove("good", "bad");
+    // restore selection (no optional chaining on LHS)
+    if (!isShortQ) {
+      const prevVal = state.answers.get(q.id);
+      const arr = Array.isArray(prevVal) ? prevVal : (prevVal != null ? [prevVal] : []);
+      arr.forEach((v) => {
+        const el = host.querySelector(`input[name="${q.id}"][value="${v}"]`);
+        if (el) el.checked = true;
+      });
+    } else {
+      const v = state.answers.get(q.id);
+      if (typeof v === "string") {
+        const el = document.getElementById(`${safeId(q.id)}__short`);
+        if (el) el.value = v;
+      }
+    }
+
+    // handlers
+    const goPrev = () => {
+      saveAnswer(q);
+      if (state.idx > 0) {
+        state.idx -= 1;
+        renderOne(qs[state.idx]);
+      }
+    };
+    const goNext = () => {
+      saveAnswer(q);
+      if (state.idx < qs.length - 1) {
+        state.idx += 1;
+        renderOne(qs[state.idx]);
+      } else {
+        finish();
+      }
+    };
+
+    const btnPrev = host.querySelector("#btnPrev");
+    const btnNext = host.querySelector("#btnNext");
+    if (btnPrev) btnPrev.addEventListener("click", goPrev);
+    if (btnNext) btnNext.addEventListener("click", goNext);
+  }
+
+  function saveAnswer(q) {
+    if (isShort(q)) {
+      const v = (document.getElementById(`${safeId(q.id)}__short`)?.value || "").trim();
+      state.answers.set(q.id, v);
+      return;
+    }
+    const checked = [...host.querySelectorAll(`input[name="${q.id}"]:checked`)]
+      .map((el) => Number(el.value));
+    if (q.multi) state.answers.set(q.id, checked);
+    else state.answers.set(q.id, checked[0] ?? null);
+
+    // 🔎 DEBUG
+    console.log("[quiz saveAnswer]", q.id, "=>", state.answers.get(q.id));
+  }
+
+  function finish() {
+    // scoring
+    let score = 0;
+    qs.forEach((q) => {
+      const got = state.answers.get(q.id);
+
+      if (q.type === "short") {
+        const ans = String(got || "").trim();
+        const key = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.map(String) : [];
+
+        let ok = false;
+        if (key.length) {
+          // exact match list
+          ok = q.caseInsensitive
+            ? key.some(k => k.trim().toLowerCase() === ans.toLowerCase())
+            : key.some(k => k.trim() === ans);
+        } else {
+          // ✅ fallback: answer နေရာဗလာမဟုတ်ရင် မှန်တယ်လို့ယူ
+          ok = ans.length > 0;
+        }
+        if (ok) score += (q.points || 1);
+        return;
+      }
+
+      if (Array.isArray(q.answerIndexes) && q.answerIndexes.length) {
+        // multi
+        const target = (q.answerIndexes || []).map(Number).sort((a,b)=>a-b);
+        const mine = Array.isArray(got) ? got.slice().sort((a,b)=>a-b) : [];
+        const ok = target.length === mine.length && target.every((v,i)=> v === mine[i]);
+        if (ok) score += (q.points || 1);
+      } else {
+        // single
+        const ok = (typeof q.answerIndex === "number") && (got === q.answerIndex);
+        if (ok) score += (q.points || 1);
+      }
     });
-    const _scoreEl2 = hostEl.querySelector("#quizScore");
-    if (_scoreEl2) _scoreEl2.textContent = "";
-    hostEl.querySelectorAll(".quiz-choice").forEach((l) => {
-      l.classList.remove("is-correct", "is-wrong");
-      l.style.outline = "";
-    });
-  });
+
+    state.score = score;
+    const pct = Math.round((score / state.max) * 100);
+    const passed = pct >= qz.passPct;
+
+    host.innerHTML = `
+      <div class="quiz-result card">
+        <h3 class="tight">${esc(qz.title)} — Result</h3>
+        <p>${score} / ${state.max} (${pct}%)</p>
+        <p class="${passed ? "ok" : "bad"}">${passed ? "Passed ✅" : "Try again"}</p>
+      </div>
+    `;
+
+    // parent callback (သင့် flow မှာ အသုံးပြုချင်ရင်)
+    try { qz.onSubmit?.({ score, pct, passed }); } catch {}
+  }
+
+  // kickoff
+  if (!qs.length) { host.innerHTML = `<div class="muted">No questions.</div>`; return; }
+  renderOne(qs[0]);
 }
 
 // renderQuizUI(qHost, quizObj);
 
 function gradeFromPct(pct) {
   if (pct >= 100) return "A+";
-  if (pct >= 95) return "A";
-  if (pct >= 85) return "B";
-  if (pct >= 75) return "C";
-  if (pct >= 65) return "D";
+  if (pct >= 85) return "A";
+  if (pct >= 75) return "B";
+  if (pct >= 65) return "C";
+  if (pct >= 55) return "D";
   return "F";
 }
 
@@ -4414,8 +4821,8 @@ async function getCourseExamSettings(courseId) {
   const s = await getDoc(doc(db, "courses", courseId));
   const c = s.exists() ? s.data() : {};
   return {
-    passPct: typeof c.passPct === "number" ? c.passPct : 65, // default 65
-    finalLimit: typeof c.finalLimit === "number" ? c.finalLimit : 12, // default 12
+    passPct: typeof c.passPct === "number" ? c.passPct : 55, // default 65
+    finalLimit: typeof c.finalLimit === "number" ? c.finalLimit : 10, // default 10
   };
 }
 
@@ -4643,7 +5050,7 @@ async function renderFinalExamUI(courseId, quiz) {
 
     const pct = Math.round((earned / Math.max(1, total)) * 100);
     const letter = gradeFromPct(pct);
-    const passed = pct >= Number(quiz.passPct || 65);
+    const passed = pct >= Number(quiz.passPct || 55);
 
     const box = document.getElementById("finalResult");
     box.innerHTML = `
@@ -5013,7 +5420,7 @@ async function importAnyJson(json) {
           title: json.quiz.title || "Quiz",
           shuffle: !!json.quiz.shuffle,
           passPct:
-            typeof json.quiz.passPct === "number" ? json.quiz.passPct : 70,
+            typeof json.quiz.passPct === "number" ? json.quiz.passPct : 55,
         }
       );
 
@@ -6108,4 +6515,19 @@ window.addEventListener("load", () => {
 // ✅ boot point
 window.addEventListener("load", () => {
   route(); // handles all navigation automatically
+});
+
+// highlight selected options (radio = single, checkbox = multi)
+document.addEventListener("change", (e) => {
+  const inp = e.target;
+  if (!inp.closest(".quiz-card")) return;
+  const label = inp.closest("label.opt");
+  if (!label) return;
+
+  if (inp.type === "radio") {
+    inp.closest(".q-body")?.querySelectorAll("label.opt").forEach(l => l.classList.remove("selected"));
+    label.classList.add("selected");
+  } else if (inp.type === "checkbox") {
+    label.classList.toggle("selected", inp.checked);
+  }
 });

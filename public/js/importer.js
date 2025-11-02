@@ -246,7 +246,10 @@ export async function importAnyJson(json) {
 
       for (const q of json.quiz.questions) {
         const qDocId = q.id || crypto.randomUUID();
-        const payload = buildQuestionPayload(q);
+        const payload = {
+            ...buildQuestionPayload(q),
+            ..._qPayload(q),   // ✅ support question / choice images & captions
+          };
         await setDoc(
           doc(db, "courses", cid, "chapters", chid, "lessons", lid, "quizzes", qid, "questions", qDocId),
           payload
@@ -258,4 +261,66 @@ export async function importAnyJson(json) {
   }
 
   throw new Error("Unrecognized JSON structure");
+}
+
+function _qPayload(q = {}) {
+  // normalize question-level image fields
+  const qImg = q.img || q.image || q.imageUrl || "";
+  const qImgAlt = q.imgAlt || q.imageAlt || "";
+  const qImgCap = q.caption || q.imageCaption || "";
+
+  // normalize choices: allow strings or { text, img, alt }
+  let choices = Array.isArray(q.choices) ? q.choices.slice() : [];
+  choices = choices.map((c) => {
+    if (c && typeof c === "object") {
+      return {
+        text: String(c.text ?? "").trim(),
+        img: String(c.img || c.image || c.imageUrl || "").trim(),
+        alt: String(c.alt || c.imageAlt || "").trim(),
+      };
+    }
+    return { text: String(c ?? "").trim(), img: "", alt: "" };
+  });
+
+  // backward-compat for answers
+  const typeRaw = String(q.type || "").toLowerCase().trim();
+  let type = typeRaw;
+  if (!type) {
+    if (Array.isArray(q.answerIndexes)) type = "mcq"; // multi
+    else if (typeof q.answerIndex === "number") type = "mcq"; // single
+    else if (q.answerText || q.acceptedAnswers) type = "short";
+    else type = "mcq";
+  }
+
+  // answers
+  let answerIndex = (typeof q.answerIndex === "number") ? q.answerIndex : null;
+  let answerIndexes = Array.isArray(q.answerIndexes) ? q.answerIndexes : null;
+  const acceptedAnswers = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers :
+                          (q.accept ? [].concat(q.accept).filter(Boolean) : null);
+
+  // points
+  const points = Number.isFinite(q.points) ? Number(q.points) : 1;
+
+  return {
+    // core
+    type,                                 // "mcq" | "short"
+    text: String(q.text || "").trim(),
+
+    // display media for the QUESTION
+    img: qImg,
+    imgAlt: qImgAlt,
+    imgCaption: qImgCap,
+
+    // choices (for mcq)
+    choices,                              // [{text, img, alt}]
+    answerIndex,                          // single
+    answerIndexes,                        // multiple
+    acceptedAnswers,                      // for short
+    caseInsensitive: !!q.caseInsensitive,
+
+    // meta
+    feedback: String(q.feedback || "").trim(),
+    points,
+    order: Number.isFinite(q.order) ? q.order : undefined,
+  };
 }

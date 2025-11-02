@@ -13,7 +13,7 @@
   "quiz": {
     "title": "Lesson 1 Quiz",
     "shuffle": true,
-    "passPct": 70,
+    "passPct": 55,
     "questions": [
       {
         "id": "q1",
@@ -95,7 +95,7 @@
           "တုမှေ",
           "ဣမေ"
         ],
-        "answerIndex": [0, 3],
+        "answerIndexes": [0, 3],
         "points": 1,
         "feedback": {
           "correct": {

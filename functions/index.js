@@ -10,10 +10,10 @@ const db = admin.firestore();
 // ----- Helper: course-wide grade letter
 function gradeFromScore(score){
   if (score >= 100) return "A+";
-  if (score >= 95) return "A";
-  if (score >= 85) return "B";
-  if (score >= 75) return "C";
-  if (score >= 65) return "D";
+  if (score >= 85) return "A";
+  if (score >= 75) return "B";
+  if (score >= 65) return "C";
+  if (score >= 55) return "D";
   return "F";
 }
 

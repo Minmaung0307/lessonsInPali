@@ -1,0 +1,21 @@
+{
+  "courseId": "pali-primary",
+  "chapterId": "ch1",
+  "lesson": { "id": "l3", "order": 3, "title": "ကိံ နာမော (ကျက်မှတ်)" },
+
+  "reading": "နာမ-မည်၏။ ကိံ နာမော- အဘယ်အမည်ရှိသနည်း။ ကိံ နာမာ- အဘယ်အမည် ရှိကုန်သနည်း…\n\nကြည့်ရှု့ရန် — “နာမ” တွင် ဧကဝုစ် ပေးပါ၊ “ကိံ နာမာ” တွင် ဗဟုဝုစ် ပေးပါ…",
+
+  "contents": [
+    { "type": "text", "url": "https://example.com/pali/l3-examples", "caption": "ဥပမာစု (QA Drill)", "order": 1 }
+  ],
+
+  "quiz": {
+    "title": "Lesson 3 Quiz",
+    "shuffle": true,
+    "passPct": 70,
+    "questions": [
+      { "id": "q1", "type": "scq", "text": "“ကိံ နာမော” သည် ဧကဝုစ်/ဗဟုဝုစ် မည်သည်?", "choices": ["ဧကဝုစ်","ဗဟုဝုစ်"], "answerIndex": 0, "points": 1 },
+      { "id": "q2", "type": "sa", "text": "“ကိံ နာမာ” ကို မြန်မာပြန် တစ်ကြောင်းသာ ရေးပါ။", "acceptedAnswers": [], "caseInsensitive": true, "points": 2 }
+    ]
+  }
+}
