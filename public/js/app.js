@@ -1913,116 +1913,34 @@ async function openCourse(courseId) {
     );
 }
 
-// ===================== QUIZ HELPERS =====================
-// === Text normalizer & SA matcher (paste once, near your quiz helpers) ===
-function _normText(s = "", { caseInsensitive = true } = {}) {
-  let t = String(s || "").trim();
+// =================== QUIZ HELPERS (canonical) ===================
+// normalize unicode + spacing
+function _normText(s, { caseInsensitive=true }={}) {
+  let t = (s ?? "").toString().normalize("NFC");
+  t = t.replace(/\s+/g, " ").trim();
   if (caseInsensitive) t = t.toLowerCase();
-  // collapse spaces + Myanmar ZWJ/ZWNJ etc.
-  t = t.replace(/[\u200B-\u200D\u2060]/g, ""); // zero-width
-  t = t.replace(/\s+/g, " ");
   return t;
 }
 
-function _saMatch(userText, accepted = [], keywords = [], opts = { caseInsensitive:true }) {
-  const u = _normText(userText, opts);
-  if (!u) return false;
+// short answer: exact OR keyword-any match
+function _saMatch(input, accepts=[], keywords=[], opt={ caseInsensitive:true }) {
+  const val = _normText(input, opt);
+  if (!val) return false;
 
-  // Exact matches first
-  for (const a of (accepted || [])) {
-    if (_normText(a, opts) === u) return true;
+  // exact list
+  for (const a of accepts) {
+    if (_normText(a, opt) === val) return true;
   }
-
-  // Fallback: keyword AND-match (all keywords must appear)
-  if (Array.isArray(keywords) && keywords.length) {
-    const tokens = keywords.map(k => _normText(k, opts)).filter(Boolean);
-    return tokens.every(tok => u.includes(tok));
+  // keyword any
+  if (keywords.length) {
+    const v = _normText(val, opt);
+    const ok = keywords.some(k => v.includes(_normText(k, opt)));
+    if (ok) return true;
   }
   return false;
 }
 
-function _quizItemHTML(q, idx = 0) {
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'
-  }[m]));
-
-  const qid = String(q.id || `q_${idx}`);
-
-  // ---- Type guard (SCQ | MCQ | SA) ----
-  let type = String(q.type || "").toLowerCase().trim();
-  if (type === "mc" || type === "multi" || type === "checkbox") type = "mcq";
-  if (type === "sc" || type === "single" || type === "radio")   type = "scq";
-  if (!["scq","mcq","sa","short"].includes(type)) {
-    const isMCQ = q.multiple === true || q.multi === true ||
-                  Array.isArray(q.answerIndexes) || Array.isArray(q.answers) ||
-                  /mc/.test(String(q.type||"").toLowerCase());
-    const isSA  = /short|free|text|sa/.test(String(q.type||"").toLowerCase());
-    type = isMCQ ? "mcq" : (isSA ? "sa" : "scq");
-  }
-  if (type === "short") type = "sa";
-
-  console.debug("[quiz type]", type, q);
-
-  // ---- Question-level media/caption ----
-  const qImg = q.img || q.image || q.imageUrl || "";
-  const qAlt = q.imgAlt || q.imageAlt || q.alt || "";
-  const qCap = q.imgCaption || q.imageCaption || q.caption || "";
-
-  const figure = qImg ? `
-    <figure class="q-figure">
-      <img class="q-img" src="${esc(qImg)}" alt="${esc(qAlt)}">
-      ${qCap ? `<figcaption class="q-cap">${esc(qCap)}</figcaption>` : ""}
-    </figure>` : "";
-
-  // ---- Choices normalize ----
-  const rawChoices = Array.isArray(q.choices) ? q.choices
-                   : (Array.isArray(q.options) ? q.options : []);
-  const normChoice = (c) => {
-    if (c && typeof c === "object") {
-      return {
-        text: String(c.text ?? c.label ?? c.value ?? "").trim(),
-        img:  String(c.img  || c.image || c.imageUrl || "").trim(),
-        alt:  String(c.alt  || c.imageAlt || "").trim()
-      };
-    }
-    return { text: String(c ?? "").trim(), img: "", alt: "" };
-  };
-  const choices = rawChoices.map(normChoice);
-
-  // ---- Body renderer ----
-  let body = "";
-  if (type === "sa") {
-    body = `<textarea name="${esc(qid)}" rows="3" placeholder="အဖြေထည့်ပါ…"></textarea>`;
-  } else {
-    const isMCQ = (type === "mcq");
-    const inputType = isMCQ ? "checkbox" : "radio";
-    const nameAttr  = isMCQ ? `${qid}[]` : qid;
-
-    body = choices.map((c, i) => {
-      const cid = `${qid}__opt${i}`;
-      return `
-        <label class="opt" for="${esc(cid)}">
-          <input type="${inputType}" id="${esc(cid)}" name="${esc(nameAttr)}" value="${i}">
-          <div class="opt-body">
-            ${c.img ? `<img class="opt-img" src="${esc(c.img)}" alt="${esc(c.alt || c.text)}">` : ""}
-            <span class="opt-text">${esc(c.text)}</span>
-          </div>
-        </label>`;
-    }).join("");
-  }
-
-  return `
-    <div class="card quiz-card" data-qid="${esc(qid)}" data-qtype="${esc(type)}">
-      <div class="q-head">
-        <span class="q-no">Q${idx + 1}.</span>
-        <span class="q-title">${esc(q.text || "")}</span>
-      </div>
-      ${figure}
-      <div class="q-body">${body}</div>
-    </div>`;
-}
-
-// Read answers & score
+// points-based scoring; rootEl = quiz container node
 function _scoreQuiz(questions, host=document) {
   let score = 0, totalPts = 0;
   const results = [];
@@ -2032,9 +1950,18 @@ function _scoreQuiz(questions, host=document) {
       .map(el=>Number(el.value));
 
   questions.forEach((raw, idx)=>{
-    // normalize
     const q = { ...raw };
-    q.type = (q.type||"scq").toLowerCase();
+    const rawType = String(q.type || "").toLowerCase();
+    let type =
+      rawType === "mcq" || rawType === "mc" || rawType === "multi" || rawType === "checkbox" ? "mcq" :
+      rawType === "scq" || rawType === "sc" || rawType === "single"  || rawType === "radio"   ? "scq" :
+      rawType === "sa"  || rawType === "short" || rawType === "text"                           ? "sa"  :
+      "scq";
+    if (type === "scq" && ((Array.isArray(q.answerIndexes) && q.answerIndexes.length >= 1) || q.multi === true)) {
+      type = "mcq";
+    }
+    q.type = type;
+
     if (!q.choices) q.choices = Array.isArray(q.options) ? q.options : [];
     if (q.answerIndexes && !Array.isArray(q.answerIndexes) && Array.isArray(q.answers)) q.answerIndexes = q.answers;
 
@@ -2057,13 +1984,12 @@ function _scoreQuiz(questions, host=document) {
       const el = host.querySelector(`textarea[name="${qid}"]`);
       const val = (el?.value||"").trim();
       user = val;
-
-      const accepts = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [];
-      const keys    = Array.isArray(q.keywords) ? q.keywords : [];
-      if (accepts.length || keys.length) {
-        correct = _saMatch(val, accepts, keys, { caseInsensitive: !!q.caseInsensitive });
+      const accepts = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.map(String) : [];
+      if (accepts.length) {
+        correct = q.caseInsensitive ? accepts.some(a=>a.toLowerCase()===val.toLowerCase())
+                                    : accepts.includes(val);
       } else {
-        correct = !!val; // no key → any non-empty counts
+        correct = !!val; // no key → any non-empty
       }
     }
 
@@ -2076,25 +2002,25 @@ function _scoreQuiz(questions, host=document) {
 }
 // =================== END QUIZ HELPERS ===================
 
-// Unified lesson loader using nested course/chapter/lesson structure + quiz passPct
+// ===== Unified lesson loader (single source) =====
 async function openLesson(courseId, chId, lessonId) {
   if (!auth.currentUser) { authDlg?.showModal?.(); return; }
 
-  // 1) read lesson doc (nested path)
+  // 1) lesson
   const lref = doc(db, "courses", courseId, "chapters", chId, "lessons", lessonId);
   const lsnap = await getDoc(lref);
   if (!lsnap.exists()) { alert("Lesson not found"); return; }
   const L = { id: lsnap.id, ...lsnap.data(), courseId, chapterId: chId };
 
-  // 2) read quiz (and questions) from the SAME nested lesson path
-  const quizObj = await loadLessonQuiz(courseId, chId, lessonId);
-  // quizObj = { id, title, shuffle, passPct, questions }
+  // 2) quiz from the SAME nested path
+  const quizObj = await loadLessonQuiz(courseId, chId, lessonId); // {title, passPct, shuffle, questions}
 
-  // 3) render lesson + quiz header
+  // 3) UI header
   const esc = s => String(s ?? "").replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]));
   const qHostId = "quizHost";
+  const passPctUI = Number(quizObj?.passPct ?? L.passPct ?? 55);
   const headerMeta = quizObj
-    ? `${quizObj.questions.length} questions · Pass ${Number(quizObj.passPct ?? 55)}%`
+    ? `${quizObj.questions.length} questions · Pass ${passPctUI}%`
     : `No quiz`;
 
   appEl.innerHTML = `
@@ -2112,27 +2038,16 @@ async function openLesson(courseId, chId, lessonId) {
 
   if (!quizObj) return;
 
-  // 4) render quiz UI using your helpers (keeps MCQ/SCQ/SA names and name="qid"/"qid[]")
+  // 4) render quiz (this uses name="qid" and name="qid[]" already)
   const qHost = document.getElementById(qHostId);
-  renderQuizUI(qHost, quizObj); // already in file
+  renderQuizUI(qHost, quizObj);
 
-  // 5) submit: score via _scoreQuiz and use quizObj.passPct (NOT lesson L.passPct)
+  // 5) submit & score
   document.getElementById("btnSubmitQuiz")?.addEventListener("click", async () => {
-    // 1) compute score with existing helper
-    const { score, totalPts, pct, results } = _scoreQuiz(qsNorm, document);
-
-    // 2) decide pass% (from quiz meta or lesson fallback)
-    let passPct = 55; // default
-    try {
-      // if you loaded quiz meta somewhere, use it; else take from lesson
-      passPct = Number(
-        (window.currentQuizMeta && window.currentQuizMeta.passPct) ??
-        (L.passPct) ?? 55
-      );
-    } catch(_) {}
+    const { score, totalPts, pct, results } = _scoreQuiz(quizObj.questions, qHost);
+    const passPct = Number(quizObj.passPct ?? L.passPct ?? 55);
     const passed = pct >= passPct;
 
-    // 3) save attempt (optional try/catch)
     try {
       await addDoc(collection(db, "users", auth.currentUser.uid, "attempts"), {
         userId: auth.currentUser.uid,
@@ -2144,20 +2059,13 @@ async function openLesson(courseId, chId, lessonId) {
         ts: serverTimestamp(),
         detail: results
       });
-    } catch (e) {
-      console.warn("save attempt failed", e);
-    }
+    } catch (e) { console.warn("save attempt failed", e); }
 
-    // 4) mark progress + auto-advance (optional)
-    try {
-      await markLessonComplete(auth.currentUser.uid, L.courseId, L.id);
-    } catch (e) {
-      console.warn("[progress]", e);
-    }
-    openChapter(L.courseId, L.chapterId);
+    try { await markLessonComplete(auth.currentUser.uid, L.courseId, L.id); }
+    catch (e) { console.warn("[progress]", e); }
 
-    // 5) show result
     alert(`Score: ${pct}% ${passed ? "✅ pass" : "❌ fail"}`);
+    openChapter(L.courseId, L.chapterId); // optional auto-advance
   });
 }
 
@@ -3758,9 +3666,7 @@ async function renderCourseDetail(courseId, lessonId = null) {
   // title
   try {
     const s = await getDoc(doc(db, "courses", courseId));
-    if (s.exists())
-      document.getElementById("crsTitle").textContent =
-        s.data().title || "Course";
+    if (s.exists()) document.getElementById("crsTitle").textContent = s.data().title || "Course";
   } catch {}
 
   // load tree
@@ -3769,19 +3675,14 @@ async function renderCourseDetail(courseId, lessonId = null) {
   const main = document.getElementById("crsMain");
 
   if (!chapters.length) {
-    if (!HIDE_CHAPTER_SIDEBAR && sb)
-      sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
+    if (!HIDE_CHAPTER_SIDEBAR && sb) sb.innerHTML = `<div class="muted">No chapters yet.</div>`;
     main.innerHTML = `<div class="muted">No lessons.</div>`;
     return;
   }
 
-  // build a flat list for navigation (always)
+  // flat list for nav
   const flat = [];
-  chapters.forEach((ch) => {
-    (ch.lessons || []).forEach((ls) => {
-      flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" });
-    });
-  });
+  chapters.forEach(ch => (ch.lessons || []).forEach(ls => flat.push({ chId: ch.id, lsId: ls.id, title: ls.title || "" })));
 
   // progress
   const uid = auth.currentUser?.uid;
@@ -3790,194 +3691,77 @@ async function renderCourseDetail(courseId, lessonId = null) {
   try {
     if (enrRef) {
       const es = await getDoc(enrRef);
-      progress = es.exists() ? es.data().progress || {} : {};
+      progress = es.exists() ? (es.data().progress || {}) : {};
     }
   } catch {}
 
   // counts
-  const allLessons = chapters.flatMap((ch) =>
-    (ch.lessons || []).filter((ls) => ls.id !== "__final__")
-  );
+  const allLessons = chapters.flatMap(ch => (ch.lessons || []).filter(ls => ls.id !== "__final__"));
   const totalCount = allLessons.length;
-  const doneCount = Object.values(progress).filter(Boolean).length;
+  const doneCount  = Object.values(progress).filter(Boolean).length;
 
-  // inject final if complete
+  // inject final when all done
   const canShowFinal = totalCount > 0 && doneCount >= totalCount;
   if (canShowFinal && chapters.length) {
     const last = chapters[chapters.length - 1];
-    if (!(last.lessons || []).some((l) => l.id === "__final__")) {
-      (last.lessons ||= []).push({
-        id: "__final__",
-        order: 9999,
-        title: "Final Exam",
-        isFinal: true,
-      });
-      // keep flat list in sync
+    if (!(last.lessons || []).some(l => l.id === "__final__")) {
+      (last.lessons ||= []).push({ id: "__final__", order: 9999, title: "Final Exam", isFinal: true });
       flat.push({ chId: last.id, lsId: "__final__", title: "Final Exam" });
     }
   }
 
-  // sidebar UI (hide if asked)
+  // sidebar UI (optional hide)
   if (!HIDE_CHAPTER_SIDEBAR && sb) {
-    sb.innerHTML = chapters
-      .map((ch) => {
-        const items = (ch.lessons || [])
-          .map(
-            (ls) =>
-              `<li><a href="#/courses/${courseId}/lesson/${ls.id}">${
-                ls.title || "Lesson"
-              }</a></li>`
-          )
-          .join("");
-        return `
+    sb.innerHTML = chapters.map(ch => {
+      const items = (ch.lessons || []).map(ls => `<li><a href="#/courses/${courseId}/lesson/${ls.id}">${ls.title || "Lesson"}</a></li>`).join("");
+      return `
         <details open class="blk">
-          <summary><strong>${ch.order ?? ""} ${
-          ch.title || ""
-        }</strong></summary>
-          <ol class="list clean">${
-            items || '<li class="muted">No lessons</li>'
-          }</ol>
+          <summary><strong>${ch.order ?? ""} ${ch.title || ""}</strong></summary>
+          <ol class="list clean">${items || '<li class="muted">No lessons</li>'}</ol>
         </details>
       `;
-      })
-      .join("");
+    }).join("");
   } else {
     const wrap = document.getElementById("crsWrap");
     if (sb) sb.remove();
-    if (wrap) {
-      wrap.classList.remove("grid-2");
-      wrap.style.display = "block";
-    }
-    if (main) {
-      main.style.minHeight = "50vh";
-      main.style.width = "100%";
-    }
+    if (wrap) { wrap.classList.remove("grid-2"); wrap.style.display = "block"; }
+    if (main) { main.style.minHeight = "50vh"; main.style.width = "100%"; }
   }
 
-  // default select first lesson
+  // default lesson if none
   if (!lessonId && flat.length) {
     location.hash = `#/courses/${courseId}/lesson/${flat[0].lsId}`;
     return;
   }
 
-  // idx + prev/next
-  const idx = flat.findIndex((x) => x.lsId === lessonId);
-  if (idx < 0) {
-    main.innerHTML = `<div class="card error">Lesson not found.</div>`;
-    return;
-  }
+  // idx + prev/next (use let next to allow reassign)
+  const idx  = flat.findIndex(x => x.lsId === lessonId);
+  if (idx < 0) { main.innerHTML = `<div class="card error">Lesson not found.</div>`; return; }
   const prev = idx > 0 ? flat[idx - 1] : null;
-  const next = idx < flat.length - 1 ? flat[idx + 1] : null;
+  let next   = idx < flat.length - 1 ? flat[idx + 1] : null;
 
   if (!next) {
-    const existsFinal = chapters[chapters.length - 1]?.lessons?.some(
-      (l) => l.id === "__final__"
-    );
-    if (existsFinal) next = { lsId: "__final__" };
+    const existsFinal = chapters[chapters.length - 1]?.lessons?.some(l => l.id === "__final__");
+    if (existsFinal) next = { chId: chapters[chapters.length - 1].id, lsId: "__final__" };
   }
 
-  // --- Normal lesson flow ---
   try {
-    // load quiz (optional)
-    let quiz = null,
-      questions = [];
+    // fetch lesson doc
     const chId = flat[idx].chId;
-
-    const lessonRef = doc(
-      db,
-      "courses",
-      courseId,
-      "chapters",
-      chId,
-      "lessons",
-      lessonId
-    );
+    const lessonRef = doc(db, "courses", courseId, "chapters", chId, "lessons", lessonId);
     const lsSnap = await getDoc(lessonRef);
-    if (!lsSnap.exists()) {
-      main.innerHTML = `<div class="card error">Lesson not found.</div>`;
-      return;
-    }
+    if (!lsSnap.exists()) { main.innerHTML = `<div class="card error">Lesson not found.</div>`; return; }
     const L = { id: lsSnap.id, ...lsSnap.data() };
 
-    // prepare helpers
-    const isUrl = (v) => /^https?:\/\//i.test(v || "");
-    const isPdf = (v) => /\.pdf($|\?)/i.test(v || "");
-    const getYouTubeId = (u = "") => {
-      try {
-        const m = u.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
-        return m ? m[1] : "";
-      } catch {
-        return "";
-      }
-    };
+    const isUrl  = v => /^https?:\/\//i.test(v || "");
+    const isPdf  = v => /\.pdf($|\?)/i.test(v || "");
+    const getYouTubeId = (u = "") => { try { const m = u.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : ""; } catch { return ""; } };
 
     // load contents
-    const contents = [];
-    const csnap = await getDocs(
-      query(
-        collection(
-          db,
-          "courses",
-          courseId,
-          "chapters",
-          chId,
-          "lessons",
-          lessonId,
-          "contents"
-        ),
-        orderBy("order", "asc")
-      )
-    );
-    csnap.forEach((d) => contents.push({ id: d.id, ...d.data() }));
-    const contentsResolved = await Promise.all(
-      contents.map(async (b) => ({
-        ...b,
-        url: await resolveMediaUrl(b.url || ""),
-      }))
-    );
-
-    // ✅ normalize quiz object (may be null)
-    const quizObj = quiz
-      ? {
-          title: quiz.title || "Quiz",
-          shuffle: !!quiz.shuffle,
-          passPct: Number(quiz.passPct ?? 55),
-          questions: questions || [],
-        }
-      : null;
-    const qsnap = await getDocs(
-      collection(
-        db,
-        "courses",
-        courseId,
-        "chapters",
-        chId,
-        "lessons",
-        lessonId,
-        "quizzes"
-      )
-    );
-    qsnap.forEach((qd) => {
-      if (!quiz) quiz = { id: qd.id, ...qd.data() };
-    });
-    if (quiz) {
-      const qsn = await getDocs(
-        collection(
-          db,
-          "courses",
-          courseId,
-          "chapters",
-          chId,
-          "lessons",
-          lessonId,
-          "quizzes",
-          quiz.id,
-          "questions"
-        )
-      );
-      qsn.forEach((d) => questions.push({ id: d.id, ...d.data() }));
-      quiz.questions = questions;
-    }
+    const items = [];
+    const csnap = await getDocs(query(collection(db,"courses",courseId,"chapters",chId,"lessons",lessonId,"contents"), orderBy("order","asc")));
+    csnap.forEach(d => items.push({ id:d.id, ...(d.data()||{}) }));
+    const contentsResolved = await Promise.all(items.map(async b => ({ ...b, url: await resolveMediaUrl(b.url || "") })));
 
     // header + shells
     const readingHtml = (() => {
@@ -3986,33 +3770,27 @@ async function renderCourseDetail(courseId, lessonId = null) {
       if (isUrl(r) && isPdf(r)) {
         return `<p style="margin:.5rem 0"><a class="btn small" href="${r}" target="_blank" rel="noopener">Open handout (PDF)</a></p>`;
       }
-      const safe = escapeHtml(String(r)).replace(/\n/g, "<br>");
+      const safe = escapeHtml(String(r)).replace(/\n/g,"<br>");
       return `<div class="card"><div class="reading">${safe}</div></div>`;
     })();
 
-    // --- build header FIRST, then query children safely ---
     main.innerHTML = `
-        <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
-            <div class="progress-bar"><span style="width:0%"></span></div>
-            <div class="progress-text muted"></div>
-          </div>
+      <div id="courseProgress" class="progress-wrap" style="margin:.5rem 0 1rem">
+        <div class="progress-bar"><span style="width:0%"></span></div>
+        <div class="progress-text muted"></div>
+      </div>
 
-        <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
-          <h3 style="margin:0">${L.title || "Lesson"}</h3>
-          <div class="row" style="gap:.5rem;align-items:center">
-            <div id="certBtns"></div>   <!-- 👈 certificate/transcript buttons will appear here -->
-            <button class="btn ghost" ${
-              prev ? "" : "disabled"
-            } data-nav="prev">← Prev</button>
-            <button class="btn" ${
-              next ? "" : "disabled"
-            } data-nav="next" id="btnNext">Next →</button>
-          </div>
+      <div class="row" style="justify-content:space-between;align-items:center; gap:.5rem;">
+        <h3 style="margin:0">${L.title || "Lesson"}</h3>
+        <div class="row" style="gap:.5rem;align-items:center">
+          <div id="certBtns"></div>
+          <button class="btn ghost" ${prev ? "" : "disabled"} data-nav="prev">← Prev</button>
+          <button class="btn" ${next ? "" : "disabled"} data-nav="next" id="btnNext">Next →</button>
         </div>
+      </div>
 
       ${readingHtml}
 
-    
       <div class="row" style="gap:.5rem; margin:.25rem 0 1rem">
         <button class="btn small" id="btnMarkDone">Mark lesson complete</button>
         <span class="muted" id="markMsg"></span>
@@ -4020,443 +3798,229 @@ async function renderCourseDetail(courseId, lessonId = null) {
 
       <div id="lessonBlocks" class="stack" style="margin-top:.5rem"></div>
 
-      ${
-        quiz
-          ? `<div class="card" id="quizCard">
-              <strong id="quizTitle">Quiz</strong>
-              <p class="muted" id="quizMeta"></p>
-              <div class="row" style="gap:.5rem;flex-wrap:wrap">
-                <button class="btn" id="btnStartQuiz">Start Quiz</button>
-                <span id="quizResult" class="muted"></span>
-              </div>
-              <div id="quizHost" style="margin-top:.5rem"></div>
-            </div>`
-          : ``
-      }
+      <div class="card" id="quizCard" style="display:none">
+        <strong id="quizTitle">Quiz</strong>
+        <p class="muted" id="quizMeta"></p>
+        <div class="row" style="gap:.5rem;flex-wrap:wrap">
+          <button class="btn" id="btnStartQuiz">Start Quiz</button>
+          <span id="quizResult" class="muted"></span>
+        </div>
+        <div id="quizHost" style="margin-top:.5rem"></div>
+      </div>
     `;
 
+    // next gating (disable unless finished)
     const btnNext = document.getElementById("btnNext");
+    const isDone  = !!progress[lessonId];
+    if (btnNext) btnNext.disabled = !isDone;
 
-    // အခုသင်ကြည့်နေတဲ့ lesson ပြီးပြီလား?
-    const isDone = !!progress[lessonId];
-    if (btnNext) btnNext.disabled = !isDone; // ❗ Quiz မပတ်လဲ မဖြတ်လမ်းနိုင်အောင်
+    // nav
+    main.querySelector('[data-nav="prev"]')?.addEventListener("click", () => prev && (location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`));
+    main.querySelector('[data-nav="next"]')?.addEventListener("click", () => next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`));
 
-    // nav buttons (ရှိပြီးသား code)
-    btnNext?.addEventListener(
-      "click",
-      () =>
-        next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
-    );
-
-    // --- only after innerHTML is set, resolve nodes ---
+    // resolve lessonBlocks ONCE (no duplicate const)
     const lessonBlocks = main.querySelector("#lessonBlocks");
-    if (!lessonBlocks) {
-      console.warn(
-        "[reader] #lessonBlocks not found; aborting render to avoid null error"
-      );
-      return;
-    }
+    if (!lessonBlocks) { console.warn("[reader] #lessonBlocks not found; abort"); return; }
 
-    // (optional) inline PDF preview
+    // inline PDF preview (optional)
     if (isUrl(L.reading) && isPdf(L.reading)) {
-      main.insertAdjacentHTML(
-        "beforeend",
-        `
+      main.insertAdjacentHTML("beforeend", `
         <div class="card" style="margin-top:.5rem">
           <div style="position:relative;padding-bottom:130%;height:0;overflow:hidden;border-radius:12px">
             <iframe src="${L.reading}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
           </div>
         </div>
-      `
-      );
+      `);
     }
 
-    // --- render contents (Hybrid first; fallback legacy) ---
+    // render blocks
     try {
-      const lessonBlocks = document.getElementById("lessonBlocks");
-      if (!lessonBlocks) return;
+      const blocks = contentsResolved.slice().sort((a,b)=>(a.order||0)-(b.order||0));
+      const hybridTypes = new Set(["hero","h1","h2","tip","pauseblock","protip","nerdnote","list","downloads","code","html"]);
+      const isHybrid = blocks.some(b => hybridTypes.has(String(b.type||"").toLowerCase()));
 
-      const blocks = contentsResolved
-        .slice()
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-      const hybridTypes = new Set([
-        "hero",
-        "h1",
-        "h2",
-        "tip",
-        "pauseblock",
-        "protip",
-        "nerdnote",
-        "list",
-        "downloads",
-        "code",
-        "html",
-      ]);
-      const isHybrid = blocks.some((b) =>
-        hybridTypes.has(String(b.type || "").toLowerCase())
-      );
-
-      lessonBlocks.innerHTML = ""; // clear once
-
-      if (
-        isHybrid &&
-        window.LessonUI &&
-        typeof window.LessonUI.render === "function"
-      ) {
+      lessonBlocks.innerHTML = "";
+      if (isHybrid && window.LessonUI && typeof window.LessonUI.render === "function") {
         window.LessonUI.render(lessonBlocks, blocks);
       } else {
-        lessonBlocks.innerHTML = blocks
-          .map((b) => {
-            const cap = b.caption
-              ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(
-                  b.caption
-                )}</div>`
-              : "";
-            const u = b.url || "";
-            const t = (b.type || "").toLowerCase();
-            const yid = getYouTubeId(u);
-            if (t === "youtube" || yid) {
-              const id = yid || "";
-              return `<div class="card">
+        lessonBlocks.innerHTML = blocks.map(b => {
+          const cap = b.caption ? `<div class="muted" style="margin:.25rem 0 0">${escapeHtml(b.caption)}</div>` : "";
+          const u = b.url || "";
+          const t = (b.type || "").toLowerCase();
+          const yid = getYouTubeId(u);
+          if (t === "youtube" || yid) {
+            const id = yid || "";
+            return `<div class="card">
               <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px">
                 <iframe src="https://www.youtube.com/embed/${id}" allowfullscreen
                   style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"></iframe>
               </div>${cap}
             </div>`;
+          }
+          switch (t) {
+            case "video":
+              return `<div class="card ${b.class||""}" id="${b.id||""}">
+                        <video src="${u}" controls style="width:100%;border-radius:12px"></video>${cap}
+                      </div>`;
+            case "audio":
+              return `<div class="card ${b.class||""}" id="${b.id||""}">
+                        <audio src="${u}" controls style="width:100%"></audio>${cap}
+                      </div>`;
+            case "image":
+              return `<div class="card ${b.class||""}" id="${b.id||""}">
+                        <img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />${cap}
+                      </div>`;
+            case "html":
+              return `<div class="card ${b.class||""}" id="${b.id||""}">${b.html||""}${cap}</div>`;
+            case "text":
+            default: {
+              const raw = String(b.text || "");
+              let tmp = raw.replace(/<br\s*\/?>/gi, "__BR__");
+              tmp = tmp.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+              tmp = tmp.replace(/\r?\n/g,"__BR__");
+              const safeHtml = tmp.replace(/__BR__/g,"<br>");
+              return `<div class="card ${b.class||""}" id="${b.id||""}">${safeHtml}${cap}</div>`;
             }
-            switch (t) {
-              case "video":
-                return `
-                  <div class="card ${b.class || ""}" id="${b.id || ""}">
-                    <video src="${u}" controls style="width:100%;border-radius:12px"></video>
-                    ${cap}
-                  </div>
-                `;
-
-              case "audio":
-                return `
-                  <div class="card ${b.class || ""}" id="${b.id || ""}">
-                    <audio src="${u}" controls style="width:100%"></audio>
-                    ${cap}
-                  </div>
-                `;
-
-              case "image":
-                return `
-                  <div class="card ${b.class || ""}" id="${b.id || ""}">
-                    <img src="${u}" alt="" style="max-width:100%;height:auto;border-radius:12px" />
-                    ${cap}
-                  </div>
-                `;
-
-              case "html":
-                return `
-                  <div class="card ${b.class || ""}" id="${b.id || ""}">
-                    ${b.html || ""}
-                    ${cap}
-                  </div>
-                `;
-
-              case "text":
-              default: {
-                // 1) raw text
-                const raw = String(b.text || "");
-
-                // 2) whitelist <br> that author already put (keep them)
-                //    -> နှားထားဖို့ placeholder ထည့်ပြီး နောက်မှပြန်တည်ဆောက်မယ်
-                let tmp = raw.replace(/<br\s*\/?>/gi, "__BR__");
-
-                // 3) now escape everything safely
-                tmp = tmp
-                  .replace(/&/g, "&amp;")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;");
-
-                // 4) convert newlines to <br>
-                tmp = tmp.replace(/\r?\n/g, "__BR__");
-
-                // 5) bring placeholders back to real <br>
-                const safeHtml = tmp.replace(/__BR__/g, "<br>");
-
-                return `
-                    <div class="card ${b.class || ""}" id="${b.id || ""}">
-                      ${safeHtml}
-                      ${cap}
-                    </div>
-                  `;
-              }
-            }
-          })
-          .join("");
+          }
+        }).join("");
       }
-    } catch (e) {
-      console.error("[reader/blocks]", e);
-    }
+    } catch (e) { console.error("[reader/blocks]", e); }
 
-    // helper: set Next button state (gray when disabled, blue when enabled)
+    // helper: next button state
     function setNextState(passed, isLast) {
-      const btnNext = document.getElementById("btnNext");
-      if (!btnNext) return;
-
-      if (isLast) {
-        // နောက်ဆုံးအခန်း—ရောက်ချင်း disabled (မခွင့်ပြု)
-        btnNext.disabled = true;
-        btnNext.classList.remove("primary");
-        btnNext.title = "This is the last lesson";
-        return;
-      }
-
-      btnNext.disabled = !passed; // Quiz မဖြတ်မချင်း မခွင့်ပြု
-      btnNext.classList.toggle("primary", !!passed); // passed => ပြာရောင်
-      btnNext.title = passed ? "" : "Complete the quiz to proceed";
+      const btn = document.getElementById("btnNext");
+      if (!btn) return;
+      if (isLast) { btn.disabled = true; btn.classList.remove("primary"); btn.title = "This is the last lesson"; return; }
+      btn.disabled = !passed;
+      btn.classList.toggle("primary", !!passed);
+      btn.title = passed ? "" : "Complete the quiz to proceed";
     }
 
-    // … header DOM တင်ပြီးနောက် (prev/next တွေတွက်ပြီး) —
+    async function saveAttempt({ uid, courseId, chapterId, lessonId, pct, passed }) {
+      try {
+        await addDoc(collection(db, "users", uid, "attempts"), {
+          userId: uid, courseId, chapterId, lessonId,
+          pct: Math.max(0, Math.min(100, Number(pct)||0)),
+          passed: !!passed,
+          ts: serverTimestamp(),
+        });
+      } catch (e) { console.warn("[attempts] save failed", e); }
+    }
+
+    async function getCourseAverage(uid, courseId) {
+      const q = query(collection(db, "users", uid, "attempts"), where("courseId","==",courseId));
+      const snap = await getDocs(q);
+      if (snap.empty) return { avg: 0, count: 0 };
+      let sum = 0, n = 0;
+      snap.forEach(d => { const x = d.data(); if (x && typeof x.pct === "number") { sum += x.pct; n++; } });
+      return { avg: n ? (sum/n) : 0, count: n };
+    }
+
     const isLastLesson = !next || !next.lsId;
     setNextState(!!progress[lessonId], isLastLesson);
+    updateProgressUI(main, progress, totalCount);
 
-    // ✦ normalize: JSON / Firestore မတူရောရင်လည်း အလွယ်တကူသုံးဖို့
-    function normalizeQuiz(raw) {
-      if (!raw) return null;
-      const q = {
-        id: raw.id || "",
-        title: raw.title || "Quiz",
-        shuffle: !!raw.shuffle,
-        passPct: Number(raw.passPct ?? 55),
-        questions: Array.isArray(raw.questions)
-          ? raw.questions.map((x) => ({
-              id: x.id || "",
-              type:
-                (x.type || "").toLowerCase() ||
-                (Array.isArray(x.answerIndex) ? "mcq" : "scq"),
-              text: x.text || "",
-              choices: Array.isArray(x.choices) ? x.choices.slice() : [],
-              answerIndex: Array.isArray(x.answerIndex)
-                ? x.answerIndex.slice()
-                : typeof x.answerIndex === "number"
-                ? x.answerIndex
-                : null,
-              points: Number(x.points || 1),
-              feedback: x.feedback || null,
-              accept: Array.isArray(x.accept) ? x.accept.slice() : null,
-            }))
-          : [],
-      };
-      return q.questions.length ? q : null;
-    }
-
-    // ✦ fallback (A): lesson doc ထဲမှာ quiz inline ရှိရင်
-    function getFallbackQuizFromLessonDoc(L) {
-      // support L.quiz or L.quizJson
-      if (L && L.quiz && Array.isArray(L.quiz.questions)) {
-        return normalizeQuiz(L.quiz);
+    document.getElementById("btnMarkDone")?.addEventListener("click", async () => {
+      progress[lessonId] = true;
+      if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
+      updateProgressUI(main, progress, totalCount);
+      const done = Object.values(progress).filter(Boolean).length;
+      if (totalCount > 0 && done >= totalCount) {
+        // inject final + go there
+        const last = chapters[chapters.length - 1];
+        if (!(last.lessons||[]).some(x => x.id === "__final__")) {
+          (last.lessons ||= []).push({ id:"__final__", order:9999, title:"Final Exam", isFinal:true });
+        }
+        location.hash = `#/courses/${courseId}/lesson/__final__`;
+      } else {
+        setNextState(true, isLastLesson);
       }
-      if (L && L.quizJson && Array.isArray(L.quizJson.questions)) {
-        return normalizeQuiz(L.quizJson);
-      }
-      return null;
-    }
+    });
 
-    // ✦ fallback (B): lessonsUrl JSON ဖိုင်ကနေ ယူချင်ရင်
-    const ALLOW_URL_FALLBACKS = false;
-    async function getFallbackQuizFromUrl(url) {
-      // if (!quizObj && ALLOW_URL_FALLBACKS) {
-      //   const url = L.lessonsUrl || L.quizUrl || L.srcUrl;
-      //   if (url) {
-      //     quizObj = await getFallbackQuizFromUrl(url);
-      //   }
-      // }
-      try {
-        if (!url) return null;
-        const res = await fetch(url, { cache: "no-cache" });
-        if (!res.ok) return null;
-        const j = await res.json();
-        // support root { quiz: {...} } or quiz ကို root-level ထဲမှာတင်ရှိမှုနှစ်မျိုးလုံး
-        const payload = j.quiz ? j.quiz : j;
-        return normalizeQuiz(payload);
-      } catch {
-        return null;
-      }
-    }
-
-    // --- after you set main.innerHTML (quizHost div already exists) ---
+    // ==== QUIZ LOAD ====
+    const quizCard = document.getElementById("quizCard");
     const startBtn = document.getElementById("btnStartQuiz");
-    const qHost = document.getElementById("quizHost");
+    const qHost    = document.getElementById("quizHost");
 
-    if (startBtn && qHost) {
-      startBtn.onclick = async () => {
-        startBtn.disabled = true;
-        startBtn.textContent = "Loading quiz…";
-
-        // 1) Firestore
-        let quizObj = await loadLessonQuiz(courseId, chId, lessonId);
-
-        // 2) Fallback (A): Lesson doc ထဲက inline quiz
-        if (!quizObj) {
-          quizObj = getFallbackQuizFromLessonDoc(L);
-        }
-
-        // 3) Fallback (B): lessonsUrl JSON (chapters.json/lesson JSON design အသုံးပြုတာနဲ့ကိုက်)
-        if (!quizObj) {
-          // L.lessonsUrl (သို့) L.quizUrl တစ်ခုခုရှိမရှိ စစ်ကြည့်
-          const url = L.lessonsUrl || L.quizUrl || L.srcUrl;
-          if (url) {
-            quizObj = await getFallbackQuizFromUrl(url);
-          }
-        }
-
-        if (!quizObj && ALLOW_URL_FALLBACKS) {
-          const u = L.lessonsUrl || L.quizUrl || L.srcUrl;
-          if (u) quizObj = await getFallbackQuizFromUrl(u);
-        }
-
-        if (!quizObj || !quizObj.questions?.length) {
-          qHost.innerHTML = `<div class="muted">This lesson has no quiz yet.</div>`;
-          startBtn.disabled = true;
-          startBtn.textContent = "No quiz";
-          return;
-        }
-
-        // header meta update
-        const ttl = document.getElementById("quizTitle");
-        const meta = document.getElementById("quizMeta");
-        if (ttl) ttl.textContent = quizObj.title || "Quiz";
-        if (meta)
-          meta.textContent = `${quizObj.questions.length} questions · Pass ${Number(quizObj.passPct ?? 55)}%`;
-
-        // pass-on complete callback
-        quizObj.onSubmit = async ({ passed }) => {
-          if (!passed) return;
-
-          // save progress
-          progress[lessonId] = true;
-          if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
-          updateProgressUI(main, progress, totalCount);
-
-          // Next button
-          const isLastLesson = !next || !next.lsId;
-          setNextState(true, isLastLesson);
-
-          // အားလုံးပြီးပြီလား?
-          const done = Object.values(progress).filter(Boolean).length;
-          const allDone = totalCount > 0 && done >= totalCount;
-
-          if (allDone) {
-            // Quiz UI lock
-            const qHost = document.getElementById("quizHost");
-            disableQuizUI(qHost);
-
-            // header cert buttons refresh
-            await showCertButtonsIfEligible(courseId, enrRef);
-
-            // modal ပြ
-            showCongratsModal();
-          }
-        };
-
-        // render!
-        renderQuizUI(qHost, quizObj);
-
-        startBtn.disabled = false;
-        startBtn.textContent = "Restart";
-      };
-    }
-
-    // === (B) Read lesson quiz+questions from Firestore ===
+    // read quiz from Firestore
     async function loadLessonQuiz(courseId, chId, lessonId) {
-      const quizCol = collection(
-        db,
-        "courses",
-        courseId,
-        "chapters",
-        chId,
-        "lessons",
-        lessonId,
-        "quizzes"
-      );
+      const quizCol = collection(db,"courses",courseId,"chapters",chId,"lessons",lessonId,"quizzes");
       const qsnap = await getDocs(quizCol);
       if (qsnap.empty) return null;
 
       const qdoc = qsnap.docs[0];
       const qdata = qdoc.data() || {};
 
-      const qsnCol = collection(
-        db,
-        "courses",
-        courseId,
-        "chapters",
-        chId,
-        "lessons",
-        lessonId,
-        "quizzes",
-        qdoc.id,
-        "questions"
-      );
+      const qsnCol  = collection(db,"courses",courseId,"chapters",chId,"lessons",lessonId,"quizzes",qdoc.id,"questions");
       const qsnSnap = await getDocs(qsnCol);
-      const questions = qsnSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() || {}),
-      }));
+      const questions = qsnSnap.docs.map(d => ({ id: d.id, ...(d.data()||{}) }));
 
-      return {
-        id: qdoc.id,
-        title: qdata.title || "Quiz",
-        shuffle: !!qdata.shuffle,
-        passPct: Number(qdata.passPct ?? 55),
-        questions,
+      return { id:qdoc.id, title:qdata.title||"Quiz", shuffle:!!qdata.shuffle, passPct:Number(qdata.passPct ?? 55), questions };
+    }
+
+    const quizObj = await loadLessonQuiz(courseId, chId, lessonId);
+    if (quizObj && quizObj.questions?.length) {
+      quizCard.style.display = "";
+      const ttl  = document.getElementById("quizTitle");
+      const meta = document.getElementById("quizMeta");
+      if (ttl)  ttl.textContent  = quizObj.title || "Quiz";
+      if (meta) meta.textContent = `${quizObj.questions.length} questions · Pass ${Number(quizObj.passPct ?? 55)}%`;
+
+      startBtn.onclick = async () => {
+        startBtn.disabled = true;
+        startBtn.textContent = "Loading quiz…";
+
+        // wire submit callback (renderQuizUI implementation already in your app)
+        quizObj.onSubmit = async ({ passed, pct }) => {
+          const scorePct = Math.max(0, Math.min(100, Number(pct ?? 0)));
+          const uid = auth.currentUser?.uid;
+          if (uid) await saveAttempt({ uid, courseId, chapterId: chId, lessonId, pct: scorePct, passed: !!passed });
+
+          if (!passed) return;
+
+          // mark lesson done
+          progress[lessonId] = true;
+          if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
+          updateProgressUI(main, progress, totalCount);
+          setNextState(true, isLastLesson);
+
+          // if all done → certificate gating by course average
+          const done = Object.values(progress).filter(Boolean).length;
+          const allDone = totalCount > 0 && done >= totalCount;
+          if (allDone) {
+            let needed = Number(quizObj.passPct ?? 0);
+            if (!needed || Number.isNaN(needed)) {
+              try {
+                const cs = await getDoc(doc(db, "courses", courseId));
+                if (cs.exists()) needed = Number(cs.data().passPct ?? 65);
+              } catch {}
+            }
+            if (!needed || Number.isNaN(needed)) needed = 65;
+
+            let allowCert = false;
+            if (uid) {
+              const { avg } = await getCourseAverage(uid, courseId);
+              allowCert = avg >= needed;
+              const meta = document.getElementById("quizMeta");
+              if (meta) meta.textContent += ` · Avg ${Math.round(avg)}% (Need ${needed}%)`;
+            }
+
+            const certWrap = document.getElementById("certBtns"); // ✅ id fixed
+            if (certWrap) certWrap.style.display = allowCert ? "" : "none";
+            if (allowCert) await showCertButtonsIfEligible?.(courseId, enrRef);
+            showCongratsModal();
+          }
+        };
+
+        renderQuizUI(qHost, quizObj);
+        startBtn.disabled = false;
+        startBtn.textContent = "Restart";
       };
+    } else {
+      // no quiz
+      quizCard.style.display = "none";
     }
 
-    async function afterLessonCompleted() {
-      // 1) save progress already done (you do this today)
-      // 2) if now all done -> inject final + rerender sidebar + maybe auto-nav
-
-      const done = Object.values(progress).filter(Boolean).length;
-      if (totalCount > 0 && done >= totalCount) {
-        ensureFinalInjected(chapters);
-        const flat2 = renderSidebarAndFlatList(courseId, chapters, lessonId);
-
-        // if user is currently at the last normal lesson and there was no "next" before,
-        // navigate to Final Exam directly
-        const i = flat2.findIndex((x) => x.lsId === lessonId);
-        const next = i >= 0 ? flat2[i + 1] : null;
-        if (next && next.lsId === "__final__") {
-          location.hash = `#/courses/${courseId}/lesson/__final__`;
-        }
-      }
-    }
-
-    console.log("[debug] contentsResolved", contentsResolved);
-    console.log("[debug] render blocks count =", contentsResolved.length);
-
-    // nav buttons
-    main
-      .querySelector('[data-nav="prev"]')
-      ?.addEventListener(
-        "click",
-        () =>
-          prev && (location.hash = `#/courses/${courseId}/lesson/${prev.lsId}`)
-      );
-    main
-      .querySelector('[data-nav="next"]')
-      ?.addEventListener(
-        "click",
-        () =>
-          next && (location.hash = `#/courses/${courseId}/lesson/${next.lsId}`)
-      );
-
-    // mark manual complete
-    document
-      .getElementById("btnMarkDone")
-      ?.addEventListener("click", async () => {
-        progress[lessonId] = true;
-        if (enrRef) await setDoc(enrRef, { progress }, { merge: true });
-        updateProgressUI(main, progress, totalCount);
-        await afterLessonCompleted(); // 👈 here
-      });
-
-    // initial progress render
-    updateProgressUI(main, progress, totalCount);
   } catch (e) {
     console.error("[reader]", e);
     main.innerHTML = `<div class="card error">Failed to load lesson.</div>`;
@@ -4528,7 +4092,7 @@ function renderQuizUI(host, quiz) {
   if (!host) return;
   host.innerHTML = "";
 
-  // shallow clone to preserve original quiz
+  // shallow clone
   const qz = {
     title: quiz.title || "Quiz",
     passPct: Number(quiz.passPct ?? 55),
@@ -4541,67 +4105,98 @@ function renderQuizUI(host, quiz) {
   const esc = (s) =>
     String(s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 
+  // id/name → CSS-safe
+  const safeId = (s) => String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_\-:.]/gi, "_");
+
   const normalizeType = (t) => {
     const x = String(t || "").trim().toLowerCase();
     if (x === "mc" || x === "multi" || x === "checkbox") return "mcq";
-    if (x === "sc" || x === "single" || x === "radio") return "scq";
-    if (x === "sa" || x === "short" || x === "text") return "short";
-    if (x === "mcq" || x === "scq") return x;
-    return "scq"; // default
+    if (x === "sc" || x === "single" || x === "radio")   return "scq";
+    if (x === "sa" || x === "short"  || x === "text")    return "short";
+    if (x === "mcq" || x === "scq" || x === "short")     return x;
+    return "scq";
   };
 
-  const isMulti = (q) =>
-    q.type === "mcq" ||
+  // multi 判定 (import မှာ answerIndex ကို array ထားမိတာပါပဲဆိုলেও စိစစ်ပေး)
+  const looksMulti = (q) =>
+    String(q.type||"").toLowerCase()==="mcq" ||
     q.multiple === true ||
     q.multi === true ||
-    (Array.isArray(q.answerIndexes) && q.answerIndexes.length > 0);
+    Array.isArray(q.answerIndexes) ||
+    (Array.isArray(q.answerIndex) && q.answerIndex.length > 1);
 
-  const isShort = (q) => q.type === "short";
+  const isShort = (q) => String(q.type||"").toLowerCase()==="short";
 
   // ===== normalize each question =====
   const normQ = (q) => {
     const type = normalizeType(q.type);
 
-    // normalize choices
+    // choices
     const rawChoices = Array.isArray(q.choices) ? q.choices : [];
     const choices = rawChoices.map((c) => {
       if (c && typeof c === "object") {
         return {
           text: String(c.text ?? "").trim(),
-          img: String(c.img || c.image || c.imageUrl || "").trim(),
-          alt: String(c.alt || c.imageAlt || "").trim(),
+          img:  String(c.img || c.image || c.imageUrl || "").trim(),
+          alt:  String(c.alt || c.imageAlt || "").trim(),
         };
       }
       return { text: String(c ?? "").trim(), img: "", alt: "" };
     });
 
     const nq = {
-      id: q.id || crypto.randomUUID?.() || String(Date.now()),
+      id: q.id || (crypto.randomUUID?.() || ("q_" + Date.now() + "_" + Math.random().toString(36).slice(2))),
       type, // "mcq" | "scq" | "short"
       text: String(q.text || "").trim(),
-      // question-level image
       img: String(q.img || q.image || q.imageUrl || "").trim(),
       imgAlt: String(q.imgAlt || q.imageAlt || "").trim(),
       imgCaption: String(q.imgCaption || q.caption || "").trim(),
 
       choices,
-      // answers
-      answerIndex: typeof q.answerIndex === "number" ? q.answerIndex : null,
-      answerIndexes: Array.isArray(q.answerIndexes) ? q.answerIndexes : null,
 
-      acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : null,
+      // keys (raw)
+      answerIndex:   (typeof q.answerIndex === "number") ? Number(q.answerIndex) : null,
+      answerIndexes: Array.isArray(q.answerIndexes) ? q.answerIndexes.map(Number) : null,
+
+      // SA keys (fallback accept -> acceptedAnswers)
+      acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.map(s=>String(s).trim())
+                        : Array.isArray(q.accept) ? q.accept.map(s=>String(s).trim())
+                        : null,
       caseInsensitive: !!q.caseInsensitive,
 
       feedback: q.feedback || null,
       points: Number.isFinite(q.points) ? Number(q.points) : 1,
-      multi: false, // will fill after
+      multi: false, // fill after
     };
 
-    // decide multi after normalization
-    nq.multi = isMulti(nq);
+    // ---- robust fallbacks
+    if (type === "mcq") {
+      // if importer သိမ်းခါစမှာ answerIndex ကို array ထားမိတဲ့ကိစ္စကို ယူပေး
+      if (!nq.answerIndexes) {
+        if (Array.isArray(q.answerIndex)) {
+          nq.answerIndexes = q.answerIndex.map(Number);
+        } else if (typeof q.answerIndex === "number") {
+          // single index mistakenly given for mcq → still accept as one-correct multi
+          nq.answerIndexes = [Number(q.answerIndex)];
+        }
+      }
+    } else if (type === "scq") {
+      // sometimes a scq may be saved as answerIndexes:[n] → take first
+      if (nq.answerIndex == null && Array.isArray(q.answerIndexes) && q.answerIndexes.length) {
+        nq.answerIndex = Number(q.answerIndexes[0]);
+      }
+    } else if (type === "short") {
+      // ensure list exists (even empty)
+      if (!Array.isArray(nq.acceptedAnswers)) nq.acceptedAnswers = [];
+    }
 
-    // 🔎 DEBUG
-    console.log("[quiz normalize]", { id: nq.id, type: nq.type, multi: nq.multi, choices: nq.choices.length, nq });
+    // final multi flag
+    nq.multi = (type === "mcq") || looksMulti(nq);
+
+    // DEBUG
+    console.debug("[quiz normalize]", { id: nq.id, type: nq.type, multi: nq.multi, choices: nq.choices.length, nq });
 
     return nq;
   };
@@ -4630,10 +4225,12 @@ function renderQuizUI(host, quiz) {
 
   const choiceHTML = (q, i) => {
     const c = q.choices[i] || { text: "" };
-    const id = `${safeId(q.id)}__c__${i}`;
+    const base = safeId(q.id);
+    const name = base;
+    const id   = `${base}__c__${i}`;
     const input = q.multi
-      ? `<input type="checkbox" name="${q.id}" value="${i}" id="${id}">`
-      : `<input type="radio"    name="${q.id}" value="${i}" id="${id}">`;
+      ? `<input type="checkbox" name="${name}[]" value="${i}" id="${id}">`
+      : `<input type="radio"    name="${name}"    value="${i}" id="${id}">`;
 
     const thumb = c.img
       ? `<img class="choice-img" src="${esc(c.img)}" alt="${esc(c.alt || c.text || "")}">`
@@ -4650,14 +4247,12 @@ function renderQuizUI(host, quiz) {
   };
 
   function renderOne(q) {
-    // compute
     const isShortQ   = isShort(q);
     const isMultiQ   = !!q.multi;
     const choicesCls = isShortQ ? "short" : (isMultiQ ? "mcq" : "scq");
     const prevDisabled = (state.idx === 0) ? "disabled" : "";
     const nextLabel    = (state.idx < qs.length - 1) ? "Next →" : "✅ Submit";
 
-    // build controls
     let controls = "";
     if (isShortQ) {
       controls = `<input class="short-input" id="${safeId(q.id)}__short" placeholder="Type your answer">`;
@@ -4665,8 +4260,7 @@ function renderQuizUI(host, quiz) {
       controls = (q.choices || []).map((_, i) => choiceHTML(q, i)).join("");
     }
 
-    // render (ONE bottom nav only)
-    const html = `
+    host.innerHTML = `
       <div class="quiz-card">
         <div class="q-text">
           <div class="q-title">${esc(q.text)}</div>
@@ -4681,14 +4275,16 @@ function renderQuizUI(host, quiz) {
         </div>
       </div>
     `;
-    host.innerHTML = html;
 
-    // restore selection (no optional chaining on LHS)
+    // restore selection
     if (!isShortQ) {
       const prevVal = state.answers.get(q.id);
       const arr = Array.isArray(prevVal) ? prevVal : (prevVal != null ? [prevVal] : []);
+      const name = safeId(q.id);
       arr.forEach((v) => {
-        const el = host.querySelector(`input[name="${q.id}"][value="${v}"]`);
+        const el =
+          host.querySelector(`input[name="${name}[]"][value="${v}"]`) ||
+          host.querySelector(`input[name="${name}"][value="${v}"]`);
         if (el) el.checked = true;
       });
     } else {
@@ -4717,10 +4313,8 @@ function renderQuizUI(host, quiz) {
       }
     };
 
-    const btnPrev = host.querySelector("#btnPrev");
-    const btnNext = host.querySelector("#btnNext");
-    if (btnPrev) btnPrev.addEventListener("click", goPrev);
-    if (btnNext) btnNext.addEventListener("click", goNext);
+    host.querySelector("#btnPrev")?.addEventListener("click", goPrev);
+    host.querySelector("#btnNext")?.addEventListener("click", goNext);
   }
 
   function saveAnswer(q) {
@@ -4729,33 +4323,35 @@ function renderQuizUI(host, quiz) {
       state.answers.set(q.id, v);
       return;
     }
-    const checked = [...host.querySelectorAll(`input[name="${q.id}"]:checked`)]
-      .map((el) => Number(el.value));
-    if (q.multi) state.answers.set(q.id, checked);
-    else state.answers.set(q.id, checked[0] ?? null);
+    const name = safeId(q.id);
+    const boxes  = [...host.querySelectorAll(`input[name="${name}[]"]:checked`)];
+    const radios = [...host.querySelectorAll(`input[name="${name}"]:checked`)];
+    const picked = boxes.length ? boxes : radios;
+    const values = picked.map((el) => Number(el.value));
 
-    // 🔎 DEBUG
-    console.log("[quiz saveAnswer]", q.id, "=>", state.answers.get(q.id));
+    if (q.multi) state.answers.set(q.id, values);
+    else state.answers.set(q.id, values[0] ?? null);
+
+    console.debug("[quiz saveAnswer]", q.id, "=>", state.answers.get(q.id));
   }
 
   function finish() {
-    // scoring
     let score = 0;
+
     qs.forEach((q) => {
       const got = state.answers.get(q.id);
 
       if (q.type === "short") {
         const ans = String(got || "").trim();
         const key = Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.map(String) : [];
-
         let ok = false;
+
         if (key.length) {
-          // exact match list
           ok = q.caseInsensitive
             ? key.some(k => k.trim().toLowerCase() === ans.toLowerCase())
             : key.some(k => k.trim() === ans);
         } else {
-          // ✅ fallback: answer နေရာဗလာမဟုတ်ရင် မှန်တယ်လို့ယူ
+          // fallback: non-empty = OK
           ok = ans.length > 0;
         }
         if (ok) score += (q.points || 1);
@@ -4763,21 +4359,25 @@ function renderQuizUI(host, quiz) {
       }
 
       if (Array.isArray(q.answerIndexes) && q.answerIndexes.length) {
-        // multi
-        const target = (q.answerIndexes || []).map(Number).sort((a,b)=>a-b);
-        const mine = Array.isArray(got) ? got.slice().sort((a,b)=>a-b) : [];
-        const ok = target.length === mine.length && target.every((v,i)=> v === mine[i]);
+        // MCQ perfect match
+        const target = q.answerIndexes.map(Number).sort((a,b)=>a-b);
+        const mine = Array.isArray(got) ? got.slice().map(Number).sort((a,b)=>a-b) : [];
+        const ok = target.length === mine.length && target.every((v,i)=>v===mine[i]);
         if (ok) score += (q.points || 1);
       } else {
-        // single
-        const ok = (typeof q.answerIndex === "number") && (got === q.answerIndex);
+        // SCQ
+        const ok = (typeof q.answerIndex==="number") && (Number(got)===Number(q.answerIndex));
         if (ok) score += (q.points || 1);
       }
     });
 
     state.score = score;
-    const pct = Math.round((score / state.max) * 100);
-    const passed = pct >= qz.passPct;
+    const pct = state.max ? Math.round((score / state.max) * 100) : 0;
+    const passNeed = Number(qz.passPct ?? 55);
+    const passed = pct >= passNeed;
+
+    // parent callback
+    try { qz.onSubmit?.({ score, pct, passed }); } catch {}
 
     host.innerHTML = `
       <div class="quiz-result card">
@@ -4786,12 +4386,8 @@ function renderQuizUI(host, quiz) {
         <p class="${passed ? "ok" : "bad"}">${passed ? "Passed ✅" : "Try again"}</p>
       </div>
     `;
-
-    // parent callback (သင့် flow မှာ အသုံးပြုချင်ရင်)
-    try { qz.onSubmit?.({ score, pct, passed }); } catch {}
   }
 
-  // kickoff
   if (!qs.length) { host.innerHTML = `<div class="muted">No questions.</div>`; return; }
   renderOne(qs[0]);
 }

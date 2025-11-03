@@ -27,47 +27,67 @@ async function clearSubcollection(pathSegments) {
 }
 
 // SA/SCQ/MCQ — safe question payload (no undefined fields)
-function buildQuestionPayload(q) {
-  const type = String(q.type || '').toLowerCase() || (Array.isArray(q.answerIndex) ? 'mcq' : 'scq');
+// Use these helpers in importer.js before writing to Firestore
+const asNumberArray = v =>
+  Array.isArray(v) ? v.map(n => Number(n)) :
+  (typeof v === 'number' ? [Number(v)] : []);
 
-  // normalize answers
-  let answerIndex = q.answerIndex;
-  if (type === 'scq') {
-    // single → number only
-    if (Array.isArray(answerIndex)) {
-      answerIndex = (answerIndex.length ? Number(answerIndex[0]) : 0);
-    }
-    answerIndex = Number(answerIndex);
-  } else if (type === 'mcq') {
-    // multi → array of numbers
-    answerIndex = Array.isArray(answerIndex) ? answerIndex.map(Number) : [];
-  } else if (type === 'sa') {
-    // SA has no answerIndex, accept[] only
-    answerIndex = undefined;
-  }
+const asStringArray = v =>
+  Array.isArray(v) ? v.map(s => String(s).trim()).filter(Boolean) : [];
+
+// Build clean payload for a question row:
+function buildQuestionPayload(row) {
+  // normalize type
+  const t = String(row.type || '').toLowerCase();
+  let type = (t==='sc'||t==='single'||t==='radio') ? 'scq'
+          : (t==='mc'||t==='multi'||t==='checkbox') ? 'mcq'
+          : (t==='sa'||t==='short'||t==='text') ? 'sa'
+          : (t==='scq'||t==='mcq'||t==='sa') ? t : 'scq';
 
   // choices only for scq/mcq
-  const choices = (type === 'sa')
-    ? undefined
-    : (Array.isArray(q.choices) ? q.choices.slice() : []);
+  const choices = (type === 'sa') ? undefined
+                 : (Array.isArray(row.choices) ? row.choices.slice() : []);
 
-  // feedback optional object/string
-  const feedback = (q.feedback && typeof q.feedback === 'object') || typeof q.feedback === 'string'
-    ? q.feedback
-    : undefined;
+  // answers
+  let answerIndex, answerIndexes, acceptedAnswers;
 
-  const accept = Array.isArray(q.accept) ? q.accept.slice() : undefined;
+  if (type === 'scq') {
+    // accept number OR [number]
+    if (typeof row.answerIndex === 'number') answerIndex = Number(row.answerIndex);
+    else if (Array.isArray(row.answerIndex)) answerIndex = Number(row.answerIndex[0] || 0);
+    else if (Array.isArray(row.answerIndexes)) answerIndex = Number(row.answerIndexes[0] || 0);
+    else answerIndex = 0;
+  }
 
-  return pickDefined({
-    text: q.text || '',
+  if (type === 'mcq') {
+    // prefer array; fallback number→array
+    if (Array.isArray(row.answerIndexes)) answerIndexes = asNumberArray(row.answerIndexes);
+    else if (Array.isArray(row.answerIndex)) answerIndexes = asNumberArray(row.answerIndex);
+    else if (typeof row.answerIndex === 'number') answerIndexes = [Number(row.answerIndex)];
+    else answerIndexes = []; // keep array type
+  }
+
+  if (type === 'sa') {
+    const acc = row.acceptedAnswers ?? row.accept ?? [];
+    acceptedAnswers = asStringArray(acc);
+  }
+
+  const payload = {
     type,
-    choices,          // omitted when undefined
-    answerIndex,      // omitted if undefined
-    accept,           // SA synonyms list (optional)
-    points: Number(q.points ?? 1),
-    feedback
-  });
+    text: String(row.text || ''),
+    points: Number(row.points ?? 1),
+  };
+  if (choices !== undefined) payload.choices = choices;
+  if (answerIndex !== undefined) payload.answerIndex = answerIndex;
+  if (answerIndexes !== undefined) payload.answerIndexes = answerIndexes;  // <-- array kept
+  if (acceptedAnswers !== undefined) payload.acceptedAnswers = acceptedAnswers; // <-- array kept
+  if (type === 'sa') payload.caseInsensitive = Boolean(row.caseInsensitive ?? true);
+
+  return payload;
 }
+
+// Example write:
+await setDoc(doc(qCol), buildQuestionPayload(row), { merge: false });
 
 // Blocks → HTML contents (if your app only renders “contents”)
 function blockToHtmlContent(b, order) {
