@@ -1,8 +1,11 @@
 // importer.js — robust + idempotent import (catalog / chapters / lesson)
 // usage: import { importAnyJson } from './importer.js'
+// import {
+//   setDoc, doc, collection, getDocs, deleteDoc
+// } from "firebase/firestore";
 import {
   setDoc, doc, collection, getDocs, deleteDoc
-} from "firebase/firestore";
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 import { db } from "./firebase.js";
 
 // ---------- helpers ----------
@@ -85,9 +88,6 @@ function buildQuestionPayload(row) {
 
   return payload;
 }
-
-// Example write:
-await setDoc(doc(qCol), buildQuestionPayload(row), { merge: false });
 
 // Blocks → HTML contents (if your app only renders “contents”)
 function blockToHtmlContent(b, order) {
